@@ -1,0 +1,3029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BDSM Scene Contract · Deep & Honey</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: linear-gradient(135deg, #1a0e0e 0%, #2d1a1a 30%, #3d1f1a 60%, #2a1410 100%);
+            font-family: 'Segoe UI', 'Roboto', system-ui, sans-serif;
+            padding: 30px 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+        .floating-particle {
+            position: fixed;
+            pointer-events: none;
+            z-index: 0;
+            font-size: 25px;
+            opacity: 0.08;
+            animation: floatParticle 15s infinite linear;
+        }
+        @keyframes floatParticle {
+            0% { transform: translateY(100vh) rotate(0deg) scale(0.5); opacity: 0; }
+            10% { opacity: 0.15; }
+            90% { opacity: 0.15; }
+            100% { transform: translateY(-100vh) rotate(720deg) scale(1.2); opacity: 0; }
+        }
+        .floating-particle:nth-child(odd) {
+            animation-duration: 18s;
+        }
+        .floating-particle:nth-child(3n) {
+            animation-duration: 22s;
+            font-size: 35px;
+        }
+        .floating-particle:nth-child(5n+2) {
+            animation-duration: 12s;
+            font-size: 18px;
+        }
+
+        .contract-container {
+            max-width: 1200px;
+            width: 100%;
+            background: linear-gradient(145deg, #fcf7f0 0%, #f5ede5 50%, #fcf7f0 100%);
+            box-shadow: 0 25px 60px -8px rgba(60, 20, 20, 0.8), inset 0 0 80px rgba(180, 120, 100, 0.05);
+            border-radius: 28px;
+            padding: 30px 35px;
+            position: relative;
+            border: 1px solid #b8a79b;
+            animation: fadeIn 0.8s ease-out;
+            z-index: 1;
+            margin-top: 10px;
+        }
+        @keyframes fadeIn {
+            0% { opacity: 0; transform: translateY(20px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+        .contract-container::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            border-radius: 30px;
+            background: linear-gradient(135deg, #8f6f5c, #c9a88c, #8f6f5c, #b19787);
+            background-size: 300% 300%;
+            z-index: -1;
+            animation: borderGlow 4s ease-in-out infinite;
+            opacity: 0.4;
+            filter: blur(2px);
+        }
+        @keyframes borderGlow {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        #login-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 8, 12, 0.88);
+            backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+            padding: 20px;
+            animation: fadeIn 0.6s ease-out;
+        }
+        .login-card {
+            background: linear-gradient(145deg, #f3ede7, #f8f0e8);
+            padding: 40px 36px;
+            border-radius: 40px;
+            max-width: 460px;
+            width: 100%;
+            box-shadow: 0 25px 40px -10px #0a080a, inset 0 0 60px rgba(180, 120, 100, 0.05);
+            border: 1px solid #c7b4a6;
+            animation: pulseGlow 3s infinite alternate;
+            position: relative;
+        }
+        .login-card::before {
+            content: '♥';
+            position: absolute;
+            top: -15px;
+            right: -15px;
+            font-size: 40px;
+            color: rgba(180, 120, 100, 0.15);
+            transform: rotate(20deg);
+            animation: floatHeartSmall 4s ease-in-out infinite;
+        }
+        .login-card::after {
+            content: '♥';
+            position: absolute;
+            bottom: -15px;
+            left: -15px;
+            font-size: 50px;
+            color: rgba(180, 120, 100, 0.1);
+            transform: rotate(-15deg);
+            animation: floatHeartSmall 5s ease-in-out infinite reverse;
+        }
+        @keyframes floatHeartSmall {
+            0%, 100% { transform: rotate(20deg) translateY(0); }
+            50% { transform: rotate(25deg) translateY(-10px); }
+        }
+        @keyframes pulseGlow {
+            0% { box-shadow: 0 25px 40px -10px #0a080a, 0 0 40px rgba(180, 120, 100, 0.05); }
+            100% { box-shadow: 0 25px 60px -5px #6f4f3a, 0 0 80px rgba(180, 120, 100, 0.15); }
+        }
+        .login-card h2 {
+            font-size: 26px;
+            font-weight: 400;
+            letter-spacing: 1px;
+            color: #2b1f1a;
+            border-bottom: 1px solid #d4c2b5;
+            padding-bottom: 18px;
+            margin-bottom: 24px;
+            text-align: center;
+            font-family: 'Georgia', serif;
+            position: relative;
+        }
+        .login-card h2::after {
+            content: '♥';
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            color: #b19787;
+            opacity: 0.5;
+            animation: heartBeat 2s ease-in-out infinite;
+        }
+        @keyframes heartBeat {
+            0%, 100% { transform: translateY(-50%) scale(1); }
+            50% { transform: translateY(-50%) scale(1.3); }
+        }
+        .login-card label {
+            display: block;
+            font-size: 15px;
+            font-weight: 500;
+            color: #3f2e27;
+            margin-top: 16px;
+        }
+        .login-card input {
+            width: 100%;
+            padding: 14px 16px;
+            margin-top: 6px;
+            background: white;
+            border: 1px solid #cfbcaf;
+            border-radius: 60px;
+            font-size: 16px;
+            outline: none;
+            transition: 0.3s;
+        }
+        .login-card input:focus {
+            border-color: #8f6f5c;
+            box-shadow: 0 0 0 3px rgba(143, 111, 92, 0.25), 0 0 30px rgba(180, 120, 100, 0.1);
+        }
+        .password-wrapper {
+            position: relative;
+        }
+        .password-wrapper .toggle-eye {
+            position: absolute;
+            right: 18px;
+            top: 50%;
+            transform: translateY(-30%);
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #6f5544;
+            transition: 0.3s;
+        }
+        .password-wrapper .toggle-eye:hover {
+            color: #3f2c22;
+            transform: translateY(-30%) scale(1.1);
+        }
+        .login-card .hint {
+            font-size: 14px;
+            color: #6f5b4d;
+            margin: 6px 0 18px 0;
+            font-style: italic;
+            background: rgba(237, 227, 219, 0.7);
+            padding: 6px 16px;
+            border-radius: 40px;
+            display: inline-block;
+            backdrop-filter: blur(4px);
+        }
+        .login-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #3d2a20, #5a3f31);
+            border: none;
+            color: white;
+            padding: 16px;
+            font-size: 20px;
+            font-weight: 500;
+            border-radius: 60px;
+            margin-top: 18px;
+            cursor: pointer;
+            transition: 0.3s;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+        .login-btn::after {
+            content: '♥';
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            opacity: 0.5;
+            animation: heartBeat 2s ease-in-out infinite;
+        }
+        .login-btn:hover {
+            background: linear-gradient(135deg, #5a3f31, #6f4f3a);
+            transform: scale(1.02);
+            box-shadow: 0 5px 30px rgba(63, 43, 32, 0.4);
+        }
+        .login-error {
+            color: #b13e3e;
+            margin-top: 12px;
+            font-size: 15px;
+            text-align: center;
+        }
+
+        .contract-header {
+            text-align: center;
+            border-bottom: 3px double #b7a094;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            position: relative;
+            padding-top: 10px;
+            min-height: 140px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .contract-header h1 {
+            font-size: 32px;
+            font-weight: 300;
+            letter-spacing: 3px;
+            color: #241b17;
+            font-family: 'Georgia', serif;
+            text-shadow: 0 2px 10px rgba(180, 120, 100, 0.1);
+            margin-top: 5px;
+            padding-right: 170px;
+            padding-left: 10px;
+        }
+        .header-logo {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 3px solid #b19787;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            z-index: 2;
+            background: white;
+            padding: 5px;
+        }
+        .contract-header .sub {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px 30px;
+            margin-top: 10px;
+            font-size: 15px;
+            color: #3f322b;
+            padding-right: 170px;
+        }
+        .contract-header .sub span {
+            background: rgba(235, 225, 217, 0.7);
+            padding: 3px 16px;
+            border-radius: 40px;
+            backdrop-filter: blur(4px);
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .page {
+            margin-bottom: 50px;
+            page-break-after: always;
+            border-bottom: 1px dashed #d8cbc1;
+            padding-bottom: 20px;
+            background: linear-gradient(to bottom, rgba(252, 247, 240, 0.9), rgba(248, 240, 232, 0.9));
+            border-radius: 16px;
+            padding: 20px;
+            transition: all 0.4s ease;
+            position: relative;
+            backdrop-filter: blur(2px);
+        }
+        .page:last-of-type {
+            border-bottom: none;
+            margin-bottom: 20px;
+        }
+        .page:hover {
+            box-shadow: 0 8px 35px rgba(143, 111, 92, 0.2), inset 0 0 60px rgba(180, 120, 100, 0.03);
+            transform: translateY(-2px);
+        }
+        .page::before {
+            content: "✦";
+            position: absolute;
+            top: 10px;
+            right: 30px;
+            font-size: 24px;
+            opacity: 0.06;
+            color: #b19787;
+            pointer-events: none;
+            animation: sparkle 3s ease-in-out infinite;
+        }
+        @keyframes sparkle {
+            0%, 100% { opacity: 0.04; transform: scale(1) rotate(0deg); }
+            50% { opacity: 0.12; transform: scale(1.2) rotate(180deg); }
+        }
+        .section-title {
+            font-size: 22px;
+            font-weight: 400;
+            font-family: 'Georgia', serif;
+            color: #2f1f18;
+            border-left: 6px solid #b19787;
+            padding-left: 16px;
+            margin: 28px 0 16px 0;
+            background: linear-gradient(to right, rgba(177, 151, 135, 0.12), transparent);
+            padding: 10px 16px;
+            border-radius: 0 8px 8px 0;
+            position: relative;
+        }
+        .section-title::after {
+            content: '♥';
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+            color: #b19787;
+            opacity: 0.3;
+            animation: heartBeat 3s ease-in-out infinite;
+        }
+        .sub-title {
+            font-weight: 600;
+            font-size: 18px;
+            margin-top: 24px;
+            margin-bottom: 8px;
+            color: #33241d;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 15px;
+            border-radius: 12px;
+            overflow: hidden;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #cdbcb0;
+            padding: 10px 12px;
+            vertical-align: top;
+            background: rgba(251, 247, 242, 0.8);
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            max-width: 100%;
+            white-space: normal !important;
+            min-width: 60px;
+        }
+        th {
+            background: linear-gradient(135deg, #e7dcd3, #dccfc5);
+            font-weight: 500;
+            text-align: left;
+        }
+        tr:nth-child(even) td {
+            background: rgba(248, 242, 236, 0.8);
+        }
+        td:last-child {
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            white-space: normal !important;
+        }
+        
+        .contract-header .datetime-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+            background: rgba(255, 247, 240, 0.5);
+            padding: 2px 5px 2px 4px;
+            border-radius: 30px;
+            border: 1px solid #dccfc5;
+        }
+        .contract-header .datetime-group input {
+            border: none;
+            border-bottom: 2px solid #ab9587;
+            background: transparent;
+            padding: 2px 0px;
+            font-size: 12px;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            line-height: 1.2;
+            height: 24px;
+            transition: all 0.2s ease;
+            color: #2a1c16;
+            width: 26px !important;
+            min-width: 26px !important;
+            max-width: 26px !important;
+            letter-spacing: 0.2px;
+        }
+        .contract-header .datetime-group input:focus {
+            border-bottom-color: #8f6f5c;
+            outline: none;
+            background: rgba(143, 111, 92, 0.08);
+            border-radius: 3px;
+        }
+        .contract-header .datetime-group .date-sep,
+        .contract-header .datetime-group .time-sep {
+            color: #6f5544;
+            font-weight: 400;
+            font-size: 13px;
+            padding: 0 1px;
+            min-width: 5px;
+            font-family: 'Courier New', monospace;
+        }
+        .contract-header .datetime-group input[placeholder="YYYY"] {
+            width: 36px !important;
+            min-width: 36px !important;
+            max-width: 36px !important;
+        }
+        .contract-header .datetime-group input[placeholder="DD"] {
+            width: 26px !important;
+            min-width: 26px !important;
+            max-width: 26px !important;
+        }
+        .contract-header .datetime-group input[placeholder="MM"] {
+            width: 26px !important;
+            min-width: 26px !important;
+            max-width: 26px !important;
+        }
+        
+        .datetime-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+            background: rgba(255, 247, 240, 0.5);
+            padding: 4px 10px 4px 8px;
+            border-radius: 30px;
+            border: 1px solid #dccfc5;
+        }
+        .datetime-group input {
+            border: none;
+            border-bottom: 2px solid #ab9587;
+            background: transparent;
+            padding: 5px 3px;
+            font-size: 17px;
+            font-weight: 600;
+            font-family: 'Courier New', monospace;
+            text-align: center;
+            line-height: 1.4;
+            height: 38px;
+            transition: all 0.2s ease;
+            color: #2a1c16;
+            letter-spacing: 0.5px;
+            width: 44px !important;
+            min-width: 44px !important;
+            max-width: 44px !important;
+        }
+        .datetime-group input:focus {
+            border-bottom-color: #8f6f5c;
+            outline: none;
+            background: rgba(143, 111, 92, 0.08);
+            border-radius: 3px;
+        }
+        .datetime-group .date-sep,
+        .datetime-group .time-sep {
+            color: #6f5544;
+            font-weight: 600;
+            font-size: 20px;
+            padding: 0 3px;
+            min-width: 12px;
+            text-align: center;
+            font-family: 'Courier New', monospace;
+        }
+        .datetime-group input[placeholder="YYYY"] {
+            width: 60px !important;
+            min-width: 60px !important;
+            max-width: 60px !important;
+        }
+        .datetime-group input[placeholder="HH"] {
+            width: 40px !important;
+            min-width: 40px !important;
+            max-width: 40px !important;
+        }
+        .datetime-group input[placeholder="MM"] {
+            width: 40px !important;
+            min-width: 40px !important;
+            max-width: 40px !important;
+        }
+        .datetime-group input[placeholder="DD"] {
+            width: 44px !important;
+            min-width: 44px !important;
+            max-width: 44px !important;
+        }
+        
+        /* Signatory date inputs - smaller size */
+        .sign-field .datetime-group input {
+            width: 32px !important;
+            min-width: 32px !important;
+            max-width: 32px !important;
+            font-size: 14px;
+            height: 32px;
+            padding: 3px 2px;
+        }
+        .sign-field .datetime-group input[placeholder="YYYY"] {
+            width: 44px !important;
+            min-width: 44px !important;
+            max-width: 44px !important;
+        }
+        .sign-field .datetime-group .date-sep {
+            font-size: 16px;
+            padding: 0 2px;
+            min-width: 8px;
+        }
+        .sign-field .datetime-group {
+            padding: 2px 6px 2px 4px;
+            gap: 2px;
+        }
+        
+        td input[type="text"], 
+        td .inline-input,
+        td input.inline-input {
+            width: 100% !important;
+            min-width: 80px;
+            max-width: 100% !important;
+            transition: all 0.3s ease;
+            border: none;
+            border-bottom: 2px solid #ab9587;
+            background: transparent;
+            padding: 4px 8px;
+            font-size: 14px;
+            word-wrap: break-word !important;
+            overflow-wrap: break-word !important;
+            word-break: break-word !important;
+            box-sizing: border-box !important;
+            display: inline-block;
+            height: auto;
+            white-space: normal !important;
+            resize: horizontal;
+            overflow: hidden;
+        }
+        td input[type="text"]:focus, 
+        td .inline-input:focus {
+            border-bottom-color: #8f6f5c;
+            outline: none;
+            background: rgba(143, 111, 92, 0.06);
+            border-radius: 4px;
+        }
+        td input[type="text"].auto-expand,
+        td .inline-input.auto-expand {
+            width: 100% !important;
+            min-width: 80px;
+            max-width: 100% !important;
+        }
+        
+        .day-finished {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 15px 0 10px 0;
+            padding: 10px 15px;
+            background: rgba(177, 151, 135, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid #b19787;
+            flex-wrap: wrap;
+        }
+        .day-finished label {
+            font-weight: 600;
+            font-size: 16px;
+            color: #3f2c22;
+        }
+        .day-finished select {
+            padding: 6px 15px;
+            border: 2px solid #b19787;
+            border-radius: 30px;
+            background: white;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            outline: none;
+            transition: 0.3s;
+            color: #3f2c22;
+        }
+        .day-finished select:focus {
+            border-color: #8f6f5c;
+            box-shadow: 0 0 0 3px rgba(143, 111, 92, 0.2);
+        }
+        .day-finished .clear-day-btn {
+            padding: 6px 20px;
+            background: #b13e3e;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: 0.3s;
+            margin-left: auto;
+        }
+        .day-finished .clear-day-btn:hover {
+            background: #8f2e2e;
+            transform: scale(1.05);
+        }
+        .checklist-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin: 6px 0;
+            padding: 4px 0;
+            transition: all 0.3s ease;
+            border-radius: 8px;
+        }
+        .checklist-item:hover {
+            background: rgba(177, 151, 135, 0.12);
+            padding-left: 8px;
+            transform: translateX(3px);
+        }
+        .checklist-item input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            margin-top: 2px;
+            accent-color: #8f6f5c;
+            flex-shrink: 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .checklist-item input[type="checkbox"]:hover {
+            transform: scale(1.15);
+        }
+        .checklist-item input[type="checkbox"]:checked {
+            filter: drop-shadow(0 0 5px rgba(143, 111, 92, 0.3));
+        }
+        .checklist-item label {
+            flex: 1;
+        }
+        .sign-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px 40px;
+            margin: 20px 0 10px;
+        }
+        .sign-field {
+            flex: 1 0 200px;
+        }
+        .sign-field input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #cbb9ac;
+            border-radius: 30px;
+            background: white;
+            font-size: 15px;
+            transition: all 0.3s ease;
+        }
+        .sign-field input:focus {
+            border-color: #8f6f5c;
+            box-shadow: 0 0 0 3px rgba(143, 111, 92, 0.2), 0 0 20px rgba(180, 120, 100, 0.05);
+            outline: none;
+        }
+        .sign-field label {
+            display: block;
+            font-weight: 500;
+            font-size: 15px;
+            margin-bottom: 6px;
+            color: #3f2c22;
+        }
+        .inline-input {
+            border: none;
+            border-bottom: 2px solid #ab9587;
+            background: transparent;
+            padding: 4px 8px;
+            font-size: 14px;
+            min-width: 120px;
+            transition: all 0.3s ease;
+            width: auto;
+            max-width: 100%;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .inline-input:focus {
+            border-bottom-color: #8f6f5c;
+            outline: none;
+            background: rgba(143, 111, 92, 0.06);
+            border-radius: 4px;
+        }
+        .note-box {
+            width: 100%;
+            border: 1px solid #d4c2b5;
+            border-radius: 12px;
+            padding: 12px;
+            background: white;
+            resize: vertical;
+            min-height: 60px;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            overflow: auto;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        .note-box:focus {
+            border-color: #8f6f5c;
+            box-shadow: 0 0 0 3px rgba(143, 111, 92, 0.15), 0 0 30px rgba(180, 120, 100, 0.05);
+            outline: none;
+            min-height: 80px;
+        }
+        .debrief-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+        .debrief-grid .full {
+            grid-column: 1 / -1;
+        }
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            justify-content: flex-end;
+            margin: 30px 0 10px;
+            position: relative;
+            z-index: 2;
+        }
+        .btn {
+            background: linear-gradient(135deg, #3f2b20, #5a3f31);
+            border: none;
+            color: white;
+            padding: 12px 32px;
+            border-radius: 50px;
+            font-size: 17px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #6b5242;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(63, 43, 32, 0.2);
+        }
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        .btn:hover::before {
+            opacity: 1;
+        }
+        .btn:hover {
+            background: linear-gradient(135deg, #5a3f31, #6f4f3a);
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 8px 30px rgba(63, 43, 32, 0.4);
+        }
+        .btn:active {
+            transform: scale(0.98);
+        }
+        .btn-outline {
+            background: transparent;
+            color: #3f2b20;
+            border: 1px solid #3f2b20;
+            box-shadow: none;
+        }
+        .btn-outline:hover {
+            background: linear-gradient(135deg, #3f2b20, #5a3f31);
+            color: white;
+        }
+        .footer-note {
+            margin-top: 40px;
+            font-size: 14px;
+            color: #4e3d33;
+            border-top: 1px solid #d4c2b5;
+            padding-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 10px;
+            background: linear-gradient(to right, transparent, rgba(177, 151, 135, 0.06), transparent);
+            padding: 20px;
+            border-radius: 12px;
+        }
+        .confidential {
+            font-weight: 500;
+        }
+        .hidden {
+            display: none !important;
+        }
+        .day-badge {
+            background: linear-gradient(135deg, #dccfc5, #cbb9ac);
+            padding: 2px 18px;
+            border-radius: 30px;
+            font-weight: 400;
+            animation: shimmer 3s infinite;
+            background-size: 200% auto;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% center; }
+            100% { background-position: 200% center; }
+        }
+
+        /* Email modal styles */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 8, 12, 0.85);
+            backdrop-filter: blur(8px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            padding: 20px;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-card {
+            background: #fcf7f0;
+            border-radius: 28px;
+            max-width: 900px;
+            width: 100%;
+            max-height: 90vh;
+            padding: 30px 35px;
+            border: 1px solid #b8a79b;
+            box-shadow: 0 25px 60px rgba(60, 20, 20, 0.6);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            animation: fadeIn 0.4s ease-out;
+        }
+        .modal-card .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #d4c2b5;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .modal-card .modal-header h3 {
+            font-family: 'Georgia', serif;
+            font-weight: 400;
+            color: #2a1c16;
+            font-size: 22px;
+        }
+        .modal-card .modal-close {
+            background: transparent;
+            border: none;
+            font-size: 28px;
+            cursor: pointer;
+            color: #6f5544;
+            transition: 0.3s;
+            padding: 0 10px;
+            line-height: 1;
+        }
+        .modal-card .modal-close:hover {
+            color: #b13e3e;
+            transform: scale(1.1);
+        }
+        .modal-card .modal-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .modal-card .modal-tabs button {
+            padding: 8px 20px;
+            border: 2px solid #b19787;
+            background: transparent;
+            border-radius: 30px;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            transition: 0.3s;
+            color: #3f2c22;
+        }
+        .modal-card .modal-tabs button.active {
+            background: #3f2b20;
+            color: white;
+            border-color: #3f2b20;
+        }
+        .modal-card .modal-tabs button:hover:not(.active) {
+            background: rgba(177, 151, 135, 0.2);
+        }
+        .modal-card .modal-body {
+            flex: 1;
+            overflow-y: auto;
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid #dccfc5;
+            min-height: 300px;
+            max-height: 55vh;
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #1a1a1a;
+        }
+        .modal-card .modal-body.html-body {
+            white-space: normal;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 14px;
+        }
+        .modal-card .modal-body.html-body pre {
+            white-space: pre-wrap;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            background: #f5f0eb;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e0d6ce;
+            overflow-x: auto;
+        }
+        .modal-card .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            padding-top: 15px;
+            border-top: 1px solid #d4c2b5;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .modal-card .modal-footer .btn {
+            padding: 10px 24px;
+            font-size: 15px;
+        }
+        .modal-card .modal-footer .btn-copy {
+            background: #3f2b20;
+        }
+        .modal-card .modal-footer .btn-copy:hover {
+            background: #5a3f31;
+        }
+        .modal-card .modal-footer .btn-close-modal {
+            background: transparent;
+            color: #3f2b20;
+            border: 1px solid #3f2b20;
+        }
+        .modal-card .modal-footer .btn-close-modal:hover {
+            background: #3f2b20;
+            color: white;
+        }
+        .modal-card .modal-footer .btn-email-send {
+            background: #2d6b4a;
+            border-color: #2d6b4a;
+        }
+        .modal-card .modal-footer .btn-email-send:hover {
+            background: #1f5236;
+            border-color: #1f5236;
+        }
+
+        @media print {
+            body { 
+                background: white; 
+                padding: 0; 
+                margin: 0; 
+                margin-top: 0 !important;
+                padding-top: 0 !important;
+            }
+            .contract-container { 
+                box-shadow: none; 
+                border-radius: 0; 
+                padding: 15px 20px; 
+                background: white; 
+                margin-top: 0 !important;
+                padding-top: 10px !important;
+            }
+            .contract-container::before { display: none; }
+            #login-overlay { display: none !important; }
+            .btn-group { display: none; }
+            .day-finished .clear-day-btn { display: none; }
+            .page { 
+                break-inside: avoid; 
+                border-bottom: 1px solid #ccc; 
+                background: white; 
+                box-shadow: none; 
+                transform: none; 
+                margin-bottom: 20px;
+                padding-top: 10px !important;
+                margin-top: 0 !important;
+            }
+            .page:first-of-type {
+                margin-top: 0 !important;
+                padding-top: 5px !important;
+            }
+            .page:hover { box-shadow: none; transform: none; }
+            .page::before { display: none; }
+            .note-box { border: 1px solid #aaa; }
+            .sign-field input { border: 1px solid #888; }
+            .inline-input { border-bottom: 1px solid #888; }
+            .floating-particle { display: none; }
+            td input[type="text"], td .inline-input { border-bottom: 1px solid #888; }
+            .contract-header .sub span { background: rgba(235, 225, 217, 0.5); }
+            .section-title::after { display: none; }
+            .day-badge { animation: none; }
+            .header-logo { 
+                display: block !important;
+                border: 2px solid #666;
+                width: 160px;
+                height: 160px;
+            }
+            .contract-header h1 {
+                padding-right: 170px;
+            }
+            .contract-header .sub {
+                padding-right: 170px;
+            }
+            .contract-header {
+                padding-top: 5px !important;
+                margin-top: 0 !important;
+                min-height: 140px;
+            }
+            td {
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                word-break: break-word !important;
+                white-space: normal !important;
+            }
+            td input[type="text"],
+            td .inline-input {
+                white-space: normal !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                word-break: break-word !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            .datetime-group {
+                border: 1px solid #ccc;
+                background: transparent;
+                padding: 3px 8px;
+            }
+            .datetime-group input {
+                border-bottom: 1px solid #888;
+                font-size: 15px;
+                height: 32px;
+                padding: 3px 2px;
+                width: 40px !important;
+                min-width: 40px !important;
+                max-width: 40px !important;
+            }
+            .datetime-group input[placeholder="YYYY"] {
+                width: 54px !important;
+                min-width: 54px !important;
+                max-width: 54px !important;
+            }
+            .datetime-group input[placeholder="HH"],
+            .datetime-group input[placeholder="MM"] {
+                width: 36px !important;
+                min-width: 36px !important;
+                max-width: 36px !important;
+            }
+            .datetime-group input[placeholder="DD"] {
+                width: 40px !important;
+                min-width: 40px !important;
+                max-width: 40px !important;
+            }
+            .datetime-group .date-sep,
+            .datetime-group .time-sep {
+                font-size: 17px;
+                padding: 0 2px;
+                min-width: 10px;
+            }
+            .sign-field .datetime-group input {
+                width: 30px !important;
+                min-width: 30px !important;
+                max-width: 30px !important;
+                font-size: 13px;
+                height: 28px;
+            }
+            .sign-field .datetime-group input[placeholder="YYYY"] {
+                width: 40px !important;
+                min-width: 40px !important;
+                max-width: 40px !important;
+            }
+            .modal-overlay { display: none !important; }
+        }
+        /* ============================================================ */
+        /* ---------- RESPONSIVE: MOBILE / TABLET / DESKTOP ---------- */
+        /* ============================================================ */
+
+        /* ---------- Global: no horizontal scroll ---------- */
+        html, body {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        /* ---------- Tablet / small laptop (<= 1100px) ---------- */
+        @media (max-width: 1100px) {
+            .contract-container {
+                padding: 26px 22px;
+                border-radius: 24px;
+            }
+            .contract-header h1 {
+                font-size: 26px;
+                letter-spacing: 2px;
+                padding-right: 150px;
+            }
+            .header-logo {
+                width: 130px;
+                height: 130px;
+            }
+            .contract-header .sub {
+                padding-right: 150px;
+            }
+            .section-title {
+                font-size: 20px;
+            }
+            table {
+                font-size: 14px;
+            }
+        }
+
+        /* ---------- Tablet (<= 850px) ---------- */
+        @media (max-width: 850px) {
+            body {
+                padding: 18px 12px;
+                align-items: stretch;
+            }
+            .contract-container {
+                padding: 22px 16px;
+                border-radius: 20px;
+                margin-top: 0;
+            }
+            .contract-header {
+                min-height: auto;
+                padding-top: 0;
+                padding-bottom: 14px;
+                flex-direction: column;
+                align-items: center;
+            }
+            .contract-header h1 {
+                font-size: 20px;
+                letter-spacing: 1.5px;
+                padding-right: 0;
+                padding-left: 0;
+                text-align: center;
+                line-height: 1.35;
+            }
+            .header-logo {
+                position: static;
+                transform: none;
+                width: 100px;
+                height: 100px;
+                margin-bottom: 12px;
+                order: -1;
+            }
+            .contract-header .sub {
+                padding-right: 0;
+                gap: 8px 14px;
+                font-size: 13px;
+                justify-content: center;
+            }
+            .contract-header .sub span {
+                padding: 3px 12px;
+                font-size: 12px;
+            }
+            .section-title {
+                font-size: 17px;
+                padding: 8px 12px;
+                border-left-width: 5px;
+                margin: 22px 0 12px 0;
+            }
+            .sub-title {
+                font-size: 16px;
+                margin-top: 18px;
+            }
+            /* Make tables scroll horizontally inside their container */
+            .page table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                white-space: nowrap;
+                font-size: 13px;
+            }
+            .page table tr {
+                display: table-row;
+            }
+            th, td {
+                padding: 8px 10px;
+                white-space: normal;
+                min-width: 70px;
+            }
+            .sign-row {
+                gap: 14px 20px;
+            }
+            .sign-field {
+                flex: 1 1 calc(50% - 10px);
+            }
+            .page {
+                padding: 16px;
+                border-radius: 12px;
+                margin-bottom: 30px;
+            }
+            .debrief-grid {
+                grid-template-columns: 1fr;
+            }
+            .btn-group {
+                justify-content: center;
+            }
+            .btn {
+                font-size: 15px;
+                padding: 10px 22px;
+            }
+            .footer-note {
+                font-size: 13px;
+                padding: 14px;
+            }
+            /* Modal */
+            .modal-card {
+                padding: 22px 18px;
+                border-radius: 20px;
+            }
+            .modal-card .modal-header h3 {
+                font-size: 18px;
+            }
+            .modal-card .modal-body {
+                max-height: 50vh;
+                font-size: 12px;
+            }
+        }
+
+        /* ---------- Phones (<= 550px) ---------- */
+        @media (max-width: 550px) {
+            body {
+                padding: 10px 6px;
+            }
+            .contract-container {
+                padding: 14px 10px;
+                border-radius: 16px;
+                border-width: 1px;
+            }
+            .contract-container::before {
+                border-radius: 18px;
+            }
+            .contract-header {
+                padding-bottom: 12px;
+                margin-bottom: 18px;
+            }
+            .contract-header h1 {
+                font-size: 15px;
+                letter-spacing: 1px;
+                line-height: 1.4;
+            }
+            .header-logo {
+                width: 80px;
+                height: 80px;
+                margin-bottom: 10px;
+            }
+            .contract-header .sub {
+                font-size: 11px;
+                gap: 6px 10px;
+            }
+            .contract-header .sub span {
+                padding: 2px 10px;
+                font-size: 10px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .section-title {
+                font-size: 14px;
+                padding: 7px 10px;
+                border-left-width: 4px;
+                margin: 18px 0 10px 0;
+            }
+            .section-title::after {
+                font-size: 12px;
+                right: 8px;
+            }
+            .sub-title {
+                font-size: 14px;
+                margin-top: 14px;
+            }
+            h2 {
+                font-size: 15px;
+            }
+            h3 {
+                font-size: 14px;
+            }
+            h4 {
+                font-size: 13px;
+            }
+            p {
+                font-size: 13px;
+                line-height: 1.55;
+            }
+            /* Tables scroll, smaller fonts */
+            .page table {
+                font-size: 11.5px;
+                margin: 10px 0;
+            }
+            th, td {
+                padding: 6px 8px;
+                min-width: 60px;
+                font-size: 11.5px;
+            }
+            /* Sign rows stack on phones */
+            .sign-row {
+                flex-direction: column;
+                gap: 12px;
+                margin: 14px 0 8px;
+            }
+            .sign-field {
+                flex: 1 1 100%;
+                min-width: 0;
+            }
+            .sign-field input {
+                padding: 9px 12px;
+                font-size: 14px;
+                border-radius: 20px;
+            }
+            .sign-field label {
+                font-size: 13px;
+                margin-bottom: 4px;
+            }
+            /* Day finished bar stacks */
+            .day-finished {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+                padding: 10px 12px;
+                margin: 12px 0 8px 0;
+            }
+            .day-finished label {
+                font-size: 14px;
+            }
+            .day-finished select {
+                width: 100%;
+                font-size: 14px;
+                padding: 8px 12px;
+            }
+            .day-finished .clear-day-btn {
+                margin-left: 0;
+                width: 100%;
+                font-size: 13px;
+                padding: 8px 14px;
+            }
+            .day-badge {
+                font-size: 12px;
+                padding: 2px 12px;
+            }
+            /* Page padding */
+            .page {
+                padding: 12px 10px;
+                border-radius: 10px;
+                margin-bottom: 22px;
+            }
+            .page::before {
+                font-size: 18px;
+                right: 14px;
+                top: 8px;
+            }
+            /* Checklist */
+            .checklist-item {
+                gap: 8px;
+                margin: 5px 0;
+                padding: 3px 0;
+                font-size: 12.5px;
+                line-height: 1.5;
+            }
+            .checklist-item input[type="checkbox"] {
+                width: 18px;
+                height: 18px;
+                margin-top: 1px;
+            }
+            /* Inline inputs */
+            .inline-input,
+            td input[type="text"],
+            td .inline-input {
+                font-size: 13px;
+                padding: 4px 6px;
+                min-width: 60px;
+            }
+            /* Note box */
+            .note-box {
+                font-size: 13px;
+                padding: 10px;
+                min-height: 70px;
+                border-radius: 10px;
+            }
+            /* Buttons */
+            .btn-group {
+                gap: 8px;
+                margin: 20px 0 10px;
+                justify-content: stretch;
+            }
+            .btn {
+                font-size: 13px;
+                padding: 10px 16px;
+                flex: 1 1 100%;
+                justify-content: center;
+                min-height: 40px;
+                border-radius: 40px;
+            }
+            /* Footer */
+            .footer-note {
+                font-size: 11.5px;
+                padding: 12px 8px;
+                flex-direction: column;
+                gap: 6px;
+                text-align: center;
+                margin-top: 22px;
+            }
+            /* Login card */
+            #login-overlay {
+                padding: 12px;
+            }
+            .login-card {
+                padding: 26px 20px;
+                border-radius: 24px;
+                max-width: 100%;
+            }
+            .login-card h2 {
+                font-size: 20px;
+                padding-bottom: 14px;
+                margin-bottom: 18px;
+            }
+            .login-card label {
+                font-size: 13px;
+                margin-top: 12px;
+            }
+            .login-card input {
+                padding: 12px 16px;
+                font-size: 16px;
+                border-radius: 40px;
+            }
+            .password-wrapper .toggle-eye {
+                right: 14px;
+                font-size: 18px;
+            }
+            .login-card .hint {
+                font-size: 11.5px;
+                padding: 5px 12px;
+                line-height: 1.5;
+            }
+            .login-btn {
+                padding: 13px;
+                font-size: 16px;
+                margin-top: 14px;
+                border-radius: 40px;
+            }
+            .login-error {
+                font-size: 13px;
+                margin-top: 8px;
+            }
+            /* Email modal */
+            .modal-overlay {
+                padding: 8px;
+            }
+            .modal-card {
+                padding: 16px 12px;
+                border-radius: 16px;
+                max-height: 94vh;
+            }
+            .modal-card .modal-header {
+                padding-bottom: 10px;
+                margin-bottom: 12px;
+            }
+            .modal-card .modal-header h3 {
+                font-size: 15px;
+            }
+            .modal-card .modal-close {
+                font-size: 24px;
+                padding: 0 6px;
+            }
+            .modal-card .modal-tabs {
+                gap: 6px;
+                margin-bottom: 10px;
+            }
+            .modal-card .modal-tabs button {
+                padding: 6px 14px;
+                font-size: 12px;
+                border-radius: 20px;
+            }
+            .modal-card .modal-body {
+                padding: 10px;
+                font-size: 11px;
+                min-height: 200px;
+                max-height: 45vh;
+                border-radius: 8px;
+            }
+            .modal-card .modal-body.html-body {
+                font-size: 12px;
+            }
+            .modal-card .modal-body.html-body pre {
+                font-size: 10.5px;
+                padding: 10px;
+            }
+            .modal-card .modal-footer {
+                gap: 6px;
+                padding-top: 10px;
+                margin-top: 10px;
+            }
+            .modal-card .modal-footer .btn {
+                padding: 8px 12px;
+                font-size: 12px;
+                flex: 1 1 auto;
+                min-height: 36px;
+            }
+            /* Floating particles lighter on phone */
+            .floating-particle {
+                font-size: 16px !important;
+                opacity: 0.05 !important;
+            }
+        }
+
+        /* ---------- Very small phones (<= 380px) ---------- */
+        @media (max-width: 380px) {
+            .contract-header h1 {
+                font-size: 13px;
+            }
+            .header-logo {
+                width: 65px;
+                height: 65px;
+            }
+            .section-title {
+                font-size: 13px;
+                padding: 6px 8px;
+            }
+            .page {
+                padding: 10px 8px;
+            }
+            table,
+            th,
+            td {
+                font-size: 10.5px;
+            }
+            th, td {
+                padding: 5px 6px;
+                min-width: 55px;
+            }
+            .checklist-item {
+                font-size: 11.5px;
+            }
+            .btn {
+                font-size: 12px;
+                padding: 9px 12px;
+            }
+            .login-card h2 {
+                font-size: 18px;
+            }
+            .modal-card .modal-footer .btn {
+                font-size: 11px;
+                padding: 7px 10px;
+            }
+            p {
+                font-size: 12px;
+            }
+        }
+
+        /* ---------- Landscape phones (short height) ---------- */
+        @media (max-height: 520px) and (orientation: landscape) {
+            body {
+                padding: 8px;
+            }
+            .contract-container {
+                padding: 12px 14px;
+                border-radius: 14px;
+            }
+            .contract-header {
+                flex-direction: row;
+                min-height: auto;
+                padding-top: 0;
+                padding-bottom: 10px;
+            }
+            .contract-header h1 {
+                font-size: 16px;
+                padding-right: 100px;
+                text-align: left;
+            }
+            .header-logo {
+                position: absolute;
+                right: 6px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 80px;
+                height: 80px;
+                margin-bottom: 0;
+                order: 0;
+            }
+            .contract-header .sub {
+                padding-right: 100px;
+            }
+            .page {
+                padding: 12px;
+                margin-bottom: 20px;
+            }
+            .section-title {
+                margin: 14px 0 10px 0;
+                padding: 6px 10px;
+                font-size: 14px;
+            }
+            .login-card {
+                padding: 18px 22px;
+                max-height: 95vh;
+                overflow-y: auto;
+                border-radius: 20px;
+            }
+            .login-card h2 {
+                font-size: 18px;
+                padding-bottom: 10px;
+                margin-bottom: 14px;
+            }
+            .modal-card {
+                max-height: 95vh;
+                padding: 14px 18px;
+            }
+            .modal-card .modal-body {
+                max-height: 40vh;
+            }
+            .sign-row {
+                flex-direction: row;
+                gap: 10px 16px;
+            }
+            .sign-field {
+                flex: 1 1 calc(50% - 8px);
+            }
+        }
+
+        /* ---------- Touch device improvements ---------- */
+        @media (hover: none) and (pointer: coarse) {
+            .btn:hover,
+            .login-btn:hover {
+                transform: none;
+            }
+            .btn:active,
+            .login-btn:active {
+                transform: scale(0.98);
+            }
+            .page:hover {
+                box-shadow: none;
+                transform: none;
+            }
+            .checklist-item:hover {
+                background: transparent;
+                padding-left: 0;
+                transform: none;
+            }
+            .checklist-item input[type="checkbox"]:hover {
+                transform: none;
+            }
+            /* Bigger tap targets */
+            .btn {
+                min-height: 42px;
+            }
+            .checklist-item input[type="checkbox"] {
+                min-width: 20px;
+                min-height: 20px;
+            }
+            .day-finished select {
+                min-height: 40px;
+            }
+            input[type="checkbox"] {
+                min-width: 18px;
+                min-height: 18px;
+            }
+            .modal-card .modal-footer .btn {
+                min-height: 40px;
+            }
+        }
+
+        /* ---------- Prevent iOS auto-zoom on input focus ---------- */
+        @media (max-width: 550px) {
+            input, button, select, textarea {
+                font-size: 16px;
+            }
+        }
+
+        /* ---------- Print responsive (final overrides) ---------- */
+        @media print {
+            .contract-container {
+                padding: 0.4in !important;
+            }
+            .contract-header {
+                min-height: auto !important;
+                padding-top: 0 !important;
+            }
+            .contract-header h1 {
+                font-size: 18pt !important;
+                padding-right: 150px !important;
+                padding-left: 0 !important;
+                text-align: left !important;
+            }
+            .header-logo {
+                display: block !important;
+                position: absolute !important;
+                right: 10px !important;
+                top: 50% !important;
+                transform: translateY(-50%) !important;
+                width: 120px !important;
+                height: 120px !important;
+            }
+            .contract-header .sub {
+                padding-right: 150px !important;
+                justify-content: flex-start !important;
+            }
+            .section-title {
+                font-size: 13pt !important;
+                padding: 6px 12px !important;
+            }
+            .page {
+                padding: 12px !important;
+                page-break-inside: avoid;
+            }
+            table {
+                font-size: 9.5pt !important;
+                display: table !important;
+                white-space: normal !important;
+            }
+            th, td {
+                padding: 5px 8px !important;
+                min-width: 0 !important;
+            }
+            .sign-row {
+                flex-direction: row !important;
+                gap: 20px 40px !important;
+            }
+            .sign-field {
+                flex: 1 0 200px !important;
+            }
+            .debrief-grid {
+                grid-template-columns: 1fr 1fr !important;
+            }
+            .btn-group {
+                display: none !important;
+            }
+            .floating-particle {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- floating particles by JS -->
+
+    <!-- LOGIN OVERLAY -->
+    <div id="login-overlay">
+        <div class="login-card">
+            <h2>🔐 Contract Access</h2>
+            <label for="password-input">Enter password</label>
+            <div class="password-wrapper">
+                <input type="password" id="password-input" placeholder="••••••••">
+                <button class="toggle-eye" id="toggle-password" type="button" aria-label="show password">👁️</button>
+            </div>
+            <div class="hint">💡 Hint: Our pet name + @ + the Date & Month we met + @</div>
+            <button class="login-btn" id="login-btn">Unlock contract</button>
+            <div id="login-error" class="login-error"></div>
+        </div>
+    </div>
+
+    <!-- EMAIL MODAL -->
+    <div class="modal-overlay" id="email-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>✉️ Email Contract Data</h3>
+                <button class="modal-close" id="modal-close-btn">×</button>
+            </div>
+            <div class="modal-tabs">
+                <button class="active" data-format="plain">Plain Text</button>
+                <button data-format="html">HTML Format</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+            <div class="modal-footer">
+                <button class="btn btn-copy" id="modal-copy-btn">📋 Copy to Clipboard</button>
+                <button class="btn btn-email-send" id="modal-email-btn">✉️ Send Email</button>
+                <button class="btn btn-close-modal" id="modal-close-footer-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CONTRACT -->
+    <div class="contract-container" id="main-contract">
+        <!-- HEADER -->
+        <div class="contract-header">
+            <h1>BDSM SCENE SPECIFIC CONTRACT</h1>
+            <img src="https://lh3.googleusercontent.com/d/1eoI5L95RQxWzs0yaDrFMtst2FFsbK_Ny=s220" alt="Logo" class="header-logo" onerror="this.style.display='none'">
+            <div class="sub">
+                <span>📄 Contract No.: #2026-05-28-01</span>
+                <span>📅 Effective Date: <div class="datetime-group"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></span>
+                <span>👤 Parties: <strong>Honey🍯</strong> (Sub) &amp; <strong>Deep</strong> (Dom)</span>
+            </div>
+        </div>
+
+        <!-- ===== DAY 1 ===== -->
+        <div class="page" id="day1">
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; align-items:baseline;">
+                <h2 style="font-family:Georgia; font-weight:400; color:#2a1c16;">DAY 1 · 30th July, 2026 — PRIVATE BEDROOM/PLAY SPACE</h2>
+                <span class="day-badge">♾️ INFINITY</span>
+            </div>
+            
+            <div class="day-finished">
+                <label>📌 Day Finished:</label>
+                <select class="day-finished-select" data-day="day1">
+                    <option value="no">❌ No</option>
+                    <option value="yes">✅ Yes</option>
+                </select>
+                <button class="clear-day-btn" data-day="day1">🗑️ Clear Day Data</button>
+            </div>
+            
+            <p><strong>Between:</strong> Deep (The Dominant / Top) &amp; Honey (The Submissive / Bottom)</p>
+            <p><strong>Duration of Contract:</strong> This contract is valid for ♾️ INFINITY (From 30th July, 2026 onwards).</p>
+
+            <h3 class="section-title">ARTICLE 1: PREAMBLE &amp; SCOPE</h3>
+            <p>WHEREAS, both parties enter into this agreement freely, willingly, and with full capacity to consent; WHEREAS, this contract serves as a binding scene‑specific agreement for a single BDSM play session, effective only on the date stated herein; WHEREAS, this agreement operates in conjunction with the standing Master/Slave or D/s contract (Section 1‑9, if applicable), but supersedes it only where specific limits or conditions for this session are stated; NOW, THEREFORE, the parties agree as follows:</p>
+
+            <h3 class="section-title">ARTICLE 2: SESSION PARAMETERS</h3>
+            <table>
+                <tr><th>Clause</th><th>Specification</th></tr>
+                <tr><td>2.1 Date of Scene</td><td><div class="datetime-group"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></td></tr>
+                <tr><td>2.2 Planned Duration</td><td>Seventy‑Five (75) minutes of active scene play, exclusive of aftercare. This is Minimum you can increase the time also if you want to.</td></tr>
+                <tr><td>2.3 Venue</td><td>Private bedroom/play space. No third parties present.</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 3: SCHEDULED ACTIVITIES (The "Play Bill")</h3>
+            <table>
+                <tr><th>Category</th><th>Specific Implement/Toy</th></tr>
+                <tr><td>Sensory Deprivation</td><td>Silk Blindfold</td></tr>
+                <tr><td>Restraint (Upper Body)</td><td>Silk Ties / Scarves AND/OR Metal Handcuffs (not simultaneously on same limb)</td></tr>
+                <tr><td>Sensation Play</td><td>Ice Cubes (temperature contrast)</td></tr>
+                <tr><td>Stimulation/Impact</td><td>Clothespins / Nipple Clamps</td></tr>
+                <tr><td>Touch / Connection</td><td>Hand / Palm (bare skin contact)</td></tr>
+            </table>
+            <p><strong>3.2 The "Contrast &amp; Control" Protocol:</strong> Restraint → Ice Trails → Clamp Application → Climax → Release.</p>
+
+            <h3 class="section-title">ARTICLE 4: NEW ACTIVITIES CLAUSE</h3>
+            <div class="checklist-item"><input type="checkbox"><label>4.1 Are any NEW activities being introduced today? <strong>NO.</strong></label></div>
+            <p>4.2 The parties affirm that all activities listed in Article 3 have been previously experienced, discussed, and consented to in prior negotiations. No unvetted activities shall be introduced during this session.</p>
+
+            <h3 class="section-title">ARTICLE 5: HARD LIMITS – SESSION SPECIFIC</h3>
+            <table>
+                <tr><th>Clause</th><th>Prohibition</th></tr>
+                <tr><td>5.1.1</td><td>Ice cubes shall NOT make contact with the neck, face, or genital mucosa (inside labia/urethral opening).</td></tr>
+                <tr><td>5.1.2</td><td>Clothespins/clamps shall remain in place for a maximum of Ten (10) consecutive minutes. A timer shall be set.</td></tr>
+                <tr><td>5.1.3</td><td>No gag, no breath play, no choking, and no suffocation of any kind during this session.</td></tr>
+                <tr><td>5.1.4</td><td>Handcuffs and silk ties shall NOT be applied to the same limb simultaneously to prevent circulation compromise.</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 6: AFTERCARE PROVISION</h3>
+            <table>
+                <tr><th>Aftercare Deliverable</th><th>Duration</th></tr>
+                <tr><td>Warm blanket wrap (thermal regulation post‑ice)</td><td>Immediate</td></tr>
+                <tr><td>Hydration (warm herbal tea or still water)</td><td>Upon request</td></tr>
+                <tr><td>Skin moisturizer/lotion applied to ice‑exposed areas</td><td>5 minutes</td></tr>
+                <tr><td>Gentle massage of wrists and ankles</td><td>5 minutes per limb</td></tr>
+                <tr><td>Undistracted cuddling, verbal debrief, and emotional reconnection</td><td>Minimum 20 minutes</td></tr>
+                <tr><td>Light snack (chocolate or fruit) for blood sugar restoration</td><td>Upon request</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 7: SPECIAL REQUESTS &amp; DESIRES</h3>
+            <p><strong>Submissive:</strong> "Extra focus on teasing and edging. Please draw out the anticipation. I request the vibrator remain on the lowest setting for the first half of Phase 3."</p>
+            <p><strong>Dominant:</strong> "I wish to experiment with alternating ice application and warm breath on the skin immediately after the ice trail, to heighten the contrast effect. No new toys — only a new technique."</p>
+
+            <h3 class="section-title">ARTICLE 8: SAFEWORDS &amp; WITHDRAWAL OF CONSENT</h3>
+            <table>
+                <tr><th>Safeword</th><th>Meaning</th><th>Action Required</th></tr>
+                <tr><td>"RED"</td><td>Full stop. Withdrawal of consent.</td><td>Scene ends immediately. All restraints removed. Aftercare begins.</td></tr>
+                <tr><td>"YELLOW"</td><td>Pause. Check‑in required.</td><td>Dominant pauses all activity, checks in verbally, and adjusts as needed.</td></tr>
+                <tr><td>"GREEN"</td><td>All good. Continue.</td><td>Dominant proceeds.</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 9: SAFETY PROTOCOLS</h3>
+            <ul style="padding-left:22px; margin:8px 0;">
+                <li>Handcuff Key: visible, easily accessible.</li>
+                <li>Clothespin Timer: set for 10 minutes.</li>
+                <li>Ice Safety: no stationary ice &gt;5 seconds.</li>
+                <li>Circulation Checks: every 10 minutes.</li>
+            </ul>
+
+            <h3 class="section-title">SIGNATORIES</h3>
+            <div class="sign-row">
+                <div class="sign-field"><label>Submissive / Bottom</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Printed Name</label><input placeholder="Honey"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Dominant / Top</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Printed Name</label><input placeholder="Deep"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+            <div style="margin-top:12px;"><label>Witness (Optional):</label> <input class="inline-input" placeholder="Signature" style="width:200px;"></div>
+
+            <!-- DAY 1 DEBRIEF & AFFIDAVIT -->
+            <h3 class="section-title" style="margin-top:30px;">PRE‑SCENE EXECUTION AFFIDAVIT – DAY 1</h3>
+            <p><strong>Date of Execution:</strong> <div class="datetime-group"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div> <strong>Time:</strong> <div class="datetime-group"><input type="text" placeholder="HH"> <span class="time-sep">:</span> <input type="text" placeholder="MM"></div></p>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH read and understood the ENTIRE Master Contract AND this Scene Contract.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH used the bathroom and are physically comfortable.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH had water/hydration within the last 30 minutes.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>All toys and props to be used today are CLEAN, SAFE, and positioned within arm's reach.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>The play area is PRIVATE, secured against interruption, and free from hazards.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>Mobile phones are on SILENT or switched OFF.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have agreed on the SPECIFIC ACTIVITIES for today (as listed in Article 3).</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have agreed on the DURATION: 75 minutes of active play, plus minimum 20 minutes aftercare.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH said our safe words OUT LOUD to confirm we remember them.</label></div>
+
+            <h4>SAFEWORD VERIFICATION</h4>
+            <table>
+                <tr><th>Safeword</th><th>Spoken by Submissive?</th><th>Spoken by Dominant?</th></tr>
+                <tr><td>"RED"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+                <tr><td>"YELLOW"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+                <tr><td>"GREEN"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+            </table>
+            <div class="checklist-item"><input type="checkbox"><label>Non‑Verbal Signal: Dropping a held object (e.g., bell, scarf) — UNDERSTOOD.</label></div>
+
+            <h4>FINAL CONSENT DECLARATION</h4>
+            <p><em>"I freely and enthusiastically consent to this scene."</em></p>
+            <div class="checklist-item"><input type="checkbox"><label>Given without coercion, pressure, or manipulation</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>Given while sober and of sound mind</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>Given with full knowledge of all risks involved</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>Revocable at ANY time for ANY reason</label></div>
+
+            <h4>TOY INVENTORY (DAY 1)</h4>
+            <table>
+                <tr><th>Item</th><th>Condition</th><th>Location</th></tr>
+                <tr><td>Silk Blindfold</td><td><input type="checkbox"> Clean / <input type="checkbox"> Safe</td><td><input class="inline-input auto-expand" placeholder="Within reach" style="width:100%;"></td></tr>
+                <tr><td>Silk Ties / Scarves</td><td><input type="checkbox"> Clean / <input type="checkbox"> Safe</td><td><input class="inline-input auto-expand" placeholder="" style="width:100%;"></td></tr>
+                <tr><td>Metal Handcuffs (key visible)</td><td><input type="checkbox"> Clean / <input type="checkbox"> Safe</td><td><input class="inline-input auto-expand" placeholder="" style="width:100%;"></td></tr>
+                <tr><td>Ice Cubes / bowl</td><td><input type="checkbox"> Fresh / <input type="checkbox"> Safe</td><td><input class="inline-input auto-expand" placeholder="" style="width:100%;"></td></tr>
+                <tr><td>Clothespins / Clamps</td><td><input type="checkbox"> Clean / <input type="checkbox"> Safe</td><td><input class="inline-input auto-expand" placeholder="" style="width:100%;"></td></tr>
+                <tr><td>Vibrator</td><td><input type="checkbox"> Clean / <input type="checkbox"> Charged</td><td><input class="inline-input auto-expand" placeholder="" style="width:100%;"></td></tr>
+            </table>
+
+            <h4>SCENE DEBRIEF – DAY 1 (after scene)</h4>
+            <div class="debrief-grid">
+                <div><label>Overall satisfaction</label> <input class="inline-input" placeholder="__ / 10" style="width:70px;"></div>
+                <div><label>Aftercare effectiveness</label> <input class="inline-input" placeholder="__ / 10" style="width:70px;"></div>
+                <div><label>Safeword used?</label> <input type="checkbox"> Yes / <input type="checkbox"> No &nbsp; If yes, which? <input class="inline-input" placeholder="RED/YELLOW" style="width:100px;"></div>
+                <div><label>Any adjustments needed next time?</label> <input class="inline-input" placeholder="Notes" style="width:160px;"></div>
+                <div class="full"><label>Debrief Notes</label> <textarea class="note-box" placeholder="Write any observations, incidents, or adjustments..."></textarea></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Deep's Signature (Debrief)</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Honey's Signature (Debrief)</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+        </div>
+
+        <!-- ===== DAY 2 ===== -->
+        <div class="page" id="day2">
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; align-items:baseline;">
+                <h2 style="font-family:Georgia; font-weight:400; color:#2a1c16;">DAY 2 · 31st July, 2026 — PRIVATE DRESSING ROOM / WALK-IN CLOSET</h2>
+                <span class="day-badge">♾️ INFINITY</span>
+            </div>
+            
+            <div class="day-finished">
+                <label>📌 Day Finished:</label>
+                <select class="day-finished-select" data-day="day2">
+                    <option value="no">❌ No</option>
+                    <option value="yes">✅ Yes</option>
+                </select>
+                <button class="clear-day-btn" data-day="day2">🗑️ Clear Day Data</button>
+            </div>
+            
+            <p><strong>Between:</strong> Deep &amp; Honey</p>
+            <p><strong>Duration of Contract:</strong> This contract is valid for ♾️ INFINITY (From 30th July, 2026 onwards).</p>
+
+            <h3 class="section-title">ARTICLE 2: SESSION PARAMETERS</h3>
+            <table>
+                <tr><th>Clause</th><th>Specification</th></tr>
+                <tr><td>2.1 Date of Scene</td><td><div class="datetime-group"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></td></tr>
+                <tr><td>2.2 Planned Duration</td><td>Seventy‑Five (75) minutes of active scene play, exclusive of aftercare.</td></tr>
+                <tr><td>2.3 Venue</td><td>Private dressing room / walk‑in closet with full mirror.</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 3: SCHEDULED ACTIVITIES</h3>
+            <table>
+                <tr><th>Category</th><th>Specific Implement/Toy</th></tr>
+                <tr><td>Visual Exposure</td><td>Forced Eye Contact / Full‑Length Mirror Access</td></tr>
+                <tr><td>Restraint (Positioning)</td><td>Leather Wrist Cuffs connected to Waist Belt / Soft Rope</td></tr>
+                <tr><td>Sensation Play</td><td>Warm Massage Oil (tactile heat contrast)</td></tr>
+                <tr><td>Stimulation/Impact</td><td>Lightweight Leather Paddle / Slap‑Paddle</td></tr>
+                <tr><td>Touch / Connection</td><td>Mirror surface contact, manual teasing, standing alignment</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 5: HARD LIMITS – SESSION SPECIFIC</h3>
+            <table>
+                <tr><th>Clause</th><th>Prohibition</th></tr>
+                <tr><td>5.1.1</td><td>The leather paddle shall NOT make contact with the spine, kidneys, or lower back.</td></tr>
+                <tr><td>5.1.2</td><td>Standing or bent‑over mirror positioning must be paused every 15 minutes for joint relief.</td></tr>
+                <tr><td>5.1.3</td><td>No gag, no breath play, no choking, and no suffocation of any kind.</td></tr>
+                <tr><td>5.1.4</td><td>Submissive's face/chest must not be pressed harshly against glass to guarantee breathing.</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 6: AFTERCARE PROVISION</h3>
+            <table>
+                <tr><th>Aftercare Deliverable</th><th>Duration</th></tr>
+                <tr><td>Plush oversized robe wrap and comfortable seating</td><td>Immediate</td></tr>
+                <tr><td>Hydration (chilled electrolyte or coconut water)</td><td>Upon request</td></tr>
+                <tr><td>Warm, damp towel wipe‑down to remove excess oil</td><td>5 minutes</td></tr>
+                <tr><td>Soothing aloe vera application to impact zones</td><td>5 minutes</td></tr>
+                <tr><td>Undistracted holding, reflection reassurance, verbal debrief</td><td>Minimum 20 mins</td></tr>
+                <tr><td>Light snack (fresh fruit slices or berries)</td><td>Upon request</td></tr>
+            </table>
+
+            <h3 class="section-title">SPECIAL REQUESTS</h3>
+            <p><strong>Submissive:</strong> "I request that Deep forces me to look at our reflection during intense moments, using verbal cues to anchor my gaze."</p>
+            <p><strong>Dominant:</strong> "I want to utilize slow, rhythmic paddle strikes to build deep internal body heat before any penetration occurs."</p>
+
+            <h3 class="section-title">SIGNATORIES</h3>
+            <div class="sign-row">
+                <div class="sign-field"><label>Submissive / Bottom</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Printed Name</label><input placeholder="Honey"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Dominant / Top</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Printed Name</label><input placeholder="Deep"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+
+            <!-- DAY 2 AFFIDAVIT & DEBRIEF -->
+            <h3 class="section-title" style="margin-top:30px;">PRE‑SCENE EXECUTION AFFIDAVIT – DAY 2</h3>
+            <p><strong>Date:</strong> <div class="datetime-group"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div> <strong>Time:</strong> <div class="datetime-group"><input type="text" placeholder="HH"> <span class="time-sep">:</span> <input type="text" placeholder="MM"></div></p>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH read and understood the ENTIRE Master Contract AND this Scene Contract.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH used the bathroom and are physically comfortable.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH had water/hydration within the last 30 minutes.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>All toys and props to be used today are CLEAN, SAFE, and positioned within arm's reach.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>The play area is PRIVATE, secured against interruption, and free from hazards.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>Mobile phones are on SILENT or switched OFF.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have agreed on the SPECIFIC ACTIVITIES for today (as listed in Article 3).</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have agreed on the DURATION: 75 minutes of active play, plus minimum 20 minutes aftercare.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH said our safe words OUT LOUD to confirm we remember them.</label></div>
+            <h4>SAFEWORD VERIFICATION</h4>
+            <table>
+                <tr><th>Safeword</th><th>Spoken by Submissive?</th><th>Spoken by Dominant?</th></tr>
+                <tr><td>"RED"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+                <tr><td>"YELLOW"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+                <tr><td>"GREEN"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+            </table>
+            <h4>TOY INVENTORY (DAY 2)</h4>
+            <table>
+                <tr><th>Item</th><th>Condition</th><th>Location</th></tr>
+                <tr><td>Leather Cuffs/Rope</td><td><input type="checkbox"> Clean / <input type="checkbox"> Safe</td><td><input class="inline-input auto-expand" placeholder="Dressing table" style="width:100%;"></td></tr>
+                <tr><td>Warm Massage Oil</td><td><input type="checkbox"> Clean / <input type="checkbox"> Safe</td><td><input class="inline-input auto-expand" placeholder="" style="width:100%;"></td></tr>
+                <tr><td>Leather Paddle</td><td><input type="checkbox"> Clean / <input type="checkbox"> Safe</td><td><input class="inline-input auto-expand" placeholder="" style="width:100%;"></td></tr>
+                <tr><td>Non-Slip Floor Mat</td><td><input type="checkbox"> Positioned</td><td><input class="inline-input auto-expand" placeholder="Under feet" style="width:100%;"></td></tr>
+                <tr><td>Warm Damp Towels</td><td><input type="checkbox"> Ready</td><td><input class="inline-input auto-expand" placeholder="" style="width:100%;"></td></tr>
+            </table>
+
+            <h4>SCENE DEBRIEF – DAY 2</h4>
+            <div class="debrief-grid">
+                <div><label>Overall satisfaction</label> <input class="inline-input" placeholder="__ / 10" style="width:70px;"></div>
+                <div><label>Aftercare effectiveness</label> <input class="inline-input" placeholder="__ / 10" style="width:70px;"></div>
+                <div><label>Safeword used?</label> <input type="checkbox"> Yes / <input type="checkbox"> No &nbsp; If yes, which? <input class="inline-input" placeholder="RED/YELLOW" style="width:100px;"></div>
+                <div><label>Any adjustments needed next time?</label> <input class="inline-input" placeholder="Notes" style="width:160px;"></div>
+                <div class="full"><label>Debrief Notes</label> <textarea class="note-box" placeholder="Write any observations..."></textarea></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Deep's Signature</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Honey's Signature</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+        </div>
+
+        <!-- ===== DAY 3 ===== -->
+        <div class="page" id="day3">
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; align-items:baseline;">
+                <h2 style="font-family:Georgia; font-weight:400; color:#2a1c16;">DAY 3 · 1st August, 2026 — PRIVATE STUDY / LIVING SPACE</h2>
+                <span class="day-badge">♾️ INFINITY</span>
+            </div>
+            
+            <div class="day-finished">
+                <label>📌 Day Finished:</label>
+                <select class="day-finished-select" data-day="day3">
+                    <option value="no">❌ No</option>
+                    <option value="yes">✅ Yes</option>
+                </select>
+                <button class="clear-day-btn" data-day="day3">🗑️ Clear Day Data</button>
+            </div>
+            
+            <p><strong>Between:</strong> Deep &amp; Honey</p>
+            <p><strong>Duration of Contract:</strong> This contract is valid for ♾️ INFINITY (From 30th July, 2026 onwards).</p>
+
+            <h3 class="section-title">ARTICLE 2: SESSION PARAMETERS</h3>
+            <table>
+                <tr><th>Clause</th><th>Specification</th></tr>
+                <tr><td>2.1 Date of Scene</td><td><div class="datetime-group"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></td></tr>
+                <tr><td>2.2 Planned Duration</td><td>Seventy‑Five (75) minutes of active scene play, exclusive of aftercare.</td></tr>
+                <tr><td>2.3 Venue</td><td>Private study / living space with high armchair and sofa.</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 3: SCHEDULED ACTIVITIES</h3>
+            <table>
+                <tr><th>Category</th><th>Specific Implement/Toy</th></tr>
+                <tr><td>Sensory Deprivation</td><td>Opaque Sleep Mask</td></tr>
+                <tr><td>Restraint (Furniture)</td><td>High‑backed Armchair Straps / Thigh Spreaders</td></tr>
+                <tr><td>Sensation Play</td><td>Wartenberg Neuro‑Pinwheel / Feather Tickler</td></tr>
+                <tr><td>Stimulation/Impact</td><td>External Wand Vibrator / Internal Silicone Pleasures</td></tr>
+                <tr><td>Touch / Connection</td><td>Immobilized chair positioning followed by open sofa play</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 5: HARD LIMITS</h3>
+            <table>
+                <tr><th>Clause</th><th>Prohibition</th></tr>
+                <tr><td>5.1.1</td><td>Submissive shall NEVER be left unattended while strapped to the armchair.</td></tr>
+                <tr><td>5.1.2</td><td>Thigh spreaders shall not be extended to a point causing joint hyperextension.</td></tr>
+                <tr><td>5.1.3</td><td>No gag, no breath play, no choking, and no suffocation of any kind.</td></tr>
+                <tr><td>5.1.4</td><td>The Wartenberg pinwheel must be applied with light pressure; never pierce the skin.</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 6: AFTERCARE PROVISION</h3>
+            <table>
+                <tr><th>Aftercare Deliverable</th><th>Duration</th></tr>
+                <tr><td>Horizontal placement on sofa with heavy fleece blanket</td><td>Immediate</td></tr>
+                <tr><td>Hydration (warm water with lemon or chamomile tea)</td><td>Upon request</td></tr>
+                <tr><td>Gentle manual stretching of hip joints and thighs</td><td>5 minutes</td></tr>
+                <tr><td>Soft massage of lower back and shoulder blades</td><td>10 minutes</td></tr>
+                <tr><td>Extended cuddling, deep breathing synchronization</td><td>Minimum 20 mins</td></tr>
+                <tr><td>Small serving of dark chocolate or sweet biscuit</td><td>Upon request</td></tr>
+            </table>
+
+            <h3 class="section-title">SPECIAL REQUESTS</h3>
+            <p><strong>Submissive:</strong> "I want to be completely immobilized on the chair, unable to predict where the pinwheel or wand will touch next."</p>
+            <p><strong>Dominant:</strong> "I want to command absolute stillness during sensory tracking, using verbal dominance to hold her in place."</p>
+
+            <h3 class="section-title">SIGNATORIES</h3>
+            <div class="sign-row">
+                <div class="sign-field"><label>Submissive / Bottom</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Printed Name</label><input placeholder="Honey"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Dominant / Top</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Printed Name</label><input placeholder="Deep"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+
+            <!-- DAY 3 AFFIDAVIT & DEBRIEF -->
+            <h3 class="section-title" style="margin-top:30px;">PRE‑SCENE EXECUTION AFFIDAVIT – DAY 3</h3>
+            <p><strong>Date:</strong> <div class="datetime-group"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div> <strong>Time:</strong> <div class="datetime-group"><input type="text" placeholder="HH"> <span class="time-sep">:</span> <input type="text" placeholder="MM"></div></p>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH read and understood the ENTIRE Master Contract AND this Scene Contract.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH used the bathroom and are physically comfortable.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH had water/hydration within the last 30 minutes.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>All toys and props to be used today are CLEAN, SAFE, and positioned within arm's reach.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>The play area is PRIVATE, secured against interruption, and free from hazards.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>Mobile phones are on SILENT or switched OFF.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have agreed on the SPECIFIC ACTIVITIES for today (as listed in Article 3).</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have agreed on the DURATION: 75 minutes of active play, plus minimum 20 minutes aftercare.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH said our safe words OUT LOUD to confirm we remember them.</label></div>
+            <h4>SAFEWORD VERIFICATION</h4>
+            <table>
+                <tr><th>Safeword</th><th>Spoken by Submissive?</th><th>Spoken by Dominant?</th></tr>
+                <tr><td>"RED"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+                <tr><td>"YELLOW"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+                <tr><td>"GREEN"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+            </table>
+            <h4>TOY INVENTORY (DAY 3)</h4>
+            <table>
+                <tr><th>Item</th><th>Condition</th><th>Location</th></tr>
+                <tr><td>Opaque Sleep Mask</td><td><input type="checkbox"> Clean / <input type="checkbox"> Safe</td><td><input class="inline-input auto-expand" placeholder="Study desk" style="width:100%;"></td></tr>
+                <tr><td>Armchair Straps</td><td><input type="checkbox"> Clean / <input type="checkbox"> Vetted</td><td><input class="inline-input auto-expand" placeholder="Pre-fitted" style="width:100%;"></td></tr>
+                <tr><td>Wartenberg Pinwheel</td><td><input type="checkbox"> Clean / <input type="checkbox"> Sanitized</td><td><input class="inline-input auto-expand" placeholder="Within reach" style="width:100%;"></td></tr>
+                <tr><td>Wand Vibrator</td><td><input type="checkbox"> Clean / <input type="checkbox"> Charged</td><td><input class="inline-input auto-expand" placeholder="Beside chair" style="width:100%;"></td></tr>
+                <tr><td>Safety Shears</td><td><input type="checkbox"> Sharp / <input type="checkbox"> Ready</td><td><input class="inline-input auto-expand" placeholder="Openly visible" style="width:100%;"></td></tr>
+            </table>
+
+            <h4>SCENE DEBRIEF – DAY 3</h4>
+            <div class="debrief-grid">
+                <div><label>Overall satisfaction</label> <input class="inline-input" placeholder="__ / 10" style="width:70px;"></div>
+                <div><label>Aftercare effectiveness</label> <input class="inline-input" placeholder="__ / 10" style="width:70px;"></div>
+                <div><label>Safeword used?</label> <input type="checkbox"> Yes / <input type="checkbox"> No &nbsp; If yes, which? <input class="inline-input" placeholder="RED/YELLOW" style="width:100px;"></div>
+                <div><label>Any adjustments needed next time?</label> <input class="inline-input" placeholder="Notes" style="width:160px;"></div>
+                <div class="full"><label>Debrief Notes</label> <textarea class="note-box" placeholder="Write any observations..."></textarea></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Deep's Signature</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Honey's Signature</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+        </div>
+
+        <!-- ===== DAY 4 ===== -->
+        <div class="page" id="day4">
+            <div style="display:flex; justify-content:space-between; flex-wrap:wrap; align-items:baseline;">
+                <h2 style="font-family:Georgia; font-weight:400; color:#2a1c16;">DAY 4 · 2nd August, 2026 — PRIVATE MASTER BATHROOM / ENSUITE</h2>
+                <span class="day-badge">♾️ INFINITY</span>
+            </div>
+            
+            <div class="day-finished">
+                <label>📌 Day Finished:</label>
+                <select class="day-finished-select" data-day="day4">
+                    <option value="no">❌ No</option>
+                    <option value="yes">✅ Yes</option>
+                </select>
+                <button class="clear-day-btn" data-day="day4">🗑️ Clear Day Data</button>
+            </div>
+            
+            <p><strong>Between:</strong> Deep &amp; Honey</p>
+            <p><strong>Duration of Contract:</strong> This contract is valid for ♾️ INFINITY (From 30th July, 2026 onwards).</p>
+
+            <h3 class="section-title">ARTICLE 2: SESSION PARAMETERS</h3>
+            <table>
+                <tr><th>Clause</th><th>Specification</th></tr>
+                <tr><td>2.1 Date of Scene</td><td><div class="datetime-group"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></td></tr>
+                <tr><td>2.2 Planned Duration</td><td>Seventy‑Five (75) minutes of active scene play, exclusive of aftercare.</td></tr>
+                <tr><td>2.3 Venue</td><td>Private master bathroom / ensuite with large bathtub.</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 3: SCHEDULED ACTIVITIES</h3>
+            <table>
+                <tr><th>Category</th><th>Specific Implement/Toy</th></tr>
+                <tr><td>Sensory Deprivation</td><td>Neoprene Waterproof Blindfold</td></tr>
+                <tr><td>Restraint (Water Safety)</td><td>Non‑Porous Vinyl Cuffs (Grab bar connection) / Manual Hold</td></tr>
+                <tr><td>Sensation Play</td><td>Hydro‑thermal contrast (Warm immersion + Ice water pours)</td></tr>
+                <tr><td>Stimulation/Impact</td><td>Waterproof Submersible Bullet Vibrator</td></tr>
+                <tr><td>Touch / Connection</td><td>Slick skin‑on‑skin aquatic friction, edge‑of‑tub bracing</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 5: HARD LIMITS</h3>
+            <table>
+                <tr><th>Clause</th><th>Prohibition</th></tr>
+                <tr><td>5.1.1</td><td>Honey's nose, mouth, and face shall NEVER be submerged under water.</td></tr>
+                <tr><td>5.1.2</td><td>No fabric, leather, or ropes that contract when wet shall be used as restraints.</td></tr>
+                <tr><td>5.1.3</td><td>No gag, no breath play, no choking, and no suffocation of any kind.</td></tr>
+                <tr><td>5.1.4</td><td>Ice‑water pours must completely bypass the face to prevent involuntary gasping.</td></tr>
+            </table>
+
+            <h3 class="section-title">ARTICLE 6: AFTERCARE PROVISION</h3>
+            <table>
+                <tr><th>Aftercare Deliverable</th><th>Duration</th></tr>
+                <tr><td>Pull plug, assist out, wrap in pre‑warmed bath sheets</td><td>Immediate</td></tr>
+                <tr><td>Hydration (warm water or hot tea to restore core heat)</td><td>Upon request</td></tr>
+                <tr><td>Application of rich body oil/lotion to wet skin</td><td>5 minutes</td></tr>
+                <tr><td>Gentle blow‑drying and brushing of Honey's hair</td><td>10 minutes</td></tr>
+                <tr><td>Transfer to bed for warm dry holding and grounding</td><td>Minimum 20 mins</td></tr>
+                <tr><td>Warm light snack (broth or hot cocoa)</td><td>Upon request</td></tr>
+            </table>
+
+            <h3 class="section-title">SPECIAL REQUESTS</h3>
+            <p><strong>Submissive:</strong> "I want to experience the thermal rush of ice water over my skin while submerged in the warm bath, feeling Deep's hands holding me securely."</p>
+            <p><strong>Dominant:</strong> "I want to guide Honey's legs over the tub edge to create elevated angles for deep bathtub sex using the water's buoyancy."</p>
+
+            <h3 class="section-title">SIGNATORIES</h3>
+            <div class="sign-row">
+                <div class="sign-field"><label>Submissive / Bottom</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Printed Name</label><input placeholder="Honey"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Dominant / Top</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Printed Name</label><input placeholder="Deep"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+
+            <!-- DAY 4 AFFIDAVIT & DEBRIEF -->
+            <h3 class="section-title" style="margin-top:30px;">PRE‑SCENE EXECUTION AFFIDAVIT – DAY 4</h3>
+            <p><strong>Date:</strong> <div class="datetime-group"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div> <strong>Time:</strong> <div class="datetime-group"><input type="text" placeholder="HH"> <span class="time-sep">:</span> <input type="text" placeholder="MM"></div></p>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH read and understood the ENTIRE Master Contract AND this Scene Contract.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH used the bathroom and are physically comfortable.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH had water/hydration within the last 30 minutes.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>All toys and props to be used today are CLEAN, SAFE, and positioned within arm's reach.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>The play area is PRIVATE, secured against interruption, and free from hazards.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>Mobile phones are on SILENT or switched OFF.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have agreed on the SPECIFIC ACTIVITIES for today (as listed in Article 3).</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have agreed on the DURATION: 75 minutes of active play, plus minimum 20 minutes aftercare.</label></div>
+            <div class="checklist-item"><input type="checkbox"><label>We have BOTH said our safe words OUT LOUD to confirm we remember them.</label></div>
+            <h4>SAFEWORD VERIFICATION</h4>
+            <table>
+                <tr><th>Safeword</th><th>Spoken by Submissive?</th><th>Spoken by Dominant?</th></tr>
+                <tr><td>"RED"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+                <tr><td>"YELLOW"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+                <tr><td>"GREEN"</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td><td><input type="checkbox"> Yes / <input type="checkbox"> No</td></tr>
+            </table>
+            <h4>TOY INVENTORY (DAY 4)</h4>
+            <table>
+                <tr><th>Item</th><th>Condition</th><th>Location</th></tr>
+                <tr><td>Neoprene Blindfold</td><td><input type="checkbox"> Clean / <input type="checkbox"> Safe</td><td><input class="inline-input auto-expand" placeholder="Bathroom counter" style="width:100%;"></td></tr>
+                <tr><td>Waterproof Vibrator</td><td><input type="checkbox"> Clean / <input type="checkbox"> Sealed OK</td><td><input class="inline-input auto-expand" placeholder="Beside tub" style="width:100%;"></td></tr>
+                <tr><td>Ice Water Pitcher</td><td><input type="checkbox"> Filled / <input type="checkbox"> Ready</td><td><input class="inline-input auto-expand" placeholder="Next to sink" style="width:100%;"></td></tr>
+                <tr><td>Bath Thermometer</td><td><input type="checkbox"> Calibrated</td><td><input class="inline-input auto-expand" placeholder="Floating" style="width:100%;"></td></tr>
+                <tr><td>Pre-Warmed Sheets</td><td><input type="checkbox"> Dry / <input type="checkbox"> Hot</td><td><input class="inline-input auto-expand" placeholder="Heated towel rack" style="width:100%;"></td></tr>
+            </table>
+
+            <h4>SCENE DEBRIEF – DAY 4</h4>
+            <div class="debrief-grid">
+                <div><label>Overall satisfaction</label> <input class="inline-input" placeholder="__ / 10" style="width:70px;"></div>
+                <div><label>Aftercare effectiveness</label> <input class="inline-input" placeholder="__ / 10" style="width:70px;"></div>
+                <div><label>Safeword used?</label> <input type="checkbox"> Yes / <input type="checkbox"> No &nbsp; If yes, which? <input class="inline-input" placeholder="RED/YELLOW" style="width:100px;"></div>
+                <div><label>Any adjustments needed next time?</label> <input class="inline-input" placeholder="Notes" style="width:160px;"></div>
+                <div class="full"><label>Debrief Notes</label> <textarea class="note-box" placeholder="Write any observations..."></textarea></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Deep's Signature</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+            <div class="sign-row">
+                <div class="sign-field"><label>Honey's Signature</label><input placeholder="Signature"></div>
+                <div class="sign-field"><label>Date</label><div class="datetime-group" style="width:100%;"><input type="text" placeholder="DD"> <span class="date-sep">/</span> <input type="text" placeholder="MM"> <span class="date-sep">/</span> <input type="text" placeholder="YYYY"></div></div>
+            </div>
+        </div>
+
+        <!-- ===== SUMMARY ===== -->
+        <div class="page" id="summary">
+            <h2 style="font-family:Georgia; font-weight:400; color:#2a1c16;">Summary of What to Do and What Not to Do</h2>
+            <p><strong>✅ DO:</strong> Pre‑scene preparation, safeword confirmation, follow "Contrast &amp; Control" protocol, aftercare mandatory.</p>
+            <p><strong>❌ DON'T:</strong> Introduce new activities, violate hard limits, skip aftercare, ignore safewords.</p>
+            <p style="margin-top:12px;"><em>Chronological Guide included in original contract (details per day).</em></p>
+
+            <h3 class="section-title">Chronological Guide – DAY 1</h3>
+            <table>
+                <tr><th>Time</th><th>Step / Action</th><th>Who</th><th>Notes</th></tr>
+                <tr><td>T‑60 min</td><td>Hydrate, prepare space, lock door, lay out toys</td><td>Both</td><td>Comfort &amp; safety</td></tr>
+                <tr><td>T‑10 min</td><td>Pre‑Scene Affidavit out loud</td><td>Both</td><td>Critical</td></tr>
+                <tr><td>T+0</td><td>Restraint (blindfold, silk ties/handcuffs)</td><td>Deep</td><td>Do not apply both to same limb</td></tr>
+                <tr><td>T+10</td><td>Ice Trails (moving motion)</td><td>Deep</td><td>Avoid hard limits</td></tr>
+                <tr><td>T+20</td><td>Clamp Application + 10‑min timer</td><td>Deep</td><td>Remove on alarm</td></tr>
+                <tr><td>T+20‑30</td><td>Teasing &amp; edging (vibrator low first half)</td><td>Deep</td><td>Honey's request</td></tr>
+                <tr><td>T+30</td><td>Remove clamps; continue to climax</td><td>Both</td><td>Peak</td></tr>
+                <tr><td>T+75</td><td>Scene ends; aftercare begins</td><td>Both</td><td>Mandatory</td></tr>
+            </table>
+
+            <h3 class="section-title">Chronological Guide – DAY 2</h3>
+            <table>
+                <tr><th>Time</th><th>Step / Action</th><th>Who</th><th>Notes</th></tr>
+                <tr><td>T‑60 min</td><td>Clean mirror, lay non‑slip mat, warm oil</td><td>Both</td><td>Secure space</td></tr>
+                <tr><td>T‑10 min</td><td>Pre‑Scene Affidavit out loud</td><td>Both</td><td>Verify posture</td></tr>
+                <tr><td>T+0</td><td>Position at mirror, restrain wrists</td><td>Deep</td><td>Forced visual focus</td></tr>
+                <tr><td>T+10</td><td>Pour warm massage oil</td><td>Deep</td><td>Slow sensory</td></tr>
+                <tr><td>T+20</td><td>Rhythmic leather paddle impact</td><td>Deep</td><td>Circulation check</td></tr>
+                <tr><td>T+30</td><td>Mandatory position pause</td><td>Both</td><td>Joint relief</td></tr>
+                <tr><td>T+35‑75</td><td>Standing mirror sex</td><td>Both</td><td>Eye contact via glass</td></tr>
+                <tr><td>T+75</td><td>Wrap in robe; aftercare</td><td>Both</td><td>Warm towel wipe‑down</td></tr>
+            </table>
+
+            <h3 class="section-title">Chronological Guide – DAY 3</h3>
+            <table>
+                <tr><th>Time</th><th>Step / Action</th><th>Who</th><th>Notes</th></tr>
+                <tr><td>T‑60 min</td><td>Fit chair straps, sanitize pinwheel, check wand</td><td>Both</td><td>Safety shears on desk</td></tr>
+                <tr><td>T‑10 min</td><td>Pre‑Scene Affidavit out loud</td><td>Both</td><td>Check lumbar pillow</td></tr>
+                <tr><td>T+0</td><td>Seat, apply sleep mask, lock straps</td><td>Deep</td><td>Immobilization</td></tr>
+                <tr><td>T+10</td><td>Wartenberg pinwheel &amp; feather tickler</td><td>Deep</td><td>Sharp/soft alternation</td></tr>
+                <tr><td>T+20</td><td>External wand vibrator</td><td>Deep</td><td>Circulation check</td></tr>
+                <tr><td>T+35</td><td>Transition to structural chair sex</td><td>Both</td><td>Positional control</td></tr>
+                <tr><td>T+50</td><td>Release straps; transition to sofa</td><td>Both</td><td>Support weight</td></tr>
+                <tr><td>T+55‑75</td><td>Deep positioning sofa sex to climax</td><td>Both</td><td>Fluid drive</td></tr>
+                <tr><td>T+75</td><td>Wrap in fleece; aftercare</td><td>Both</td><td>Specialized</td></tr>
+            </table>
+
+            <h3 class="section-title">Chronological Guide – DAY 4</h3>
+            <table>
+                <tr><th>Time</th><th>Step / Action</th><th>Who</th><th>Notes</th></tr>
+                <tr><td>T‑60 min</td><td>Scrub tub, check suction mats, fill water (37°C‑39°C)</td><td>Both</td><td>Safety</td></tr>
+                <tr><td>T‑10 min</td><td>Pre‑Scene Affidavit out loud</td><td>Both</td><td>Open‑palm splash safeword</td></tr>
+                <tr><td>T+0</td><td>Honey enters tub, apply waterproof blindfold</td><td>Deep</td><td>Continuous hand contact</td></tr>
+                <tr><td>T+10</td><td>Pour ice‑cold water over shoulders/chest</td><td>Deep</td><td>Thermal shock</td></tr>
+                <tr><td>T+25</td><td>Introduce submersible bullet vibrator</td><td>Deep</td><td>Check water level</td></tr>
+                <tr><td>T+40</td><td>Reposition, lift legs over tub edge</td><td>Deep</td><td>Brace hips</td></tr>
+                <tr><td>T+45‑75</td><td>Buoyant bathtub sex to climax</td><td>Both</td><td>Low‑friction</td></tr>
+                <tr><td>T+75</td><td>Pull plug, assist to dry towels, wrap, hair dry</td><td>Both</td><td>Warm aftercare</td></tr>
+            </table>
+        </div>
+
+        <!-- FOOTER -->
+        <div class="footer-note">
+            <span class="confidential">**CONFIDENTIALITY NOTICE:** The information in this document is strictly private and confidential. Any unauthorized disclosure is prohibited.</span>
+            <span>Safewords: RED | YELLOW | GREEN | Non‑Verbal: Dropped Object</span>
+        </div>
+
+        <!-- BUTTONS -->
+        <div class="btn-group">
+            <button class="btn btn-outline" id="save-contract">💾 Save (local)</button>
+            <button class="btn" id="print-pdf">📄 Print / PDF</button>
+            <button class="btn" id="email-contract">✉️ Email Data</button>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // Floating hearts
+            function createFloatingParticles() {
+                const symbols = ['♥', '♡', '✧', '✦', '♢', '♤', '❤', '💕', '💖'];
+                for (let i = 0; i < 25; i++) {
+                    const el = document.createElement('div');
+                    el.className = 'floating-particle';
+                    el.textContent = symbols[i % symbols.length];
+                    el.style.left = Math.random() * 100 + 'vw';
+                    el.style.fontSize = (15 + Math.random() * 35) + 'px';
+                    el.style.animationDuration = (12 + Math.random() * 20) + 's';
+                    el.style.animationDelay = (Math.random() * 25) + 's';
+                    el.style.opacity = 0.04 + Math.random() * 0.09;
+                    el.style.transform = `rotate(${Math.random() * 360}deg)`;
+                    document.body.appendChild(el);
+                }
+            }
+            createFloatingParticles();
+
+            // LOGIN
+            const overlay = document.getElementById('login-overlay');
+            const passwordInput = document.getElementById('password-input');
+            const loginBtn = document.getElementById('login-btn');
+            const errorDiv = document.getElementById('login-error');
+            const toggleBtn = document.getElementById('toggle-password');
+            const correctPassword = 'Deepnectar@1612@';
+
+            toggleBtn.addEventListener('click', function() {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+                this.textContent = type === 'password' ? '👁️' : '👁️‍🗨️';
+            });
+
+            function tryLogin() {
+                const entered = passwordInput.value.trim();
+                if (entered === correctPassword) {
+                    overlay.classList.add('hidden');
+                    errorDiv.textContent = '';
+                } else {
+                    errorDiv.textContent = '❌ Incorrect password. Please try again.';
+                    passwordInput.value = '';
+                    passwordInput.focus();
+                }
+            }
+
+            loginBtn.addEventListener('click', tryLogin);
+            passwordInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin(); });
+
+            // Clear day data
+            function clearDayData(dayId) {
+                const page = document.getElementById(dayId);
+                if (!page) return;
+                const inputs = page.querySelectorAll('input:not([type="password"]), textarea, select');
+                inputs.forEach(el => {
+                    if (el.type === 'checkbox') {
+                        el.checked = false;
+                    } else if (el.tagName === 'SELECT') {
+                        if (!el.classList.contains('day-finished-select')) {
+                            el.selectedIndex = 0;
+                        }
+                    } else {
+                        el.value = '';
+                    }
+                });
+                const finishedSelect = page.querySelector('.day-finished-select');
+                if (finishedSelect) {
+                    finishedSelect.value = 'no';
+                }
+                alert(`✅ Data for ${dayId.toUpperCase()} has been cleared.`);
+            }
+
+            document.querySelectorAll('.clear-day-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const dayId = this.getAttribute('data-day');
+                    if (confirm(`Are you sure you want to clear ALL data for ${dayId.toUpperCase()}?`)) {
+                        clearDayData(dayId);
+                    }
+                });
+            });
+
+            // Auto-expand textareas
+            document.querySelectorAll('textarea').forEach(textarea => {
+                textarea.addEventListener('input', function() {
+                    this.style.minHeight = '60px';
+                    this.style.height = 'auto';
+                    this.style.height = this.scrollHeight + 'px';
+                });
+                setTimeout(() => {
+                    if (textarea.value) {
+                        textarea.style.height = 'auto';
+                        textarea.style.height = textarea.scrollHeight + 'px';
+                    }
+                }, 100);
+            });
+
+            // Auto-expand inputs
+            document.querySelectorAll('td input[type="text"], td .inline-input, .auto-expand').forEach(input => {
+                if (input.closest('.datetime-group')) return;
+                function autoExpandInput(el) {
+                    const temp = document.createElement('span');
+                    temp.style.visibility = 'hidden';
+                    temp.style.position = 'absolute';
+                    temp.style.whiteSpace = 'pre';
+                    temp.style.fontSize = window.getComputedStyle(el).fontSize;
+                    temp.style.fontFamily = window.getComputedStyle(el).fontFamily;
+                    temp.textContent = el.value || el.placeholder || '';
+                    document.body.appendChild(temp);
+                    const width = temp.offsetWidth + 25;
+                    document.body.removeChild(temp);
+                    if (width > 60) {
+                        el.style.width = Math.min(width, 400) + 'px';
+                    } else {
+                        el.style.width = 'auto';
+                        el.style.minWidth = '60px';
+                    }
+                }
+                input.addEventListener('input', function() {
+                    autoExpandInput(this);
+                });
+                setTimeout(() => {
+                    if (input.value) {
+                        autoExpandInput(input);
+                    }
+                }, 100);
+            });
+
+            // Save
+            document.getElementById('save-contract').addEventListener('click', function() {
+                const inputs = document.querySelectorAll('input:not([type="password"]), textarea, select');
+                const data = {};
+                inputs.forEach((el, idx) => {
+                    if (el.type === 'checkbox') {
+                        data[el.id || `chk-${idx}`] = el.checked;
+                    } else if (el.type === 'select-one') {
+                        data[el.id || el.className || `sel-${idx}`] = el.value;
+                    } else {
+                        const key = el.placeholder || el.name || `field-${idx}`;
+                        data[key] = el.value;
+                    }
+                });
+                const allCheckboxes = document.querySelectorAll('input[type="checkbox"]');
+                allCheckboxes.forEach((cb, i) => {
+                    data[`cb-${i}`] = cb.checked;
+                });
+                document.querySelectorAll('.day-finished-select').forEach(sel => {
+                    data[`day-${sel.dataset.day}-finished`] = sel.value;
+                });
+                localStorage.setItem('bdsmContractData', JSON.stringify(data));
+                alert('✅ Contract data saved locally.');
+            });
+
+            // Load
+            function loadSaved() {
+                const saved = localStorage.getItem('bdsmContractData');
+                if (!saved) return;
+                try {
+                    const data = JSON.parse(saved);
+                    const inputs = document.querySelectorAll('input:not([type="password"]), textarea, select');
+                    const allCheckboxes = document.querySelectorAll('input[type="checkbox"]');
+                    allCheckboxes.forEach((cb, i) => {
+                        const key = `cb-${i}`;
+                        if (data.hasOwnProperty(key)) {
+                            cb.checked = data[key];
+                        }
+                    });
+                    document.querySelectorAll('.day-finished-select').forEach(sel => {
+                        const key = `day-${sel.dataset.day}-finished`;
+                        if (data.hasOwnProperty(key)) {
+                            sel.value = data[key];
+                        }
+                    });
+                    let idx = 0;
+                    inputs.forEach(el => {
+                        if (el.type === 'checkbox') return;
+                        if (el.type === 'select-one') {
+                            const key = el.id || el.className || `sel-${idx}`;
+                            if (data.hasOwnProperty(key)) {
+                                el.value = data[key];
+                            }
+                        } else {
+                            const key = el.placeholder || el.name || `field-${idx}`;
+                            if (data.hasOwnProperty(key)) {
+                                el.value = data[key];
+                            }
+                        }
+                        idx++;
+                    });
+                } catch (e) { /* ignore */ }
+            }
+
+            const observer = new MutationObserver(() => {
+                if (overlay.classList.contains('hidden')) {
+                    loadSaved();
+                    observer.disconnect();
+                }
+            });
+            observer.observe(overlay, { attributes: true, attributeFilter: ['class'] });
+
+            if (overlay.classList.contains('hidden')) {
+                loadSaved();
+                observer.disconnect();
+            }
+
+            // Print
+            document.getElementById('print-pdf').addEventListener('click', function() {
+                window.print();
+            });
+
+            // ---- EMAIL MODAL ----
+            const modal = document.getElementById('email-modal');
+            const modalBody = document.getElementById('modal-body');
+            const modalCloseBtn = document.getElementById('modal-close-btn');
+            const modalCloseFooter = document.getElementById('modal-close-footer-btn');
+            const modalCopyBtn = document.getElementById('modal-copy-btn');
+            const modalEmailBtn = document.getElementById('modal-email-btn');
+            const tabButtons = document.querySelectorAll('.modal-tabs button');
+            let currentFormat = 'plain';
+            let currentPlainText = '';
+            let currentHtmlText = '';
+
+            function closeModal() {
+                modal.classList.remove('active');
+            }
+
+            modalCloseBtn.addEventListener('click', closeModal);
+            modalCloseFooter.addEventListener('click', closeModal);
+            modal.addEventListener('click', function(e) {
+                if (e.target === this) closeModal();
+            });
+
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    tabButtons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentFormat = this.dataset.format;
+                    renderModalContent();
+                });
+            });
+
+            function renderModalContent() {
+                if (currentFormat === 'plain') {
+                    modalBody.textContent = currentPlainText;
+                    modalBody.className = 'modal-body';
+                } else {
+                    modalBody.innerHTML = currentHtmlText;
+                    modalBody.className = 'modal-body html-body';
+                }
+            }
+
+            // Build email content
+            function buildEmailContent() {
+                const finishedDays = [];
+                document.querySelectorAll('.day-finished-select').forEach(sel => {
+                    if (sel.value === 'yes') {
+                        finishedDays.push(sel.dataset.day);
+                    }
+                });
+
+                if (finishedDays.length === 0) {
+                    alert('⚠️ No days marked as completed. Please mark days as "Yes" in the Day Finished selector before emailing.');
+                    return null;
+                }
+
+                // --- PLAIN TEXT ---
+                let plain = '';
+                plain += '========================================\n';
+                plain += '   BDSM SCENE CONTRACT - COMPLETED DAYS\n';
+                plain += '========================================\n\n';
+                plain += 'Exported: ' + new Date().toLocaleString() + '\n';
+                plain += 'Completed Days: ' + finishedDays.join(', ').toUpperCase() + '\n';
+                plain += '========================================\n\n';
+
+                // --- HTML ---
+                let html = '<div style="font-family: Georgia, \'Times New Roman\', serif; max-width: 800px; margin: 0 auto; background: #fcf7f0; padding: 30px 35px; border-radius: 16px; border: 1px solid #b8a79b; color: #2a1c16;">';
+                html += '<div style="text-align: center; border-bottom: 3px double #b7a094; padding-bottom: 15px; margin-bottom: 25px;">';
+                html += '<h1 style="font-size: 28px; font-weight: 300; letter-spacing: 3px; font-family: Georgia, serif; color: #241b17; margin: 0 0 8px 0;">BDSM SCENE CONTRACT</h1>';
+                html += '<p style="color: #3f322b; font-size: 14px; margin: 0;">📅 Exported: ' + new Date().toLocaleString() + '</p>';
+                html += '<p style="color: #3f322b; font-size: 14px; margin: 4px 0 0 0;">✅ Completed Days: <strong>' + finishedDays.join(', ').toUpperCase() + '</strong></p>';
+                html += '</div>';
+
+                function getDateFromGroup(group) {
+                    if (!group) return '';
+                    const inputs = group.querySelectorAll('input');
+                    const vals = Array.from(inputs).map(inp => inp.value || inp.placeholder);
+                    if (vals.length >= 3) {
+                        const clean = vals.filter(v => v && v !== 'DD' && v !== 'MM' && v !== 'YYYY' && v !== 'HH' && v !== 'MM');
+                        if (clean.length >= 3) {
+                            const d = clean[0] !== 'DD' && clean[0] !== '' ? clean[0] : '';
+                            const m = clean[1] !== 'MM' && clean[1] !== '' ? clean[1] : '';
+                            const y = clean[2] !== 'YYYY' && clean[2] !== '' ? clean[2] : '';
+                            if (d && m && y) return d + '/' + m + '/' + y;
+                            return clean.join('/');
+                        }
+                        if (clean.length === 2) {
+                            const h = clean[0] !== 'HH' && clean[0] !== '' ? clean[0] : '';
+                            const m = clean[1] !== 'MM' && clean[1] !== '' ? clean[1] : '';
+                            if (h && m) return h + ':' + m;
+                            return clean.join(':');
+                        }
+                        return vals.join('/');
+                    }
+                    return '';
+                }
+
+                function getInputValue(el) {
+                    if (!el) return '';
+                    if (el.tagName === 'TEXTAREA') return el.value;
+                    if (el.tagName === 'INPUT') {
+                        if (el.type === 'checkbox') return el.checked ? 'Yes' : 'No';
+                        return el.value;
+                    }
+                    if (el.tagName === 'SELECT') return el.value;
+                    return '';
+                }
+
+                function escapeHtml(text) {
+                    if (!text) return '';
+                    const div = document.createElement('div');
+                    div.textContent = text;
+                    return div.innerHTML;
+                }
+
+                finishedDays.forEach(dayId => {
+                    const page = document.getElementById(dayId);
+                    if (!page) return;
+
+                    const titleEl = page.querySelector('h2');
+                    const pageTitle = titleEl ? titleEl.textContent.trim() : dayId.toUpperCase();
+
+                    plain += '╔══════════════════════════════════════════════════╗\n';
+                    plain += '║  ✅ ' + pageTitle + ' - COMPLETED\n';
+                    plain += '╚══════════════════════════════════════════════════╝\n\n';
+
+                    html += '<div style="margin-bottom: 35px; padding: 15px 20px; background: rgba(252, 247, 240, 0.8); border-radius: 12px; border-left: 4px solid #b19787;">';
+                    html += '<h2 style="font-family: Georgia, serif; font-weight: 400; color: #2a1c16; margin: 0 0 10px 0; font-size: 20px;">✅ ' + escapeHtml(pageTitle) + '</h2>';
+
+                    let dayData = [];
+
+                    // Signatures
+                    const signRows = page.querySelectorAll('.sign-row');
+                    signRows.forEach(row => {
+                        const labels = row.querySelectorAll('label');
+                        const inputs = row.querySelectorAll('input:not([type="checkbox"])');
+                        labels.forEach((label, i) => {
+                            if (inputs[i] && !inputs[i].closest('.datetime-group')) {
+                                const val = inputs[i].value.trim();
+                                if (val && val !== 'Honey' && val !== 'Deep' && val !== 'Signature' && val !== '') {
+                                    dayData.push({ label: label.textContent.trim(), value: val });
+                                }
+                            }
+                        });
+                        const dateGroups = row.querySelectorAll('.datetime-group');
+                        dateGroups.forEach(dg => {
+                            const dateStr = getDateFromGroup(dg);
+                            if (dateStr && dateStr !== 'DD/MM/YYYY' && dateStr !== '//' && dateStr !== ':' && dateStr !== '') {
+                                const label = dg.closest('.sign-field')?.querySelector('label')?.textContent || 'Date';
+                                dayData.push({ label: label, value: dateStr });
+                            }
+                        });
+                    });
+
+                    // Special Requests
+                    const requests = page.querySelectorAll('.section-title + p');
+                    requests.forEach(p => {
+                        const strong = p.querySelector('strong');
+                        if (strong && (strong.textContent.includes('Submissive') || strong.textContent.includes('Dominant'))) {
+                            const text = p.textContent.replace(strong.textContent, '').trim();
+                            if (text && text !== '') {
+                                dayData.push({ label: strong.textContent.trim(), value: text });
+                            }
+                        }
+                    });
+
+                    // Debrief
+                    const debriefGrids = page.querySelectorAll('.debrief-grid');
+                    debriefGrids.forEach(grid => {
+                        const labels = grid.querySelectorAll('label');
+                        const inputs = grid.querySelectorAll('input, textarea');
+                        labels.forEach((label, i) => {
+                            if (inputs[i]) {
+                                const val = getInputValue(inputs[i]);
+                                if (val && val.trim() !== '') {
+                                    dayData.push({ label: label.textContent.trim(), value: val });
+                                }
+                            }
+                        });
+                        const textareas = grid.querySelectorAll('textarea');
+                        textareas.forEach(ta => {
+                            const val = ta.value.trim();
+                            if (val && val !== '') {
+                                const label = ta.closest('.full')?.querySelector('label')?.textContent || 'Debrief Notes';
+                                dayData.push({ label: label, value: val });
+                            }
+                        });
+                    });
+
+                    // Safeword verification
+                    const safewordTables = page.querySelectorAll('table');
+                    safewordTables.forEach(table => {
+                        const prevH4 = table.previousElementSibling;
+                        if (prevH4 && prevH4.tagName === 'H4' && prevH4.textContent.includes('SAFEWORD VERIFICATION')) {
+                            const rows = table.querySelectorAll('tr');
+                            rows.forEach((row, ri) => {
+                                if (ri === 0) return;
+                                const cells = row.querySelectorAll('td');
+                                if (cells.length >= 3) {
+                                    const safeword = cells[0].textContent.trim();
+                                    const subCbs = cells[1].querySelectorAll('input[type="checkbox"]');
+                                    const domCbs = cells[2].querySelectorAll('input[type="checkbox"]');
+                                    const subYes = subCbs[0]?.checked || false;
+                                    const domYes = domCbs[0]?.checked || false;
+                                    if (safeword) {
+                                        dayData.push({ label: safeword + ' (Submissive)', value: subYes ? 'Yes' : 'No' });
+                                        dayData.push({ label: safeword + ' (Dominant)', value: domYes ? 'Yes' : 'No' });
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    // Checklist
+                    const checklistItems = page.querySelectorAll('.checklist-item');
+                    checklistItems.forEach(item => {
+                        const cb = item.querySelector('input[type="checkbox"]');
+                        const labelText = item.textContent.trim();
+                        if (cb && cb.checked && labelText && labelText !== '') {
+                            dayData.push({ label: '✓ ' + labelText, value: 'Yes' });
+                        }
+                    });
+
+                    // Toy inventory
+                    const toyTables = page.querySelectorAll('table');
+                    toyTables.forEach(table => {
+                        const prevH4 = table.previousElementSibling;
+                        if (prevH4 && prevH4.tagName === 'H4' && prevH4.textContent.includes('TOY INVENTORY')) {
+                            const rows = table.querySelectorAll('tr');
+                            rows.forEach((row, ri) => {
+                                if (ri === 0) return;
+                                const cells = row.querySelectorAll('td');
+                                if (cells.length >= 3) {
+                                    const item = cells[0].textContent.trim();
+                                    const locInput = cells[2].querySelector('input');
+                                    const location = locInput ? locInput.value.trim() : cells[2].textContent.trim();
+                                    const cleanCbs = cells[1].querySelectorAll('input[type="checkbox"]');
+                                    let conditions = [];
+                                    if (cleanCbs.length > 0 && cleanCbs[0]?.checked) conditions.push('Clean');
+                                    if (cleanCbs.length > 1 && cleanCbs[1]?.checked) conditions.push(cleanCbs[1]?.nextSibling?.textContent?.trim() || 'Safe');
+                                    if (conditions.length > 0 || location) {
+                                        const condStr = conditions.length > 0 ? ' [' + conditions.join(', ') + ']' : '';
+                                        const locStr = location && location !== '' && location !== '(empty)' ? ' → ' + location : '';
+                                        dayData.push({ label: item, value: condStr + locStr });
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    // Article 2: Parameters
+                    const paramTables = page.querySelectorAll('table');
+                    paramTables.forEach(table => {
+                        const prevH3 = table.previousElementSibling;
+                        if (prevH3 && prevH3.tagName === 'H3' && prevH3.textContent.includes('ARTICLE 2')) {
+                            const rows = table.querySelectorAll('tr');
+                            rows.forEach((row, ri) => {
+                                if (ri === 0) return;
+                                const cells = row.querySelectorAll('td');
+                                if (cells.length >= 2) {
+                                    const clause = cells[0].textContent.trim();
+                                    let value = cells[1].textContent.trim();
+                                    const dateGroup = cells[1].querySelector('.datetime-group');
+                                    if (dateGroup) {
+                                        const dateStr = getDateFromGroup(dateGroup);
+                                        if (dateStr && dateStr !== 'DD/MM/YYYY' && dateStr !== '//' && dateStr !== ':' && dateStr !== '') {
+                                            value = dateStr;
+                                        }
+                                    }
+                                    if (value && value !== 'DD/MM/YYYY' && value !== 'HH:MM' && value !== '//' && value !== ':' && value !== '') {
+                                        dayData.push({ label: clause, value: value });
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    // Article 5: Hard Limits
+                    const limitTables = page.querySelectorAll('table');
+                    limitTables.forEach(table => {
+                        const prevH3 = table.previousElementSibling;
+                        if (prevH3 && prevH3.tagName === 'H3' && prevH3.textContent.includes('ARTICLE 5')) {
+                            const rows = table.querySelectorAll('tr');
+                            rows.forEach((row, ri) => {
+                                if (ri === 0) return;
+                                const cells = row.querySelectorAll('td');
+                                if (cells.length >= 2) {
+                                    const clause = cells[0].textContent.trim();
+                                    const limit = cells[1].textContent.trim();
+                                    if (clause && limit) {
+                                        dayData.push({ label: clause, value: limit });
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    // Article 6: Aftercare
+                    const aftercareTables = page.querySelectorAll('table');
+                    aftercareTables.forEach(table => {
+                        const prevH3 = table.previousElementSibling;
+                        if (prevH3 && prevH3.tagName === 'H3' && prevH3.textContent.includes('ARTICLE 6')) {
+                            const rows = table.querySelectorAll('tr');
+                            rows.forEach((row, ri) => {
+                                if (ri === 0) return;
+                                const cells = row.querySelectorAll('td');
+                                if (cells.length >= 2) {
+                                    const deliverable = cells[0].textContent.trim();
+                                    const duration = cells[1].textContent.trim();
+                                    if (deliverable && duration) {
+                                        dayData.push({ label: deliverable, value: duration });
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    // Output
+                    if (dayData.length > 0) {
+                        plain += '--- SCENE DATA ---\n';
+                        html += '<div style="margin: 10px 0;">';
+                        dayData.forEach(item => {
+                            plain += '  ' + item.label + ': ' + item.value + '\n';
+                            html += '<div style="padding: 4px 0; border-bottom: 1px solid #ede5de; font-size: 14px;">';
+                            html += '<strong style="color: #3f2c22;">' + escapeHtml(item.label) + ':</strong> ';
+                            html += '<span style="color: #2a1c16;">' + escapeHtml(item.value) + '</span>';
+                            html += '</div>';
+                        });
+                        html += '</div>';
+                        plain += '\n────────────────────────────────────────────\n\n';
+                    } else {
+                        plain += 'No custom data entered for this day.\n\n';
+                    }
+
+                    html += '</div>';
+                });
+
+                // Confidentiality footer
+                plain += '========================================\n';
+                plain += '   CONFIDENTIALITY NOTICE\n';
+                plain += '   The information in this document is\n';
+                plain += '   strictly private and confidential.\n';
+                plain += '========================================\n';
+
+                html += '<div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #d4c2b5; text-align: center; color: #4e3d33; font-size: 13px;">';
+                html += '<p style="margin: 0;"><strong>CONFIDENTIALITY NOTICE</strong></p>';
+                html += '<p style="margin: 4px 0 0 0;">The information in this document is strictly private and confidential.</p>';
+                html += '</div>';
+                html += '</div>';
+
+                return { plain, html };
+            }
+
+            // Email button
+            document.getElementById('email-contract').addEventListener('click', function() {
+                const content = buildEmailContent();
+                if (!content) return;
+                currentPlainText = content.plain;
+                currentHtmlText = content.html;
+                renderModalContent();
+                modal.classList.add('active');
+            });
+
+            // Copy button
+            modalCopyBtn.addEventListener('click', function() {
+                const text = currentFormat === 'plain' ? currentPlainText : currentHtmlText;
+                navigator.clipboard.writeText(text).then(() => {
+                    alert('✅ Copied to clipboard!');
+                }).catch(() => {
+                    // Fallback
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    alert('✅ Copied to clipboard!');
+                });
+            });
+
+            // Email send button
+            modalEmailBtn.addEventListener('click', function() {
+                const subject = encodeURIComponent('BDSM Contract Data - ' + new Date().toLocaleDateString());
+                const body = encodeURIComponent(currentPlainText);
+                window.open('mailto:?subject=' + subject + '&body=' + body, '_blank');
+            });
+
+            // Keyboard shortcut: ESC to close modal
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && modal.classList.contains('active')) {
+                    closeModal();
+                }
+            });
+        })();
+    </script>
+</body>
+</html>
