@@ -1,5 +1,8 @@
 # Deep & Honey · Eternal Contract (v2.4 DH)
 
+## What's new in this version
+- **v2.4 DH (home screen):** the current app version is now shown always on the home screen — a `v2.4 DH ♥` badge sits in the header next to the Soulmate Code wordmark. Tapping it pops a "✨ What's new in v2.4 DH" toast listing the release highlights. The badge text is driven by `APP_VERSION` in `js/app.js`, so bumping that one constant keeps the home screen in sync automatically; add one `WHATS_NEW` line there per release.
+
 A private, password-gated scene contract web app. **All state lives in Supabase cloud** (`contract_state` table) — nothing is saved to localStorage/sessionStorage/IndexedDB.
 
 ## Files
