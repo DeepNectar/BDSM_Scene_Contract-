@@ -231,6 +231,9 @@
      plain lh3 Drive link + clickable /view anchor + SVG onerror mark. */
   const EMBED_SIZES = { Deep: [360, 120], Honey: [360, 120], stamp: [280, 280], logo: [280, 240] };
   const compressImg = (key, path) => new Promise(resolve => {
+    /* v3.1 DH — guard: if fetch/URL.createObjectURL are unavailable (older
+       browsers or test runners), skip embedding and let the SVG fallbacks show. */
+    if (typeof fetch !== 'function' || typeof URL === 'undefined' || !URL.createObjectURL) return resolve('');
     fetch(path).then(r => (r && r.ok) ? r.blob() : null).then(blob => {
       if (!blob) return resolve('');
       const url = URL.createObjectURL(blob);
@@ -262,6 +265,12 @@
      remote images. The <img> still tries the Drive https link first; if it
      fails to load, onerror swaps in the matching SVG placeholder. */
   const escA = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/'/g,'&#39;');
+  /* v3.1 DH — hoisted here (was declared further below) so early helpers like
+     buildSubchips() can use it during init. Declaring it lower in the file and
+     calling it earlier threw a TDZ ReferenceError that killed the whole script,
+     silently breaking the "✉ Email data" / "✨ AI write a day" buttons and the
+     Delete-day buttons. */
+  const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   const wrapSvg = inner => 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="160" viewBox="0 0 480 160">` +
     `<rect width="480" height="160" rx="14" fill="#fdf6f0" stroke="#c98a97" stroke-width="3"/>${inner}</svg>`);
@@ -932,7 +941,7 @@
   const CARE_LABELS = { cuddle:'Warm blanket wrap + ≥20 minutes of unhurried cuddles', massage:'Gentle massage of bound / played areas — 5 min per limb', praise:'Verbal praise, reassurance and eye contact throughout cool-down', treats:'Hydration — warm herbal tea, water and a light sweet snack', quiet:'Quiet presence: same room, no demands, soft company', words:'Talk-it-through debrief: scores, feelings, one pride and one wish' };
   const BASE_AFTERCARE = [['Warm blanket wrap (thermal regulation)','Immediate'],['Hydration — warm herbal tea or still water','Upon request'],['Light snack — chocolate or fruit','Upon request']];
 
-  const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  /* escH hoisted to the top of the IIFE (v3.1 DH) */
 
   const buildPlan = () => {
     /* v3.0 DH — read every selectable option: mood, intensity, lead, venue,
