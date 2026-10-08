@@ -26,11 +26,11 @@ window.CloudStore = null;
   window.CloudStore = {
     ready: true,
     fields: () => F,
-    saveFields(f) { F = f; },
+    saveFields(f) { F = f; return Promise.resolve(true); },
     days: () => D,
     saveDays(list) { D = list; return Promise.resolve(true); },
     accepts: () => A,
-    saveAccepts(a) { A = a; },
+    saveAccepts(a) { A = a; return Promise.resolve(true); },
     load: async () => ({ fields: {}, days: [] }),
     save: async () => true,
   };
@@ -68,6 +68,9 @@ check('Day deleted from DOM', !$('#day2'));
 
 /* ---------- 3. Email data button renders modal ---------- */
 (async () => {
+  /* mark Day 1 as finished so the exporter has data (same flow a user follows) */
+  const fin = $('#df-day1');
+  if (fin) { fin.value = 'yes'; fin.dispatchEvent(new window.Event('change', { bubbles: true })); }
   $('#email-contract').click();
   await new Promise(r => setTimeout(r, 800));
   check('Email modal opens', $('#email-modal').classList.contains('active'));

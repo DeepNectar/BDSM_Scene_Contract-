@@ -16,6 +16,19 @@
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+  /* v3.2 DH — mark the app as live so the inline no-JS fallback in index.html
+     never fires; real handlers below own every button. */
+  window.__dhReady = true;
+
+  /* any error that escapes our code becomes a visible toast instead of a
+     silently dead button (this is how "Email data"/"Delete day" broke before) */
+  window.addEventListener('error', ev => {
+    try {
+      const t = document.getElementById('toast');
+      if (t) { t.textContent = '⚠️ ' + (ev.message || 'Script error') + ' — please refresh.'; t.classList.add('show'); }
+    } catch (_) {}
+  });
+
   /* ---------- toast ---------- */
   const toastEl = $('#toast');
   let toastTimer;
@@ -30,10 +43,11 @@
      APP_VERSION is the single source of truth: it drives the badge shown on
      the home screen (header) so the version always stays in sync. When you
      bump a release here, also prepend one WHATS_NEW line describing it. */
-  const APP_VERSION = 'v3.0 DH';
+  const APP_VERSION = 'v3.2 DH';
   const WHATS_NEW = [
+    '🔧 v3.2: Delete-day button now visible on EVERY day (Day 1 included) and fully working; “✉ Email data” & “✨ AI write a day” hardened with an error-toast watchdog + no-JS fallback so buttons can never appear dead.',
     '✨ AI day-writer upgraded: pick MOOD (romantic / spicy / playful / intense / tender / slow burn), INTENSITY, WHO LEADS, VENUE, aftercare focus, special requests per partner, extra limits — plus a huge BDSM category & subcategory menu (sensory, bondage & rope, impact, sensation, power exchange, protocol, edging & denial, worship, roleplay, fetish, ritual, scene extras, aftercare & drop care) with safety rules baked into every choice.',
-    '🗑 Delete a day manually: every day page now has a “✖ Delete day” button (the permanent Day 1 is protected). Deleted days vanish from the contract AND from the cloud sync.',
+    '🗑 Delete a day manually: EVERY day page (Day 1 included) now shows a red “✖ Delete day” button next to “Clear this day”. Confirm once and the day vanishes from the contract AND from the cloud sync — it stays gone after reload.',
     '💌 HTML email completely restyled: romantic gradient banner, gold-rose dividers, labelled data cards, zebra-striped tables with wine headers, ✓ confirmed / ○ pending chips, RED-YELLOW-GREEN safeword pills, numbered day badges, signature panels and an elegant framed love-stamp footer — formatted data, not plain label dumps.',
     '♥ HTML email still carries EVERY important field from the Day section and the Pre-Scene Execution Affidavit: execution date & time, all checklist items, safeword verification, non-verbal signal, consent declarations, full toy inventory, debrief scores/notes/safeword-used, signature dates — plus Contract Overview and both signatures.',
     'Sign, stamp & logo preview everywhere — compressed base64 embeds with pixel-link and SVG fallbacks; no “View on Google Drive” text or links anywhere.'
@@ -231,6 +245,9 @@
      plain lh3 Drive link + clickable /view anchor + SVG onerror mark. */
   const EMBED_SIZES = { Deep: [360, 120], Honey: [360, 120], stamp: [280, 280], logo: [280, 240] };
   const compressImg = (key, path) => new Promise(resolve => {
+    /* v3.1 DH — guard: if fetch/URL.createObjectURL are unavailable (older
+       browsers or test runners), skip embedding and let the SVG fallbacks show. */
+    if (typeof fetch !== 'function' || typeof URL === 'undefined' || !URL.createObjectURL) return resolve('');
     fetch(path).then(r => (r && r.ok) ? r.blob() : null).then(blob => {
       if (!blob) return resolve('');
       const url = URL.createObjectURL(blob);
@@ -262,6 +279,12 @@
      remote images. The <img> still tries the Drive https link first; if it
      fails to load, onerror swaps in the matching SVG placeholder. */
   const escA = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/'/g,'&#39;');
+  /* v3.1 DH — hoisted here (was declared further below) so early helpers like
+     buildSubchips() can use it during init. Declaring it lower in the file and
+     calling it earlier threw a TDZ ReferenceError that killed the whole script,
+     silently breaking the "✉ Email data" / "✨ AI write a day" buttons and the
+     Delete-day buttons. */
+  const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   const wrapSvg = inner => 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="160" viewBox="0 0 480 160">` +
     `<rect width="480" height="160" rx="14" fill="#fdf6f0" stroke="#c98a97" stroke-width="3"/>${inner}</svg>`);
@@ -510,15 +533,12 @@
      deleted. Deleting removes the page from the DOM, drops its per-day
      signature areas, prunes its saved field values and re-syncs the cloud day
      list so it stays gone on every device. */
-  const STATIC_DAY_IDS = new Set(['day1']);
+  /* v3.2 DH — per the user's request, EVERY day (including Day 1) can be deleted
+     manually after confirmation; no day is protected any more. */
   const deleteDay = btn => {
     const dayId = btn.dataset.day;
     const page  = $('#' + dayId);
     if (!page) return;
-    if (STATIC_DAY_IDS.has(dayId)) {
-      toast('💍 Day 1 is our founding page — it can be cleared, but never deleted.', 3600);
-      return;
-    }
     const title = $('h2', page)?.textContent.trim() || dayId.toUpperCase();
     if (!confirm(`Delete “${title}” completely?\nAll its entries, checks and signatures are removed from the contract and the cloud. This cannot be undone.`)) return;
     /* drop per-day signature state (signatories-dayN / debrief-dayN) */
@@ -932,7 +952,7 @@
   const CARE_LABELS = { cuddle:'Warm blanket wrap + ≥20 minutes of unhurried cuddles', massage:'Gentle massage of bound / played areas — 5 min per limb', praise:'Verbal praise, reassurance and eye contact throughout cool-down', treats:'Hydration — warm herbal tea, water and a light sweet snack', quiet:'Quiet presence: same room, no demands, soft company', words:'Talk-it-through debrief: scores, feelings, one pride and one wish' };
   const BASE_AFTERCARE = [['Warm blanket wrap (thermal regulation)','Immediate'],['Hydration — warm herbal tea or still water','Upon request'],['Light snack — chocolate or fruit','Upon request']];
 
-  const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+  /* escH hoisted to the top of the IIFE (v3.1 DH) */
 
   const buildPlan = () => {
     /* v3.0 DH — read every selectable option: mood, intensity, lead, venue,
@@ -1138,7 +1158,9 @@
   };
 
   /* ---------- append a freshly created day ---------- */
-  const STATIC_IDS = new Set(['day1']);   // days shipped in index.html — never persisted
+  const STATIC_IDS = new Set(['day1']);   /* days shipped in index.html are NOT persisted:
+                                              deleting one only removes it for the session
+                                              (reloading restores the original page). */
   const persistDays = () => {
     const list = $$('.page')
       .filter(p => dayNumber(p.id) && !STATIC_IDS.has(p.id))
