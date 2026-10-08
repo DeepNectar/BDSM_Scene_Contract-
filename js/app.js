@@ -110,14 +110,17 @@
     catch { /* storage full — the explicit 💾 Save button surfaces the error instead */ }
   };
 
-  const save = () => {
+  const save = (quiet) => {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(collectState()));
-      toast('💾 Saved — our contract is kept safe on this device.');
+      if (!quiet) toast('💾 Saved — our contract is kept safe on this device.');
     } catch {
-      toast('⚠️ Browser storage is full — clear a finished AI day or export by email.', 3600);
+      if (!quiet) toast('⚠️ Browser storage is full — clear a finished AI day or export by email.', 3600);
     }
   };
+
+  /* ---------- visibility helpers (used by autosave AND the app lifecycle) ---------- */
+  const pageVisible = () => document.visibilityState === 'visible';
 
   const loadSaved = () => {
     let data;
@@ -137,7 +140,7 @@
 
   /* restore AI-created day pages (innerHTML kept verbatim → DOM paths stay stable),
      then replay saved values on top of them */
-  const DAYS_KEY = 'dhContract.days.v1';
+  var DAYS_KEY = 'dhContract.days.v1';   // var (not const) → also readable from the service worker
   const restoreDays = () => {
     let raw;
     try { raw = JSON.parse(localStorage.getItem(DAYS_KEY)); } catch { return; }
@@ -158,8 +161,45 @@
   };
 
   $('#save-contract').addEventListener('click', save);
-  $('#print-pdf').addEventListener('click', () => window.print());
-  setInterval(writeStore, 60000);          // gentle autosave
+
+  /* ---------- Print / PDF ----------
+     On phones window.print() is unreliable (no print service, or it silently
+     opens a broken share sheet), so the app generates the PDF itself — see
+     js/pdf.js. Desktop keeps the native "Print → Save as PDF" dialog. */
+  const useGeneratedPDF = () => {
+    if (typeof makeContractPDF !== 'function') return false;
+    if (isPhone()) return true;                                    // phones: always build the file
+    try {                                                           // installed PWA: no browser chrome to print from
+      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+      if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) return true;
+      if (navigator.standalone) return true;                        // iOS home-screen app
+    } catch { /* ignore */ }
+    return false;
+  };
+  $('#print-pdf').addEventListener('click', async e => {
+    const btn = e.currentTarget;
+    if (!useGeneratedPDF()) { window.print(); return; }
+    const old = btn.textContent;
+    btn.disabled = true; btn.textContent = '⏳ Building PDF…';
+    try {
+      writeStore();                                   // make sure the newest entries are on disk first
+      const res = await makeContractPDF();
+      downloadBlob(res.blob, res.filename);
+      toast('📄 PDF ready — check your Downloads folder ♥', 3400);
+    } catch (err) {
+      console.warn(err);
+      toast('⚠️ Could not build the PDF here — opening the print dialog instead.', 3600);
+      try { window.print(); } catch { /* nothing more we can do */ }
+    } finally {
+      btn.disabled = false; btn.textContent = old;
+    }
+  });
+
+  /* gentle autosave — every change writes instantly, plus safety nets */
+  ['input', 'change'].forEach(ev => document.addEventListener(ev, writeStore, true));
+  setInterval(() => { if (!pageVisible()) writeStore(); }, 20000);   // background top-up (PWA / tab switch)
+  document.addEventListener('visibilitychange', () => { if (!pageVisible()) writeStore(); });
+  window.addEventListener('pagehide', writeStore);
   window.addEventListener('beforeunload', writeStore);
 
   /* ============================================================
@@ -314,8 +354,12 @@
   });
 
   /* re-apply on initial page load too — AFTER restoring saved values so that
-     sealed slots/dates take ownership instead of being overwritten by old data */
-  document.addEventListener('DOMContentLoaded', () => { restoreDays(); loadSaved(); applySignatures(); });
+     sealed slots/dates take ownership instead of being overwritten by old data.
+     (app.js is loaded with `defer`, so this also runs after js/device.js and
+     js/pdf.js have defined their globals.) */
+  const bootContract = () => { restoreDays(); loadSaved(); applySignatures(); };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootContract);
+  else bootContract();
 
   /* ---------- clear a day ---------- */
   const clearDay = btn => {
@@ -346,8 +390,16 @@
     const sel = $('.day-finished-select', page);
     return !!sel && sel.value === 'yes';
   };
+  /* the finished-switch is a <select>: on phones it opens the OS picker, so make
+     it look like one (native arrow + tinted background when "finished") */
+  const styleSwitch = page => {
+    const sel = $('.day-finished-select', page);
+    if (!sel) return;
+    page.classList.toggle('day-finished-on', dayLocked(page));
+  };
   const syncLockUI = page => {
     page.classList.toggle('day-locked', dayLocked(page));
+    styleSwitch(page);
   };
   const syncAllLocks = () => $$('.page').forEach(syncLockUI);
   $$('.day-finished-select').forEach(sel => {
@@ -736,9 +788,16 @@
     }
   });
 
-  /* ---------- textareas: grow with content ---------- */
+  /* ---------- textareas: grow with content (batched → cheap on phones) ---------- */
   const autoGrow = ta => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
   const autoGrowAll = () => $$('textarea').forEach(autoGrow);
+  let growQueued = false;
+  const scheduleAutoGrowAll = () => {
+    if (growQueued) return;
+    growQueued = true;
+    requestAnimationFrame(() => { growQueued = false; autoGrowAll(); });
+  };
+  window.scheduleAutoGrowAll = scheduleAutoGrowAll;   // used by js/device.js after a profile change
   const wireTextareas = root => $$('textarea', root).forEach(ta => ta.addEventListener('input', () => autoGrow(ta)));
 
   /* ---------- date/time pills: auto-advance + digits only ---------- */
@@ -757,6 +816,29 @@
   wireTextareas(document);
   wirePills(document);
   $$('.datetime-group').forEach(() => {});   // keep grouping explicit for readability
+
+  /* ---------- keyboard-safe scrolling: a sticky footer bar would sit on top of
+     the on-screen keyboard, so on phones we simply scroll the button into view ---------- */
+  const btnGroup = $('.btn-group');
+  if (btnGroup) {
+    let lastKb = -1;
+    const syncKb = () => {
+      const vh = window.innerHeight || screen.height || 0;
+      const full = Math.max(vh, window.visualViewport ? window.visualViewport.height : vh);
+      const kb = Math.max(0, Math.round(full - vh));
+      if (kb === lastKb) return;
+      lastKb = kb;
+      document.documentElement.style.setProperty('--kb', kb + 'px');
+      if (isPhone()) $$('#main-contract input, #main-contract select, #main-contract textarea').forEach(el => {
+        el.addEventListener('focus', () => {
+          setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { /* ignore */ } }, 260);
+        });
+      });
+    };
+    syncKb();
+    window.addEventListener('resize', syncKb);
+    if (window.visualViewport) window.visualViewport.addEventListener('resize', syncKb);
+  }
 
   /* ============================================================
      EMAIL EXPORT
@@ -976,4 +1058,162 @@
     const body = encodeURIComponent(plainText);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   });
+
+  /* ============================================================
+     📱 PWA LIFECYCLE — install prompt, offline service worker,
+     update check. Everything is optional: if a browser has no
+     service workers (file:// preview, old WebView) the contract
+     still works exactly as before.
+     ============================================================ */
+  const PW_KEY = 'dhContract.pw.v1';
+  const pwState = (() => {
+    try { return JSON.parse(localStorage.getItem(PW_KEY)) || {}; } catch { return {}; }
+  })();
+  const savePw = () => { try { localStorage.setItem(PW_KEY, JSON.stringify(pwState)); } catch { /* ignore */ } };
+
+  /* ---------- "Add to Home screen" button ---------- */
+  const installBtn = $('#install-app');
+  let deferredPrompt = null;
+  const alreadyInstalled = () => {
+    try {
+      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+      if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) return true;
+    } catch { /* ignore */ }
+    return !!navigator.standalone;                       // iOS home-screen app
+  };
+  const setInstallUI = () => {
+    if (!installBtn) return;
+    if (alreadyInstalled()) { installBtn.hidden = true; return; }
+    installBtn.hidden = false;
+    if (pwState.installed) { installBtn.textContent = '✅ Installed'; installBtn.disabled = true; }
+    else if (deferredPrompt) { installBtn.textContent = '📲 Install app'; installBtn.disabled = false; }
+    else { installBtn.textContent = '📲 Install app'; installBtn.disabled = false; }
+  };
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    setInstallUI();
+    toast('💞 Tip: press “Install app” to keep our contract offline on your phone.', 3800);
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredPrompt = null; pwState.installed = true; savePw(); setInstallUI();
+    toast('♥ Installed! Open it any time from your home screen — even offline.');
+  });
+  if (installBtn) installBtn.addEventListener('click', async () => {
+    if (deferredPrompt) {
+      try { deferredPrompt.prompt(); } catch { /* older Chrome */ }
+      let outcome = 'unknown';
+      try { outcome = (await deferredPrompt.userChoice).outcome; } catch { /* ignore */ }
+      if (outcome === 'accepted') { pwState.installed = true; savePw(); }
+      deferredPrompt = null;
+      setInstallUI();
+      toast(outcome === 'accepted' ? '♥ Installing… look for us on your home screen.'
+                                   : 'No rush — you can install us any time ♥', 3200);
+      return;
+    }
+    showInstallHelp();
+  });
+  setInstallUI();
+
+  /* ---------- manual instructions when there is no auto-prompt (iOS/Safari) ---------- */
+  const installModal = $('#install-modal');
+  const installSteps = $('#install-steps');
+  function showInstallHelp() {
+    if (!installModal) { toast('📲 Use your browser menu → “Add to Home screen”.', 3600); return; }
+    const ua = navigator.userAgent;
+    const ios = /iP(hone|ad|od|uch)/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    const safari = ios && /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|Edg/.test(ua);
+    const chromeDroid = /Android/.test(ua) && /Chrome|Firefox|Edg/.test(ua);
+    let html;
+    if (safari) {
+      html = '<ol>' +
+        '<li>Open this page in <strong>Safari</strong>.</li>' +
+        '<li>Tap the <strong>Share</strong> button <span class="kbd">⎙︎</span> (box with the arrow).</li>' +
+        '<li>Scroll down and tap <strong>“Add to Home Screen”</strong>.</li>' +
+        '<li>Confirm with <strong>Add</strong> — the ♥ icon appears on your home screen.</li>' +
+        '<li>Launch it from there: it opens full-screen like a real app, works offline, and <strong>Save PDF works</strong>.</li>' +
+        '</ol>';
+    } else if (chromeDroid) {
+      html = '<ol>' +
+        '<li>Tap the browser menu <span class="kbd">⋮</span> at the top right.</li>' +
+        '<li>Choose <strong>“Add to Home screen”</strong> / <strong>“Install app”</strong>.</li>' +
+        '<li>Confirm — the ♥ icon lands on your home screen.</li>' +
+        '<li>Open it from there: full-screen app mode, offline ready, <strong>Save PDF works</strong>.</li>' +
+        '</ol>';
+    } else {
+      html = '<ol>' +
+        '<li>Look for <strong>“Install app”</strong> in your browser menu.</li>' +
+        '<li>On iPhone/iPad: Safari → <strong>Share</strong> → <strong>“Add to Home Screen”</strong>.</li>' +
+        '<li>On Android: Chrome ⋮ → <strong>“Add to Home screen”</strong>.</li>' +
+        '</ol>';
+    }
+    installSteps.innerHTML = html;
+    installModal.classList.add('active');
+  }
+  const closeInstall = () => { if (installModal) installModal.classList.remove('active'); };
+  if ($('#install-close-btn')) $('#install-close-btn').addEventListener('click', closeInstall);
+  if ($('#install-close-footer-btn')) $('#install-close-footer-btn').addEventListener('click', closeInstall);
+  if (installModal) installModal.addEventListener('click', e => { if (e.target === installModal) closeInstall(); });
+
+  /* ---------- service worker (offline + app-like shell) ---------- */
+  const swSupported = 'serviceWorker' in navigator &&
+                      (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1');
+  const notifyUpdate = () => {
+    if (pwState.dismissed) return;
+    toast('🔄 A new version is ready — pull to refresh or tap here to reload.', 5200);
+    const again = () => { location.reload(); };
+    toastEl.addEventListener('click', again, { once: true });
+  };
+  if (swSupported) {
+    window.addEventListener('load', async () => {
+      let reg = null;
+      try { reg = await navigator.serviceWorker.register('sw.js'); }
+      catch (err) { console.warn('Service worker not registered:', err); return; }
+      const post = msg => { try { (reg.active || reg.installing || reg.waiting)?.postMessage(msg); } catch { /* ignore */ } };
+      post({ type: 'DH_STATE', key: STORE_KEY, value: localStorage.getItem(STORE_KEY) || null });
+      post({ type: 'DH_STATE', key: DAYS_KEY,  value: localStorage.getItem(DAYS_KEY)  || null });
+      post({ type: 'DH_STATE', key: 'signAccepted', value: localStorage.getItem('signAccepted') || null });
+      document.addEventListener('visibilitychange', () => {
+        if (pageVisible()) post({ type: 'DH_STATE', key: STORE_KEY, value: localStorage.getItem(STORE_KEY) || null });
+      });
+      ['syncData', 'save-contract'].forEach(id => {
+        const b = $('#' + id);
+        if (b) b.addEventListener('click', () => post({ type: 'DH_STATE', key: DAYS_KEY, value: localStorage.getItem(DAYS_KEY) || null }));
+      });
+      if (reg.waiting) notifyUpdate();
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        if (!nw) return;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) notifyUpdate();
+        });
+      });
+    });
+  }
+
+  /* ---------- keep data fresh across the tab / installed app windows ---------- */
+  window.addEventListener('storage', e => {
+    if (!e.key) return;
+    if (e.key === STORE_KEY || e.key === DAYS_KEY || e.key === 'signAccepted') {
+      try {
+        restoreDays();
+        loadSaved();
+        applySignatures();
+        syncAllLocks();
+        scheduleAutoGrowAll();
+      } catch (err) { console.warn(err); }
+    }
+  });
+
+  /* ---------- periodic background sync of our own data into the SW cache ---------- */
+  setInterval(() => {
+    if (!swSupported) return;
+    navigator.serviceWorker.getRegistration().then(reg => {
+      if (!reg) return;
+      const post = msg => { try { (reg.active || reg.installing || reg.waiting)?.postMessage(msg); } catch { /* ignore */ } };
+      post({ type: 'DH_STATE', key: STORE_KEY, value: localStorage.getItem(STORE_KEY) || null });
+      post({ type: 'DH_STATE', key: DAYS_KEY,  value: localStorage.getItem(DAYS_KEY)  || null });
+      post({ type: 'DH_STATE', key: 'signAccepted', value: localStorage.getItem('signAccepted') || null });
+    }).catch(() => { /* ignore */ });
+  }, 90000);
 })();
