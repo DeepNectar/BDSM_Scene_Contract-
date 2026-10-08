@@ -1,4 +1,4 @@
-# Deep & Honey · Eternal Contract (v1.9 DH)
+# Deep & Honey · Eternal Contract (v2.0 DH)
 
 A private, password-gated scene contract web app. **All state lives in Supabase cloud** (`contract_state` table) — nothing is saved to localStorage/sessionStorage/IndexedDB.
 
@@ -24,4 +24,6 @@ create policy "contract rw" on contract_state for all using (true) with check (t
 ## Notes
 - Accept → signs as that party; **Signed ✓ · Undo** stays available even inside a finished day (fresh accepts remain locked).
 - Text inputs/textareas are compact and auto-grow to their content.
-- ✉ Email data → HTML tab embeds signatures, Our love stamp and the Soulmate code logo as data URIs (survives copy/paste into email).
+- ✉ Email data → HTML tab embeds **all signature images** (Deep & Honey PNGs), Our love stamp and the Soulmate code logo as base64 data URIs — they render inside the email itself (survives copy/paste into any email client); plain-text export carries the Drive links.
+- **v2.0 DH:** Marking a day *finished* seals it **and collapses it automatically**; every day has a ▾ Collapse / ▸ Expand toggle (works for AI-created days too). Collapsed days still print/export in full (print CSS overrides collapse).
+- **v2.0 DH:** Header shows the Soulmate code logo enlarged (220×220, was 88×88) with a bigger "SOULMATE CODE" wordmark beneath it.

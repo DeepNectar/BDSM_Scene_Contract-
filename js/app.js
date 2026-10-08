@@ -411,18 +411,50 @@
     const sel = $('.day-finished-select', page);
     return !!sel && sel.value === 'yes';
   };
+  /* ---------- v2.0 DH — collapsible days ----------
+     Marking a day finished collapses it automatically; ▾/▸ keeps it
+     collapsible/expandable by hand for any day. The collapse state is
+     derived from "Day finished" + an optional manual override, so it
+     survives cloud save/load (the select value itself is persisted). */
+  const collapsedOverride = new Map();          // page.id -> true/false (manual only)
+  const isCollapsed = page => {
+    const o = collapsedOverride.get(page.id);
+    return o === undefined ? dayLocked(page) : o;   // finished ⇒ collapsed by default
+  };
+  const updateToggleBtn = page => {
+    const btn = $('.collapse-toggle', page);
+    if (!btn) return;
+    const col = page.classList.contains('day-collapsed');
+    btn.textContent = col ? '▸ Expand' : '▾ Collapse';
+    btn.setAttribute('aria-expanded', String(!col));
+  };
+  const applyCollapse = page => {
+    page.classList.toggle('day-collapsed', isCollapsed(page));
+    updateToggleBtn(page);
+  };
   const syncLockUI = page => {
     page.classList.toggle('day-locked', dayLocked(page));
+    applyCollapse(page);                        // v2.0 DH — finished ⇒ auto-collapse
   };
   const syncAllLocks = () => $$('.page').forEach(syncLockUI);
+  /* wire the ▾/▸ buttons (static markup + event delegation → AI days too) */
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.collapse-toggle');
+    if (!btn) return;
+    const page = btn.closest('.page');
+    if (!page) return;
+    collapsedOverride.set(page.id, !isCollapsed(page));
+    applyCollapse(page);
+  });
   $$('.day-finished-select').forEach(sel => {
     sel.addEventListener('change', () => {
       const page = sel.closest('.page');
+      collapsedOverride.delete(page.id);   // v2.0 DH — fresh choice re-derives the collapse
       syncLockUI(page);
       writeStore();
       toast(dayLocked(page)
-        ? `🔒 ${sel.dataset.day.toUpperCase()} marked finished — signatures & fields are sealed.`
-        : `🔓 ${sel.dataset.day.toUpperCase()} is open again — every sign and field is editable.`);
+        ? `🔒 ${sel.dataset.day.toUpperCase()} marked finished — sealed & collapsed. Tap ▸ Expand to peek inside ♥`
+        : `🔓 ${sel.dataset.day.toUpperCase()} is open again — expanded, every sign and field is editable.`);
     });
   });
   /* guard: clicks on accept-buttons / filled signature slots inside a locked day.
@@ -612,6 +644,7 @@
           <option value="no">❌ No</option>
           <option value="yes">✅ Yes</option>
         </select>
+        <button class="collapse-toggle" type="button" aria-expanded="true" title="Collapse / expand this day">▾ Collapse</button>
         <button class="clear-day-btn" type="button" data-day="day${N}">🗑 Clear this day</button>
       </div>
       <p class="lock-note">🔒 This day is marked as finished — everything (signatures included) is sealed. Set “Day finished” to ❌ No to edit again.</p>
@@ -1047,7 +1080,14 @@
     let sigHtml  = '<div style="margin:0 0 14px">';
     const AREA_NAMES = { seal: 'Seal', signatories: 'Signatories', debrief: 'Debrief' };
     const nameOf = a => AREA_NAMES[a] || a.replace(/-/g, ' · ').replace(/^(.)/, m => m.toUpperCase());
-    const [deepUri, honeyUri] = await Promise.all([fileToDataUri(SIG_CONFIG.Deep), fileToDataUri(SIG_CONFIG.Honey)]);
+    /* v2.0 DH — ALL signature images (Deep & Honey PNGs, love stamp, Soulmate code logo)
+       embedded as base64 data URIs so they render inside the HTML email itself. */
+    const [deepUri, honeyUri, stampUri, logoUri] = await Promise.all([
+      fileToDataUri(SIG_CONFIG.Deep),
+      fileToDataUri(SIG_CONFIG.Honey),
+      fileToDataUri('img/love-stamp.png'),
+      fileToDataUri('img/soulmate-logo.png'),
+    ]);
     const partyUri = p => (p === 'Deep' ? deepUri : honeyUri) || SIG_CONFIG[p];
     AREAS.forEach(area => {
       const byParty = accepts[area] || {};
@@ -1056,27 +1096,27 @@
         const tag = `${nameOf(area)} — ${party}`;
         if (acc) {
           sigPlain += `  ${tag}: signed (${new Date(acc.ts).toLocaleString()})\n`;
-          sigHtml += `<div style="padding:4px 0"><strong>${esc(tag)}:</strong> accepted &amp; signed ` +
-                     `<img src="${partyUri(party)}" alt="${esc(party)} signature" style="height:40px;vertical-align:middle;margin-left:8px"></div>`;
+          sigHtml += `<div style="padding:6px 0;border-bottom:1px solid #efe3d4"><strong>${esc(tag)}:</strong> accepted &amp; signed ` +
+                     `<img src="${partyUri(party)}" alt="${esc(party)} signature" width="150" height="48" style="height:48px;width:auto;max-width:200px;vertical-align:middle;margin-left:10px;display:inline-block;border:none"></div>`;
         } else {
           sigPlain += `  ${tag}: (awaiting signature)\n`;
-          sigHtml += `<div style="padding:4px 0"><strong>${esc(tag)}:</strong> <em>(awaiting signature)</em></div>`;
+          sigHtml += `<div style="padding:6px 0;border-bottom:1px solid #efe3d4"><strong>${esc(tag)}:</strong> <em>(awaiting signature)</em></div>`;
         }
       });
     });
     sigHtml += '</div>';
 
     /* Our love stamp + Soulmate code logo — embedded as data URIs in the HTML email;
-       plain-text version carries the Drive links (in-app previews use local copies). */
-    const stampUri = await fileToDataUri('img/love-stamp.png');
-    const logoUri  = await fileToDataUri('img/soulmate-logo.png');
+       plain-text version carries the Drive links (in-app previews use local copies).
+       v2.0 DH — bigger sizes + explicit width/height attrs (email clients honour them). */
     const brandHtml =
-      (logoUri  ? `<div style="text-align:center;padding:6px 0"><img src="${logoUri}" alt="Soulmate code logo" style="height:56px"></div>` : '') +
-      (stampUri ? `<div style="text-align:center;padding:6px 0"><img src="${stampUri}" alt="Our love stamp" style="height:72px"><div style="font-size:12px;color:#5b4437">\u2726 Our love stamp \u2726</div></div>` : '');
+      (logoUri  ? `<div style="text-align:center;padding:10px 0"><img src="${logoUri}" alt="Soulmate code logo" width="220" height="220" style="height:110px;width:auto;max-width:220px;display:inline-block;border:none"><div style="font-family:Georgia,serif;font-size:26px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:#7b2d3b;margin-top:6px">Soulmate Code</div></div>` : '') +
+      (stampUri ? `<div style="text-align:center;padding:10px 0"><img src="${stampUri}" alt="Our love stamp" width="160" height="160" style="height:120px;width:auto;max-width:160px;display:inline-block;border:none"><div style="font-size:13px;color:#5b4437">\u2726 Our love stamp \u2726</div></div>` : '');
 
     let plain = `\u2665 DEEP & HONEY \u2014 SCENE CONTRACT EXPORT \u2665\nExported: ${now}\nCompleted: ${days.map(d => d.id.toUpperCase()).join(', ')}\n${'='.repeat(52)}\n\nSignatures:\n${sigPlain}`;
-    plain += `\nOur love stamp: https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw/view?usp=sharing\nSoulmate code logo: https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS/view?usp=sharing\n`;
+    plain += `\nOur love stamp: https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw/view?usp=sharing\nSoulmate code logo: https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS/view?usp=sharing\nDeep's signature: https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj/view?usp=sharing\nHoney's signature: https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI/view?usp=sharing\n`;
     let html  = `<div style="font-family:Georgia,serif;color:#2a1c16">` +
+                (logoUri ? `<div style="text-align:center;padding:0 0 8px"><img src="${logoUri}" alt="Soulmate code logo" width="220" height="220" style="height:96px;width:auto;max-width:220px;display:inline-block;border:none"></div>` : '') +
                 `<h2 style="letter-spacing:.05em;margin:0 0 4px">\u2665 Deep &amp; Honey \u2014 Scene Contract Export</h2>` +
                 `<p style="margin:0 0 4px;color:#5b4437">Exported: ${esc(now)}</p>` +
                 `<p style="margin:0 0 8px;color:#5b4437">Completed: <strong>${days.map(d => esc(d.id.toUpperCase())).join(', ')}</strong></p>` +
