@@ -192,8 +192,44 @@
     stamp: '1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw',
     logo:  '17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS',
   };
+  /* v2.4 DH — CRITICAL: the lh3.googleusercontent.com/d/<ID> endpoint only serves
+     image bytes for files shared "Anyone with the link". For PRIVATE files it
+     answers with an HTML sign-in page, so <img> silently fails in every preview.
+     To make the export bullet-proof we ALSO embed each local img/ copy as a
+     base64 data URI (works offline / in any viewer). If a previewer strips data
+     URIs, the inline SVG fallback still draws the mark. */
   const ghUrl   = (k, w, h) => `https://lh3.googleusercontent.com/d/${IMG_IDS[k]}=w${w}h${h}`;
   const viewUrl = k => `https://drive.google.com/file/d/${IMG_IDS[k]}/view?usp=sharing`;
+
+  const IMG_FILES = { Deep: 'img/signature-deep.png', Honey: 'img/signature-honey.png', stamp: 'img/love-stamp.png', logo: 'img/soulmate-logo.png' };
+  let DATA_URIS = {};                       // key -> base64 data URI (filled async before export)
+  const toDataUri = b64 => `data:image/png;base64,${b64}`;
+  const loadImageUris = () => Promise.all(Object.entries(IMG_FILES).map(([k, p]) =>
+    fetch(p).then(r => r.ok ? r.blob() : null).then(b => b && new Promise(res => {
+      const fr = new FileReader();
+      fr.onload = () => { DATA_URIS[k] = String(fr.result); res(); }
+      try { fr.readAsDataURL(b); } catch (_) { res(); }
+    })).catch(() => {})));
+  /* srcset keeps the Drive https link as an alternative source; the primary src
+     is always the embedded base64 copy (see imgTag) so previews never go blank. */
+  const imgSrcs = k => DATA_URIS[k]
+    ? { src: DATA_URIS[k], srcset: `${ghUrl(k, 480, 160)} 1x` }
+    : { src: ghUrl(k, 480, 160), srcset: '' };
+
+  /* v2.3 DH — inline SVG fallbacks drawn directly into the HTML so the sign and
+     brand marks are ALWAYS visible in any previewer, even ones that block all
+     remote images. The <img> still tries the Drive https link first; if it
+     fails to load, onerror swaps in the matching SVG placeholder. */
+  const escA = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const wrapSvg = inner => 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="160" viewBox="0 0 480 160">` +
+    `<rect width="480" height="160" rx="14" fill="#fdf6f0" stroke="#c98a97" stroke-width="3"/>${inner}</svg>`);
+  const SIG_SVG = {
+    Deep:  wrapSvg(`<text x="240" y="86" font-family="Georgia,serif" font-style="italic" font-size="52" fill="#7b2d3b" text-anchor="middle">&#10022; Deep &#9829;</text><text x="240" y="128" font-family="Arial,sans-serif" font-size="16" letter-spacing="4" fill="#a04b5c" text-anchor="middle">DOMINANT / TOP &#8212; SEALED</text>`),
+    Honey: wrapSvg(`<text x="240" y="86" font-family="Georgia,serif" font-style="italic" font-size="52" fill="#a04b5c" text-anchor="middle">&#10022; Honey &#9829;</text><text x="240" y="128" font-family="Arial,sans-serif" font-size="16" letter-spacing="4" fill="#7b2d3b" text-anchor="middle">SUBMISSIVE / BOTTOM &#8212; SEALED</text>`),
+    stamp: wrapSvg(`<circle cx="240" cy="80" r="58" fill="none" stroke="#7b2d3b" stroke-width="3" stroke-dasharray="6 4"/><text x="240" y="74" font-family="Georgia,serif" font-style="italic" font-size="26" fill="#7b2d3b" text-anchor="middle">Our love</text><text x="240" y="102" font-family="Georgia,serif" font-size="20" fill="#a04b5c" text-anchor="middle">&#9829; stamp &#9829;</text>`),
+    logo:  wrapSvg(`<text x="240" y="72" font-family="Georgia,serif" font-size="34" letter-spacing="6" fill="#7b2d3b" text-anchor="middle">SOULMATE</text><text x="240" y="110" font-family="Georgia,serif" font-size="26" letter-spacing="10" fill="#a04b5c" text-anchor="middle">CODE</text><text x="240" y="138" font-family="Georgia,serif" font-style="italic" font-size="14" fill="#5b4437" text-anchor="middle">&#9829; two hearts, one covenant &#9829;</text>`),
+  };
   const UNDO_MS   = Infinity;              // v1.9 DH: undo is ALWAYS allowed — no sealing window
 
   /* ---------- per-area signature state (cloud-backed, in-memory mirror) ---------- */
@@ -1132,6 +1168,7 @@
       toast('⚠️ Mark at least one day as finished before exporting.', 3200);
       return null;
     }
+    await loadImageUris();   // v2.4 DH: embed base64 copies so images preview even offline / when Drive links are blocked
     const now = new Date().toLocaleString();
     const days = done.map(s => ({ id: s.dataset.day, rows: collectDay($('#' + s.dataset.day)) }));
 
@@ -1148,6 +1185,15 @@
        Drive /view link, with a text fallback if the preview blocks remote imgs. */
     const partyImg = p => ghUrl(p, 480, 160);          // embed-safe direct pixel URL
     const partyView = p => viewUrl(p);                 // human-clickable Drive link
+    /* v2.4 DH — <img> tag builder: primary src = embedded base64 copy of the real
+       PNG (previews in EVERY viewer, even offline); lh3 Drive link kept as a
+       srcset alternative; onerror falls back to the inline SVG mark. */
+    const imgTag = (k, w, h, alt, style) => {
+      const s = imgSrcs(k);
+      const main = DATA_URIS[k] || s.src;              // prefer the guaranteed data URI
+      const alt2 = s.srcset ? ` srcset="${escA(s.srcset)}"` : '';
+      return `<img src="${escA(main)}"${alt2} alt="${esc(alt)}" width="${w}" onerror="this.onerror=null;this.src='${SIG_SVG[k]}'" style="${style}">`;
+    };
     AREAS.forEach(area => {
       const byParty = accepts[area] || {};
       Object.keys(SIG_CONFIG).forEach(party => {
@@ -1157,11 +1203,19 @@
           sigPlain += `  ${tag}: signed (${new Date(acc.ts).toLocaleString()})\n`;
           sigHtml += `<tr><td style="padding:10px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong>${esc(tag)}:</strong>&nbsp;accepted &amp; signed<br>` +
                      `<a href="${partyView(party)}" target="_blank" style="text-decoration:none">` +
-                     `<img src="${partyImg(party)}" alt="${esc(party)} signature" width="200" style="height:56px;width:auto;max-width:220px;display:inline-block;vertical-align:middle;border:0">` +
+                     imgTag(party, 200, 56, `${party} signature`, 'height:56px;width:auto;max-width:220px;display:inline-block;vertical-align:middle;border:0') +
+                     `<br><span style="font-family:Georgia,serif;font-style:italic;font-size:20px;color:#7b2d3b">&#10022; ${esc(party)} &#9829;</span>` +
                      `</a><br><a href="${partyView(party)}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">View ${esc(party)}&apos;s signature on Google Drive</a></td></tr>`;
         } else {
-          sigPlain += `  ${tag}: (awaiting signature)\n`;
-          sigHtml += `<tr><td style="padding:10px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong>${esc(tag)}:</strong>&nbsp;<em>(awaiting signature)</em>&nbsp;&mdash;&nbsp;` +
+          /* v2.4 DH — even when the in-app Accept hasn't been recorded for this
+             area, ALWAYS show the real sign image (embedded base64 + Drive link)
+             so nothing looks blank in the HTML email preview. */
+          sigPlain += `  ${tag}: (awaiting in-app accept — sign image linked below)\n`;
+          sigHtml += `<tr><td style="padding:10px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong>${esc(tag)}:</strong>&nbsp;` +
+                     `<a href="${partyView(party)}" target="_blank" style="text-decoration:none">` +
+                     imgTag(party, 200, 56, `${party} signature`, 'height:56px;width:auto;max-width:220px;display:inline-block;vertical-align:middle;border:0') +
+                     `<br><span style="font-family:Georgia,serif;font-style:italic;font-size:20px;color:#7b2d3b">&#10022; ${esc(party)} &#9829;</span>` +
+                     `</a>&nbsp;<em>(accept pending)</em>&nbsp;&mdash;&nbsp;` +
                      `<a href="${partyView(party)}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">sign image on Google Drive</a></td></tr>`;
         }
       });
@@ -1172,7 +1226,7 @@
     const headHtml =
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#fdf6f0;border-left:4px solid #c98a97;border-right:4px solid #c98a97;border-top:4px solid #c98a97">` +
       `<tr><td align="center" style="padding:30px 20px 10px">` +
-      `<a href="${viewUrl('logo')}" target="_blank" style="text-decoration:none"><img src="${ghUrl('logo', 320, 320)}" alt="Soulmate code logo" width="120" style="height:104px;width:auto;max-width:120px;display:block;margin:0 auto;border:0"></a>` +
+      `<a href="${viewUrl('logo')}" target="_blank" style="text-decoration:none">` + imgTag('logo', 120, 104, 'Soulmate code logo', 'height:104px;width:auto;max-width:120px;display:block;margin:0 auto;border:0') + `</a>` +
       `<div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#7b2d3b;margin-top:12px">Soulmate&nbsp;Code</div>` +
       `<div style="font-family:Georgia,serif;font-style:italic;font-size:14px;color:#a04b5c;margin-top:6px">&#9829; Two hearts, one covenant &#9829;</div>` +
       `<div style="width:80px;height:2px;background:#c98a97;margin:16px auto"></div>` +
@@ -1182,7 +1236,7 @@
     const footHtml =
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:30px">` +
       `<tr><td align="center" style="padding:26px 20px;background:#faf1ea;border:1px solid #e7d6c8;border-top:3px double #c98a97">` +
-      `<a href="${viewUrl('stamp')}" target="_blank" style="text-decoration:none"><img src="${ghUrl('stamp', 320, 320)}" alt="Our love stamp" width="140" style="height:116px;width:auto;max-width:140px;display:block;margin:0 auto;border:0"></a>` +
+      `<a href="${viewUrl('stamp')}" target="_blank" style="text-decoration:none">` + imgTag('stamp', 140, 116, 'Our love stamp', 'height:116px;width:auto;max-width:140px;display:block;margin:0 auto;border:0') + `</a>` +
       `<div style="font-size:13px;color:#7b2d3b;letter-spacing:.12em;margin-top:8px">&#10022; OUR LOVE STAMP &#10022;</div>` +
       `<div style="margin-top:6px"><a href="${viewUrl('stamp')}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">View stamp on Google Drive</a></div>` +
       `<p style="margin:16px 0 4px;font-style:italic;font-size:14px;color:#5b4437;font-family:Georgia,serif">&ldquo;Every scene a promise, every promise kept &mdash; with all our love, Deep &amp; Honey &#9829;&rdquo;</p>` +
