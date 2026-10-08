@@ -1,4 +1,6 @@
-# Deep & Honey · Eternal Contract (v2.4 DH)
+# Deep & Honey · Eternal Contract (v2.6 DH)
+- **v2.6 DH (HTML email):** the exported HTML email is now fully self-contained and Drive-link-free — NO "View on Google Drive" text or anchors anywhere. Sign, stamp and logo render in every HTML previewer via compressed base64 embeds with a pixel-link → inline-SVG fallback chain (never blank). Style upgraded to a romantic & professional look: rose-bordered banner with the Soulmate Code wordmark + heart tagline, and a love-stamp footer with quote. ALL important data is included: Contract Overview (contract no., effective date, printed names, special requests, days covered, safewords, consent declaration), both signature rows with accept status, and every finished day's entries — collapsed days are temporarily revealed during collection so nothing gets missed. The plain-text export also dropped its Drive links.
+- **v2.5 DH (HTML email):** images embedded as compact JPEG/base64 copies so they preview in strict viewers; email slimmed to the main/important content only.
 
 ## What's new in this version
 - **v2.4 DH (home screen):** the current app version is now shown always on the home screen — a `v2.4 DH ♥` badge sits in the header next to the Soulmate Code wordmark. Tapping it pops a "✨ What's new in v2.4 DH" toast listing the release highlights. The badge text is driven by `APP_VERSION` in `js/app.js`, so bumping that one constant keeps the home screen in sync automatically; add one `WHATS_NEW` line there per release.
