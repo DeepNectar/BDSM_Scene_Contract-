@@ -33,7 +33,9 @@
   };
 
   /* ---------- in-memory mirror (never written to disk) ---------- */
-  const mem = { fields: {}, accepts: {}, days: [] };
+  /* v3.3 DH — `wiped` is a persisted flag: once the user clears ALL days, every
+     device must start with an empty contract (no old day pages re-appearing). */
+  const mem = { fields: {}, accepts: {}, days: [], wiped: false };
 
   const upsert = async (k, v) => {
     if (!sb) return false;
@@ -55,6 +57,7 @@
           if (r.k === 'fields')  Object.assign(mem.fields, r.v || {});
           if (r.k === 'accepts') Object.assign(mem.accepts, r.v || {});
           if (r.k === 'days' && Array.isArray(r.v)) mem.days = r.v;
+          if (r.k === 'wiped')  mem.wiped = !!(r.v && r.v.flag);
         });
         cloudReady = true;
         return { fields: mem.fields, accepts: mem.accepts, days: mem.days };
@@ -68,11 +71,15 @@
     saveFields(fields) { mem.fields = fields; return sb ? upsert('fields', fields) : Promise.resolve(false); },
     saveAccepts(a)     { mem.accepts = a;    return sb ? upsert('accepts', a)    : Promise.resolve(false); },
     saveDays(list)     { mem.days = list;    return sb ? upsert('days', list)    : Promise.resolve(false); },
+    /* v3.3 DH — persist the "all days cleared" flag so the empty contract
+       survives reloads on every device */
+    saveWiped(flag)    { mem.wiped = !!flag; return sb ? upsert('wiped', { flag: !!flag }) : Promise.resolve(false); },
 
     /* synchronous accessors used by the UI between saves */
     fields()  { return mem.fields; },
     accepts() { return mem.accepts; },
     days()    { return mem.days; },
+    wiped()   { return mem.wiped; },
   };
 
   window.CloudStore = cloud;
