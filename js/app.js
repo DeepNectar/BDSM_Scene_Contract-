@@ -1016,7 +1016,7 @@
     $$('.ai-subchips .ai-chip').forEach(c => c.classList.remove('active'));
   });
 
-  const dayNumber = id => { const m = /^day(\d+)$/.exec(id); return m ? +m[1] : null; };
+  // NOTE: `dayNumber` is already defined once at the top of this IIFE — redeclaring it here (const) was a SyntaxError that broke app init.
   const existingDayIds = () => $$('.page').map(p => p.id).filter(id => dayNumber(id));
 
   const refreshAiDayOptions = () => {
@@ -1502,9 +1502,7 @@
   };
 
   /* ---------- append a freshly created day ---------- */
-  const STATIC_IDS = new Set(['day1']);   /* days shipped in index.html are NOT persisted:
-                                              deleting one only removes it for the session
-                                              (reloading restores the original page). */
+  // NOTE: STATIC_IDS is already declared at the top of this IIFE (line ~57); redeclaring caused a SyntaxError.
   const persistDays = () => {
     const list = $$('.page')
       .filter(p => dayNumber(p.id) && !STATIC_IDS.has(p.id))
@@ -2125,8 +2123,7 @@ ${bodyHtml}
     const out = await buildEmail();
     if (!out) return;
     plainText = out.plain; htmlText = out.html;
-    renderModal();
-    openModal();
+    renderModal(); openModal();
   });
 
   $('#modal-copy-btn').addEventListener('click', async () => {
