@@ -69,7 +69,9 @@ body{
   text-align:center;padding:22px 0 26px;margin-bottom:26px;
   border-bottom:3px double var(--line);position:relative;
 }
-.header-logo{width:88px;height:88px;border-radius:50%;margin-bottom:12px;box-shadow:0 6px 18px rgba(42,28,22,.25)}
+.header-logo{width:88px;height:88px;border-radius:50%;object-fit:cover;object-position:center;margin-bottom:12px;background:#fffdf9;border:1px solid var(--line);box-shadow:0 6px 18px rgba(42,28,22,.25)}
+/* v1.9 DH — cloud status pill (Supabase sync indicator) */
+.cloud-status{display:inline-block;font-size:11.5px;letter-spacing:.05em;color:var(--ink-soft);background:rgba(200,162,124,.14);border:1px solid var(--line);border-radius:999px;padding:3px 12px;margin:0 0 8px}
 .contract-header h1{
   font-family:var(--serif);font-weight:600;font-size:clamp(26px,4.6vw,42px);
   letter-spacing:.06em;color:var(--ink);
@@ -238,6 +240,12 @@ select{border:1px solid var(--line);border-radius:8px;padding:3px 7px;font-size:
 .sig-name{display:block;font-family:var(--serif);font-size:13.5px;font-weight:600;color:var(--ink);margin-top:2px}
 .sig-status{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-top:1px}
 .sig-card.signed .sig-status{color:var(--ok)}
+
+/* ---------- our love stamp (compact, auto-adjusting) ---------- */
+.love-stamp{display:flex;flex-direction:column;align-items:center;gap:2px;margin:14px auto 6px}
+.love-stamp img{max-width:min(210px,45%);height:auto;display:block;transform:rotate(-2deg);filter:drop-shadow(0 4px 10px rgba(124,45,58,.25))}
+.stamp-caption{font-family:var(--serif);font-style:italic;font-size:13px;letter-spacing:.08em;color:var(--wine)}
+@media (max-width:640px){.love-stamp img{max-width:170px}}
 
 /* ---------- debrief grid ---------- */
 .debrief-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px 22px;margin:10px 0}
