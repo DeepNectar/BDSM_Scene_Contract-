@@ -171,6 +171,40 @@ select{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background
 .sign-field input{width:100%;border-bottom:1.5px solid var(--accent);font-family:var(--serif);font-size:17px;font-style:italic}
 .sign-field .datetime-group{margin-top:2px}
 
+/* ---------- photo signatures on accept ---------- */
+.initials-slot{position:relative;display:inline-block;min-height:30px}
+.slot-sig{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;
+  opacity:0;transform:rotate(-4deg) scale(.96);
+  transition:opacity .45s ease,transform .45s ease;
+}
+.slot-filled .slot-sig{opacity:1;transform:rotate(-4deg) scale(1)}
+.slot-filled input.editable-field{visibility:hidden}   /* hide, don't remove — keeps data intact */
+
+.seal{text-align:center;margin-top:18px;padding-top:14px;border-top:1px dashed var(--line)}
+.seal-title{font-family:var(--serif);font-style:italic;font-size:17px;color:var(--wine);letter-spacing:.04em}
+.accept-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:10px 0 14px}
+.accept-btn{
+  font:inherit;font-weight:500;font-size:14px;letter-spacing:.05em;cursor:pointer;
+  padding:8px 22px;border-radius:999px;border:1px solid var(--wine);color:var(--wine);background:transparent;
+  transition:background .2s,color .2s,box-shadow .2s,transform .15s;
+}
+.accept-btn:hover{background:rgba(124,45,58,.08);transform:translateY(-1px)}
+.sig-cards{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.sig-card{
+  position:relative;width:230px;border:1px solid var(--line);border-radius:14px;background:#fffdf9;
+  padding:14px 14px 10px;box-shadow:0 8px 20px -12px rgba(42,28,22,.35);transition:border-color .3s,box-shadow .3s;
+}
+.sig-card.signed{border-color:var(--accent-2);box-shadow:0 10px 26px -10px rgba(124,45,58,.45)}
+.sig-card .sig-photo{
+  display:block;width:100%;height:64px;object-fit:contain;opacity:0;transform:rotate(-3deg);
+  transition:opacity .5s ease,transform .5s ease;
+}
+.sig-card.signed .sig-photo{opacity:1;transform:rotate(-3deg) translateY(-2px)}
+.sig-name{display:block;font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink);margin-top:4px}
+.sig-status{display:block;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-top:2px}
+.sig-card.signed .sig-status{color:var(--ok)}
+
 /* ---------- debrief grid ---------- */
 .debrief-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px 22px;margin:10px 0}
 .debrief-grid .full{grid-column:1/-1}
@@ -272,19 +306,36 @@ select{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background
 
 /* ---------- responsive ---------- */
 @media (max-width:640px){
+  .datetime-group{padding:2px 6px}
+  .datetime-group input{width:1.9ch;font-size:12px}
+  .inline-input{width:110px}
+  .inline-input.adj{width:140px}
+  .debrief-grid{grid-template-columns:1fr}
   .sign-row{flex-direction:column}
   .clear-day-btn{margin-left:0}
   th,td{padding:6px 8px;font-size:13px}
   .modal-footer .btn{flex:1}
+  .accept-btn{width:100%}
+  .sig-card{width:100%;max-width:320px}
+  .sig-card .sig-photo,.slot-sig{height:44px}
+}
+
+/* ---------- reduced motion ---------- */
+@media (prefers-reduced-motion:reduce){
+  .slot-sig,.sig-card .sig-photo,.accept-btn,.particle,.login-heart{transition:none!important;animation:none!important}
 }
 
 /* ---------- print ---------- */
 @media print{
   body{background:#fff;padding:0}
-  .particle,.login-overlay,.modal-overlay,.btn-group,.toast,.clear-day-btn,.day-finished{display:none!important}
+  .particle,.login-overlay,.modal-overlay,.btn-group,.toast,.clear-day-btn,.day-finished,.accept-btn{display:none!important}
   .contract-container{max-width:none;box-shadow:none;border:none;border-radius:0;padding:0}
   .contract-container::after{display:none}
   .page{border:1px solid #bbb;break-inside:avoid-page;box-shadow:none;background:#fff;margin-bottom:14px}
   a{color:inherit;text-decoration:none}
   input,select,textarea{border-color:#999}
+  /* show signature photos in print/PDF */
+  .slot-filled .slot-sig{opacity:1!important}
+  .sig-card .sig-photo{opacity:1!important}
+  .sig-status{color:#555}
 }
