@@ -114,6 +114,7 @@
     <!-- Soulmate code logo — Drive ref: https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS/view?usp=sharing (local copy; hotlinked Drive /view URLs are blocked by browsers/email/print) -->
     <img class="header-logo" width="200" height="200" alt="Soulmate code logo"
          src="img/soulmate-logo.png">
+    <p class="brand-name">Soulmate Code</p>
     <span id="cloud-status" class="cloud-status" title="Checking cloud…">☁️ Connecting to Supabase…</span>
     <h1>BDSM Scene-Specific Contract</h1>
     <p class="tagline">Two hearts · one bond · an agreement written in trust and tenderness</p>
@@ -158,6 +159,7 @@
         <option value="no">❌ No</option>
         <option value="yes">✅ Yes</option>
       </select>
+      <button class="collapse-toggle" type="button" aria-expanded="true" title="Collapse / expand this day">▾ Collapse</button>
       <button class="clear-day-btn" type="button" data-day="day1">🗑 Clear this day</button>
     </div>
     <p class="lock-note">🔒 This day is marked as finished — everything (signatures included) is sealed. Set “Day finished” to ❌ No to edit again.</p>
@@ -370,7 +372,7 @@
 
   <!-- ACTIONS -->
   <div class="btn-group">
-    <button class="btn btn-outline" id="save-contract" type="button">💾 Save locally</button>
+    <button class="btn btn-outline" id="save-contract" type="button">💾 Save</button>
     <button class="btn btn-primary" id="print-pdf" type="button">📄 Print / PDF</button>
     <button class="btn btn-outline" id="email-contract" type="button">✉ Email data</button>
     <button class="btn btn-outline" id="ai-assistant" type="button">✨ AI write a day</button>

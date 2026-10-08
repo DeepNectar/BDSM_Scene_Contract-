@@ -180,6 +180,20 @@
     Deep:  'img/signature-deep.png',
     Honey: 'img/signature-honey.png',
   };
+
+  /* v2.1/v2.2 DH — PUBLIC image URLs for the HTML email export.
+     base64 data URIs are blocked by many HTML-preview tools and email clients,
+     and uc?export=view often returns an HTML warning page instead of image
+     bytes, so exported <img src> use lh3.googleusercontent.com/d/<ID>=w<h>h<h>
+     (always serves real pixels) while clickable links use /file/d/<ID>/view. */
+  const IMG_IDS = {
+    Deep:  '1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj',
+    Honey: '1HRoqjVvSDswlROnookv0ykGagHwLQ6FI',
+    stamp: '1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw',
+    logo:  '17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS',
+  };
+  const ghUrl   = (k, w, h) => `https://lh3.googleusercontent.com/d/${IMG_IDS[k]}=w${w}h${h}`;
+  const viewUrl = k => `https://drive.google.com/file/d/${IMG_IDS[k]}/view?usp=sharing`;
   const UNDO_MS   = Infinity;              // v1.9 DH: undo is ALWAYS allowed — no sealing window
 
   /* ---------- per-area signature state (cloud-backed, in-memory mirror) ---------- */
@@ -411,18 +425,50 @@
     const sel = $('.day-finished-select', page);
     return !!sel && sel.value === 'yes';
   };
+  /* ---------- v2.0 DH — collapsible days ----------
+     Marking a day finished collapses it automatically; ▾/▸ keeps it
+     collapsible/expandable by hand for any day. The collapse state is
+     derived from "Day finished" + an optional manual override, so it
+     survives cloud save/load (the select value itself is persisted). */
+  const collapsedOverride = new Map();          // page.id -> true/false (manual only)
+  const isCollapsed = page => {
+    const o = collapsedOverride.get(page.id);
+    return o === undefined ? dayLocked(page) : o;   // finished ⇒ collapsed by default
+  };
+  const updateToggleBtn = page => {
+    const btn = $('.collapse-toggle', page);
+    if (!btn) return;
+    const col = page.classList.contains('day-collapsed');
+    btn.textContent = col ? '▸ Expand' : '▾ Collapse';
+    btn.setAttribute('aria-expanded', String(!col));
+  };
+  const applyCollapse = page => {
+    page.classList.toggle('day-collapsed', isCollapsed(page));
+    updateToggleBtn(page);
+  };
   const syncLockUI = page => {
     page.classList.toggle('day-locked', dayLocked(page));
+    applyCollapse(page);                        // v2.0 DH — finished ⇒ auto-collapse
   };
   const syncAllLocks = () => $$('.page').forEach(syncLockUI);
+  /* wire the ▾/▸ buttons (static markup + event delegation → AI days too) */
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.collapse-toggle');
+    if (!btn) return;
+    const page = btn.closest('.page');
+    if (!page) return;
+    collapsedOverride.set(page.id, !isCollapsed(page));
+    applyCollapse(page);
+  });
   $$('.day-finished-select').forEach(sel => {
     sel.addEventListener('change', () => {
       const page = sel.closest('.page');
+      collapsedOverride.delete(page.id);   // v2.0 DH — fresh choice re-derives the collapse
       syncLockUI(page);
       writeStore();
       toast(dayLocked(page)
-        ? `🔒 ${sel.dataset.day.toUpperCase()} marked finished — signatures & fields are sealed.`
-        : `🔓 ${sel.dataset.day.toUpperCase()} is open again — every sign and field is editable.`);
+        ? `🔒 ${sel.dataset.day.toUpperCase()} marked finished — sealed & collapsed. Tap ▸ Expand to peek inside ♥`
+        : `🔓 ${sel.dataset.day.toUpperCase()} is open again — expanded, every sign and field is editable.`);
     });
   });
   /* guard: clicks on accept-buttons / filled signature slots inside a locked day.
@@ -612,6 +658,7 @@
           <option value="no">❌ No</option>
           <option value="yes">✅ Yes</option>
         </select>
+        <button class="collapse-toggle" type="button" aria-expanded="true" title="Collapse / expand this day">▾ Collapse</button>
         <button class="clear-day-btn" type="button" data-day="day${N}">🗑 Clear this day</button>
       </div>
       <p class="lock-note">🔒 This day is marked as finished — everything (signatures included) is sealed. Set “Day finished” to ❌ No to edit again.</p>
@@ -1013,8 +1060,55 @@
     return rows;
   };
 
-  /* v1.9 DH — load a project image as a base64 data URI so the email HTML export
-     shows real images (relative paths & Drive /view links both break in email). */
+  /* v2.1 DH — base64 data-URI embedding was retired for the HTML email (previews
+     and many email clients block data: URIs); the export now uses the public
+     https links (ghUrl / viewUrl). fileToDataUri is kept only as a helper/fallback. */
+  /* contract-level "important data" — header fields + rules/pledges that are not
+     per-day inputs; collected live from the page so exports always match what
+     the couple actually filled in. */
+  const collectGlobalRows = () => {
+    const rows = [];
+    const add = (label, value) => { value = String(value ?? '').trim(); if (value) rows.push({ label, value }); };
+    const doc = document;
+    /* header: contract no + effective date pills */
+    const head = $('.contract-header');
+    if (head) {
+      const no = $('strong', head.querySelector('.sub span'))?.textContent.trim();
+      if (no) add('Contract No.', no);
+      const effPill = $('.datetime-group', head.querySelector('.sub'));
+      if (effPill) add('Effective date', pillText(effPill));
+    }
+    /* printed names from the signatories block */
+    $$('.sign-field', doc).forEach(f => {
+      const label = $('label', f)?.textContent.trim() || '';
+      const inp = $('input:not([type="checkbox"])', f);
+      if (/printed name/i.test(label) && inp?.value.trim()) add(label, inp.value.trim());
+    });
+    /* special requests quotes (Submissive / Dominant wishes) */
+    $$('.quote', doc).forEach(q => {
+      const who = $('strong', q)?.textContent.trim();
+      if (who) add(who, q.textContent.replace(/^\s*\S+:/, '').replace(/[“”]/g, '').trim());
+    });
+    const heads = $$('h2', doc).map(h => h.textContent.trim()).filter(t => /Day\s*\d/i.test(t));
+    if (heads.length) add('Days covered', heads.join('  ·  '));
+    /* safewords from the verification table(s) */
+    const words = [];
+    $$('.verify-table tr', doc).slice(1).forEach(tr => {
+      const word = $('td', tr)?.textContent.trim();
+      if (word) words.push(word);
+    });
+    if (words.length) add('Safeword' + (words.length > 1 ? 's' : ''), words.join(' / '));
+    /* consent declaration */
+    const consent = [...$$('.quote', doc)].map(q => q.textContent.trim())
+      .find(t => /consent to this scene/i.test(t));
+    if (consent) add('Consent declaration', consent.replace(/[“”]/g, ''));
+    /* summary do / don't lists */
+    const dos   = $$('.do-card li').map(li => li.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const donts = $$('.dont-card li').map(li => li.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    if (dos.length)   add('Always do', dos.join(' | '));
+    if (donts.length) add('Never do', donts.join(' | '));
+    return rows;
+  };
   const uriCache = {};
   const fileToDataUri = async path => {
     if (uriCache[path]) return uriCache[path];
@@ -1044,11 +1138,16 @@
     /* signature status block for the export — per AREA: accepted there → embed img; else awaiting */
     const accepts = readAccepts();
     let sigPlain = '';
-    let sigHtml  = '<div style="margin:0 0 14px">';
+    let sigHtml  = '';
     const AREA_NAMES = { seal: 'Seal', signatories: 'Signatories', debrief: 'Debrief' };
     const nameOf = a => AREA_NAMES[a] || a.replace(/-/g, ' · ').replace(/^(.)/, m => m.toUpperCase());
-    const [deepUri, honeyUri] = await Promise.all([fileToDataUri(SIG_CONFIG.Deep), fileToDataUri(SIG_CONFIG.Honey)]);
-    const partyUri = p => (p === 'Deep' ? deepUri : honeyUri) || SIG_CONFIG[p];
+    /* v2.2 DH — images referenced by PUBLIC https links so the copied HTML
+       previews correctly everywhere: <img src> uses lh3.googleusercontent.com
+       (always serves real image pixels — uc?export=view often returns an HTML
+       warning page instead), and every image is ALSO a clickable anchor to its
+       Drive /view link, with a text fallback if the preview blocks remote imgs. */
+    const partyImg = p => ghUrl(p, 480, 160);          // embed-safe direct pixel URL
+    const partyView = p => viewUrl(p);                 // human-clickable Drive link
     AREAS.forEach(area => {
       const byParty = accepts[area] || {};
       Object.keys(SIG_CONFIG).forEach(party => {
@@ -1056,46 +1155,89 @@
         const tag = `${nameOf(area)} — ${party}`;
         if (acc) {
           sigPlain += `  ${tag}: signed (${new Date(acc.ts).toLocaleString()})\n`;
-          sigHtml += `<div style="padding:4px 0"><strong>${esc(tag)}:</strong> accepted &amp; signed ` +
-                     `<img src="${partyUri(party)}" alt="${esc(party)} signature" style="height:40px;vertical-align:middle;margin-left:8px"></div>`;
+          sigHtml += `<tr><td style="padding:10px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong>${esc(tag)}:</strong>&nbsp;accepted &amp; signed<br>` +
+                     `<a href="${partyView(party)}" target="_blank" style="text-decoration:none">` +
+                     `<img src="${partyImg(party)}" alt="${esc(party)} signature" width="200" style="height:56px;width:auto;max-width:220px;display:inline-block;vertical-align:middle;border:0">` +
+                     `</a><br><a href="${partyView(party)}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">View ${esc(party)}&apos;s signature on Google Drive</a></td></tr>`;
         } else {
           sigPlain += `  ${tag}: (awaiting signature)\n`;
-          sigHtml += `<div style="padding:4px 0"><strong>${esc(tag)}:</strong> <em>(awaiting signature)</em></div>`;
+          sigHtml += `<tr><td style="padding:10px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong>${esc(tag)}:</strong>&nbsp;<em>(awaiting signature)</em>&nbsp;&mdash;&nbsp;` +
+                     `<a href="${partyView(party)}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">sign image on Google Drive</a></td></tr>`;
         }
       });
     });
-    sigHtml += '</div>';
+    sigHtml = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${sigHtml}</table>`;
 
-    /* Our love stamp + Soulmate code logo — embedded as data URIs in the HTML email;
-       plain-text version carries the Drive links (in-app previews use local copies). */
-    const stampUri = await fileToDataUri('img/love-stamp.png');
-    const logoUri  = await fileToDataUri('img/soulmate-logo.png');
-    const brandHtml =
-      (logoUri  ? `<div style="text-align:center;padding:6px 0"><img src="${logoUri}" alt="Soulmate code logo" style="height:56px"></div>` : '') +
-      (stampUri ? `<div style="text-align:center;padding:6px 0"><img src="${stampUri}" alt="Our love stamp" style="height:72px"><div style="font-size:12px;color:#5b4437">\u2726 Our love stamp \u2726</div></div>` : '');
+    /* header banner + footer branding — all via https links (professional & romantic look) */
+    const headHtml =
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#fdf6f0;border-left:4px solid #c98a97;border-right:4px solid #c98a97;border-top:4px solid #c98a97">` +
+      `<tr><td align="center" style="padding:30px 20px 10px">` +
+      `<a href="${viewUrl('logo')}" target="_blank" style="text-decoration:none"><img src="${ghUrl('logo', 320, 320)}" alt="Soulmate code logo" width="120" style="height:104px;width:auto;max-width:120px;display:block;margin:0 auto;border:0"></a>` +
+      `<div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#7b2d3b;margin-top:12px">Soulmate&nbsp;Code</div>` +
+      `<div style="font-family:Georgia,serif;font-style:italic;font-size:14px;color:#a04b5c;margin-top:6px">&#9829; Two hearts, one covenant &#9829;</div>` +
+      `<div style="width:80px;height:2px;background:#c98a97;margin:16px auto"></div>` +
+      `<div style="font-family:Georgia,serif;font-size:20px;color:#4a362c">&#9829; Deep &amp; Honey &mdash; Scene Contract Export &#9829;</div>` +
+      `<div style="font-size:13px;color:#5b4437;margin-top:12px">Exported: ${esc(now)}<br>Completed: <strong>${days.map(d => esc(d.id.toUpperCase())).join(', ')}</strong></div>` +
+      `</td></tr></table>`;
+    const footHtml =
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:30px">` +
+      `<tr><td align="center" style="padding:26px 20px;background:#faf1ea;border:1px solid #e7d6c8;border-top:3px double #c98a97">` +
+      `<a href="${viewUrl('stamp')}" target="_blank" style="text-decoration:none"><img src="${ghUrl('stamp', 320, 320)}" alt="Our love stamp" width="140" style="height:116px;width:auto;max-width:140px;display:block;margin:0 auto;border:0"></a>` +
+      `<div style="font-size:13px;color:#7b2d3b;letter-spacing:.12em;margin-top:8px">&#10022; OUR LOVE STAMP &#10022;</div>` +
+      `<div style="margin-top:6px"><a href="${viewUrl('stamp')}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">View stamp on Google Drive</a></div>` +
+      `<p style="margin:16px 0 4px;font-style:italic;font-size:14px;color:#5b4437;font-family:Georgia,serif">&ldquo;Every scene a promise, every promise kept &mdash; with all our love, Deep &amp; Honey &#9829;&rdquo;</p>` +
+      `<p style="margin:0;font-size:12px;color:#8a6f5f">Confidentiality notice: strictly private between Deep &amp; Honey.</p>` +
+      `</td></tr></table>`;
 
-    let plain = `\u2665 DEEP & HONEY \u2014 SCENE CONTRACT EXPORT \u2665\nExported: ${now}\nCompleted: ${days.map(d => d.id.toUpperCase()).join(', ')}\n${'='.repeat(52)}\n\nSignatures:\n${sigPlain}`;
-    plain += `\nOur love stamp: https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw/view?usp=sharing\nSoulmate code logo: https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS/view?usp=sharing\n`;
-    let html  = `<div style="font-family:Georgia,serif;color:#2a1c16">` +
-                `<h2 style="letter-spacing:.05em;margin:0 0 4px">\u2665 Deep &amp; Honey \u2014 Scene Contract Export</h2>` +
-                `<p style="margin:0 0 4px;color:#5b4437">Exported: ${esc(now)}</p>` +
-                `<p style="margin:0 0 8px;color:#5b4437">Completed: <strong>${days.map(d => esc(d.id.toUpperCase())).join(', ')}</strong></p>` +
-                `<h3 style="border-bottom:2px solid #dccdbd;padding-bottom:4px;margin:14px 0 8px">Signatures</h3>` + sigHtml;
+    let plain = `\u2665 DEEP & HONEY \u2014 SCENE CONTRACT EXPORT \u2665\nExported: ${now}\nCompleted: ${days.map(d => d.id.toUpperCase()).join(', ')}\n${'='.repeat(52)}\n\nSignatures:\n${sigPlain.replace(/<\/?[^>]+>/g, '')}`;
+    plain += `\nOur love stamp: ${viewUrl('stamp')}\nSoulmate code logo: ${viewUrl('logo')}\nDeep's signature: ${viewUrl('Deep')}\nHoney's signature: ${viewUrl('Honey')}\n`;
+
+    /* contract-level important data block (names/dates/pledge/rules) */
+    const globalRows = collectGlobalRows();
+    let globalHtml = '';
+    globalRows.forEach(r => {
+      plain += `\n${r.label}: ${r.value}`;
+      globalHtml += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr><td style="padding:6px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong style="color:#7b2d3b">${esc(r.label)}:</strong> ${esc(r.value)}</td></tr></table>`;
+    });
+
+    /* full standalone HTML document — pastes into any HTML preview and renders with images */
+    const sectionH3 = t => `<h3 style="font-family:Georgia,serif;color:#7b2d3b;border-bottom:2px solid #dccdbd;padding-bottom:4px;margin:24px 0 10px;font-size:16px;letter-spacing:.08em;text-transform:uppercase">${t}</h3>`;
+    let bodyHtml =
+      headHtml +
+      (globalHtml ? sectionH3('Contract Overview') + globalHtml : '') +
+      sectionH3('Signatures') + sigHtml;
 
     days.forEach(({ id, rows }) => {
       const title = $(`#${id} h2`)?.textContent.trim() || id.toUpperCase();
       plain += `\n── ${title} ──\n`;
-      html  += `<h3 style="border-bottom:2px solid #dccdbd;padding-bottom:4px;margin:18px 0 8px">${esc(title)}</h3>`;
-      if (!rows.length) { plain += '  (no entries recorded)\n'; html += '<p style="color:#5b4437">(no entries recorded)</p>'; }
+      bodyHtml += sectionH3(esc(title));
+      if (!rows.length) { plain += '  (no entries recorded)\n'; bodyHtml += '<p style="color:#5b4437;font-size:14px;margin:0 0 10px">(no entries recorded)</p>'; }
       rows.forEach(r => {
         plain += `  ${r.label}: ${r.value}\n`;
-        html  += `<div style="padding:3px 0;border-bottom:1px solid #efe3d4"><strong>${esc(r.label)}:</strong> ${esc(r.value)}</div>`;
+        bodyHtml += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr><td style="padding:6px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong style="color:#7b2d3b">${esc(r.label)}:</strong> ${esc(r.value)}</td></tr></table>`;
       });
     });
+    bodyHtml += footHtml;
 
     plain += `\n${'='.repeat(52)}\nCONFIDENTIAL — private between Deep & Honey.\n`;
-    html  += brandHtml +
-             `<p style="margin-top:18px;font-style:italic;color:#5b4437">Confidentiality notice: strictly private between Deep &amp; Honey.</p></div>`;
+    const html =
+`<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Deep &amp; Honey — Scene Contract Export</title>
+</head>
+<body style="margin:0;padding:0;background:#f6ede6">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#f6ede6">
+<tr><td align="center" style="padding:24px 12px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;border-collapse:collapse;background:#ffffff;border:1px solid #e7d6c8;border-radius:10px;box-shadow:0 2px 8px rgba(90,50,40,.08);font-family:Georgia,'Times New Roman',serif;color:#2a1c16">
+<tr><td style="padding:26px 28px">
+${bodyHtml}
+</td></tr></table>
+</td></tr></table>
+</body>
+</html>`;
 
     return { plain, html };
   };

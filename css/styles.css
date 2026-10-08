@@ -69,7 +69,11 @@ body{
   text-align:center;padding:22px 0 26px;margin-bottom:26px;
   border-bottom:3px double var(--line);position:relative;
 }
-.header-logo{width:88px;height:88px;object-fit:contain;object-position:center;margin-bottom:12px;background:transparent;border:none;border-radius:0;box-shadow:none}
+/* v2.0 DH — Soulmate code logo made bigger in the header (was 88×88, now 220×220) */
+.header-logo{width:220px;height:220px;object-fit:contain;object-position:center;margin-bottom:12px;background:transparent;border:none;border-radius:0;box-shadow:none}
+/* v2.0 DH — "Soulmate Code" wordmark under the logo, enlarged to match */
+.brand-name{font-family:var(--serif);font-weight:600;font-size:clamp(24px,3.6vw,34px);letter-spacing:.18em;text-transform:uppercase;color:var(--wine);margin:-2px 0 6px}
+@media (max-width:600px){.header-logo{width:150px;height:150px}.brand-name{font-size:clamp(20px,5.5vw,26px)}}
 /* v1.9 DH — cloud status pill (Supabase sync indicator) */
 .cloud-status{display:inline-block;font-size:11.5px;letter-spacing:.05em;color:var(--ink-soft);background:rgba(200,162,124,.14);border:1px solid var(--line);border-radius:999px;padding:3px 12px;margin:0 0 8px}
 .contract-header h1{
@@ -219,6 +223,20 @@ select{border:1px solid var(--line);border-radius:8px;padding:3px 7px;font-size:
   border:1px dashed rgba(140,59,59,.45);border-radius:8px;
 }
 .page.day-locked .lock-note{display:flex}
+
+/* ---------- v2.0 DH — collapsible day pages ----------
+   A finished day collapses automatically (see js/app.js syncLockUI);
+   the ▾/▸ button lets you expand or collapse any day by hand.       */
+.collapse-toggle{
+  font:inherit;font-size:12.5px;color:var(--accent);cursor:pointer;
+  background:transparent;border:1px solid var(--line);border-radius:8px;padding:3px 10px;transition:.2s;
+}
+.collapse-toggle:hover{background:rgba(200,162,124,.14)}
+.page.day-collapsed > *:not(.page-head):not(.day-finished){display:none!important}
+.page.day-collapsed > .lock-note{display:none!important}
+.page.day-collapsed > .page-head .day-badge::after{content:" · collapsed — tap ▸ Expand to open ♥";text-transform:none;letter-spacing:.02em}
+/* PDF/Print safety: never let a collapsed day hide its content in print/PDF output */
+@media print{.page.day-collapsed > *{display:block!important}.page.day-collapsed > table{display:table!important}.collapse-toggle{display:none!important}}
 
 /* ---------- photo signatures on accept (compact) ---------- */
 .initials-slot{position:relative;display:inline-block;min-height:28px}
