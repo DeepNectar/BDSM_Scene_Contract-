@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2a1c16">
+<title>Deep &amp; Honey · Eternal Contract</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ==================== LOGIN OVERLAY ==================== -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-card" role="dialog" aria-labelledby="login-title">
+    <div class="login-heart">♥</div>
+    <h2 id="login-title">A Contract of Trust</h2>
+    <p class="login-sub">Between Deep &amp; Honey · written for infinity</p>
+    <label for="password-input">Enter our secret word</label>
+    <div class="password-wrapper">
+      <input type="password" id="password-input" placeholder="••••••••" autocomplete="current-password">
+      <button class="toggle-eye" id="toggle-password" type="button" aria-label="Show password">👁</button>
+    </div>
+    <p class="hint">Hint: pet name @ date &amp; month we met @</p>
+    <button class="btn btn-primary login-btn" id="login-btn" type="button">Unlock our contract ♥</button>
+    <p class="login-error" id="login-error" role="alert"></p>
+  </div>
+</div>
+
+<!-- ==================== EMAIL MODAL ==================== -->
+<div class="modal-overlay" id="email-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h3 id="modal-title">✉ Email Contract Data</h3>
+      <button class="modal-close" id="modal-close-btn" type="button" aria-label="Close dialog">×</button>
+    </div>
+    <div class="modal-tabs" role="tablist">
+      <button class="active" data-format="plain" type="button" role="tab" aria-selected="true">Plain Text</button>
+      <button data-format="html" type="button" role="tab" aria-selected="false">HTML Format</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" id="modal-copy-btn" type="button">📋 Copy</button>
+      <button class="btn btn-primary" id="modal-email-btn" type="button">✉ Send Email</button>
+      <button class="btn btn-ghost" id="modal-close-footer-btn" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== AI ASSISTANT MODAL ==================== -->
+<div class="ai-overlay" id="ai-modal" role="dialog" aria-modal="true" aria-labelledby="ai-title">
+  <div class="ai-card">
+    <div class="ai-header">
+      <h3 id="ai-title">✨ AI Assistant — write our day</h3>
+      <button class="ai-close" id="ai-close-btn" type="button" aria-label="Close dialog">×</button>
+    </div>
+    <div class="ai-body">
+      <div class="ai-block">
+        <label for="ai-day-select">Target day</label>
+        <select id="ai-day-select" class="ai-field"></select>
+      </div>
+      <div class="ai-block">
+        <label>What should the AI do?</label>
+        <div class="ai-chips" id="ai-mode-chips" role="group">
+          <button class="ai-chip active" data-mode="create" type="button">🆕 Create a new day</button>
+          <button class="ai-chip" data-mode="write" type="button">✍️ Write into an existing day</button>
+        </div>
+      </div>
+      <div class="ai-block">
+        <label>What to create / write — pick the BDSM sequence elements ♥</label>
+        <div class="ai-chips" id="ai-seq-chips" role="group">
+          <button class="ai-chip" data-seq="sensory" type="button">Sensory deprivation</button>
+          <button class="ai-chip" data-seq="restraint" type="button">Restraint</button>
+          <button class="ai-chip" data-seq="bondage" type="button">Bondage / rope</button>
+          <button class="ai-chip" data-seq="impact" type="button">Impact play</button>
+          <button class="ai-chip" data-seq="sensation" type="button">Temperature / sensation</button>
+          <button class="ai-chip" data-seq="powerexchange" type="button">Power exchange / orders</button>
+          <button class="ai-chip" data-seq="service" type="button">Service submission</button>
+          <button class="ai-chip" data-seq="edging" type="button">Teasing &amp; edging</button>
+          <button class="ai-chip" data-seq="aftercare" type="button">Aftercare</button>
+        </div>
+      </div>
+      <div class="ai-block">
+        <label for="ai-duration">Planned duration</label>
+        <input id="ai-duration" class="ai-field" type="text" placeholder="e.g. 60 minutes + aftercare">
+      </div>
+      <div class="ai-block">
+        <label for="ai-notes">Extra notes / special requests (optional)</label>
+        <textarea id="ai-notes" class="ai-field" rows="2" placeholder="Anything specific you two want woven in…"></textarea>
+      </div>
+      <div class="ai-block">
+        <label>Preview</label>
+        <div class="ai-preview" id="ai-preview"><span class="muted">Choose your options above and press “Generate” to see what the AI would write, then apply it with “Create day” / “Write into day”.</span></div>
+      </div>
+    </div>
+    <div class="ai-footer">
+      <button class="btn btn-outline" id="ai-generate-btn" type="button">🪄 Generate</button>
+      <button class="btn btn-primary" id="ai-apply-btn" type="button" disabled>✨ Create day</button>
+      <button class="btn btn-ghost" id="ai-close-footer-btn" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== MAIN CONTRACT ==================== -->
+<main class="contract-container" id="main-contract">
+
+  <!-- HEADER -->
+  <header class="contract-header">
+    <img class="header-logo" width="200" height="200" alt="Contract crest"
+         src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='47' fill='%23f6ece2' stroke='%23b19787' stroke-width='2'/%3E%3Cpath d='M50 70 C32 56 24 44 32 36 C38 30 46 33 50 40 C54 33 62 30 68 36 C76 44 68 56 50 70Z' fill='%23a3705c'/%3E%3Ctext x='50' y='88' text-anchor='middle' font-size='11' fill='%236b4a3a' font-family='Georgia'%3ED %E2%99%A5 H%3C/text%3E%3C/svg%3E">
+    <h1>BDSM Scene-Specific Contract</h1>
+    <p class="tagline">Two hearts · one bond · an agreement written in trust and tenderness</p>
+    <div class="sub">
+      <span>📄 Contract No. <strong>#DH-2026-∞</strong></span>
+      <span>📅 Effective Date
+        <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD" aria-label="Day"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Month"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY" aria-label="Year"></span>
+      </span>
+      <span>💞 Parties · <strong>Honey</strong> (Sub) &amp; <strong>Deep</strong> (Dom)</span>
+    </div>
+
+    <div class="seal">
+      <p class="seal-title">✦&ensp;Seal this contract with your signature&ensp;✦</p>
+      <div class="sig-cards">
+        <div class="sig-card" data-area="seal" data-party="Deep">
+          <!-- Sign image: https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj/view?usp=sharing (kept exactly as provided, local copy) -->
+          <img class="sig-photo" src="img/signature-deep.png" alt="Deep's signature" loading="lazy">
+          <span class="sig-name">Deep · Dominant</span>
+          <span class="sig-status">Awaiting acceptance…</span>
+          <button class="accept-btn" data-area="seal" data-party="Deep" type="button">Accept</button>
+        </div>
+        <div class="sig-card" data-area="seal" data-party="Honey">
+          <!-- Sign image: https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI/view?usp=sharing (kept exactly as provided, local copy) -->
+          <img class="sig-photo" src="img/signature-honey.png" alt="Honey's signature" loading="lazy">
+          <span class="sig-name">Honey · Submissive</span>
+          <span class="sig-status">Awaiting acceptance…</span>
+          <button class="accept-btn" data-area="seal" data-party="Honey" type="button">Accept</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== DAY 1 ==================== -->
+  <section class="page" id="day1">
+    <div class="page-head">
+      <h2>Day 1 · 30 July 2026 — Private Bedroom / Play Space</h2>
+      <span class="day-badge">♾ Infinity</span>
+    </div>
+    <div class="day-finished">
+      <label for="df-day1">📌 Day finished:</label>
+      <select class="day-finished-select" id="df-day1" data-day="day1">
+        <option value="no">❌ No</option>
+        <option value="yes">✅ Yes</option>
+      </select>
+      <button class="clear-day-btn" type="button" data-day="day1">🗑 Clear this day</button>
+    </div>
+    <p class="lock-note">🔒 This day is marked as finished — everything (signatures included) is sealed. Set “Day finished” to ❌ No to edit again.</p>
+
+    <p><strong>Between:</strong> Deep (the Dominant) &amp; Honey (the Submissive)</p>
+    <p><strong>Duration:</strong> This contract is valid for ♾ infinity, from 30 July 2026 onwards.</p>
+
+    <h3 class="section-title">Article 1 · Preamble &amp; Scope</h3>
+    <p>Wherefore both parties enter this agreement freely, willingly, and with full capacity to consent; this contract is a scene-specific accord, effective only on the dates stated herein, operating alongside — and superseding only where explicitly stated — the standing D/s agreement. Lovingly, cautiously, and without exception, the parties agree as follows.</p>
+
+    <h3 class="section-title">Article 2 · Session Parameters</h3>
+    <table>
+      <tr><th>Clause</th><th>Specification</th></tr>
+      <tr><td>2.1 Date of scene</td><td><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></td></tr>
+      <tr><td>2.2 Planned duration</td><td>Seventy-five (75) minutes of active scene play, exclusive of aftercare — a minimum; more time together is always permitted.</td></tr>
+      <tr><td>2.3 Venue</td><td>Private bedroom / play space. No third parties present.</td></tr>
+    </table>
+
+    <h3 class="section-title">Article 3 · Scheduled Activities (The Play Bill)</h3>
+    <table>
+      <tr><th>Category</th><th>Specific implement / toy</th></tr>
+      <tr><td>Sensory deprivation</td><td>Silk blindfold</td></tr>
+      <tr><td>Restraint (upper body)</td><td>Silk ties / scarves and/or metal handcuffs — never simultaneously on the same limb</td></tr>
+      <tr><td>Sensation play</td><td>Ice cubes (temperature contrast)</td></tr>
+      <tr><td>Stimulation / impact</td><td>Clothespins / nipple clamps</td></tr>
+      <tr><td>Touch &amp; connection</td><td>Hand / palm — bare skin contact</td></tr>
+    </table>
+    <p><strong>3.2 The “Contrast &amp; Control” protocol:</strong> Restraint → ice trails → clamp application → climax → release.</p>
+
+    <h3 class="section-title">Article 4 · New Activities Clause</h3>
+    <div class="checklist-item"><input type="checkbox" id="d1-new"><label for="d1-new">4.1 Are any NEW activities being introduced today? <strong>No.</strong></label></div>
+    <p>4.2 All activities listed in Article 3 have been previously experienced, discussed, and consented to. No unvetted activity shall be introduced during this session.</p>
+
+    <h3 class="section-title">Article 5 · Hard Limits — Session Specific</h3>
+    <table>
+      <tr><th>Clause</th><th>Prohibition</th></tr>
+      <tr><td>5.1.1</td><td>Ice shall not contact the neck, face, or genital mucosa.</td></tr>
+      <tr><td>5.1.2</td><td>Clamps remain on for a maximum of ten (10) consecutive minutes; a timer shall be set.</td></tr>
+      <tr><td>5.1.3</td><td>No gag, no breath play, no choking, no suffocation of any kind.</td></tr>
+      <tr><td>5.1.4</td><td>Handcuffs and silk ties shall never bind the same limb simultaneously.</td></tr>
+    </table>
+
+    <h3 class="section-title">Article 6 · Aftercare Provision</h3>
+    <table>
+      <tr><th>Aftercare deliverable</th><th>Duration</th></tr>
+      <tr><td>Warm blanket wrap (thermal regulation post-ice)</td><td>Immediate</td></tr>
+      <tr><td>Hydration — warm herbal tea or still water</td><td>Upon request</td></tr>
+      <tr><td>Moisturiser applied to ice-exposed skin</td><td>5 minutes</td></tr>
+      <tr><td>Gentle massage of wrists and ankles</td><td>5 minutes per limb</td></tr>
+      <tr><td>Undistracted cuddling, verbal debrief, emotional reconnection</td><td>Minimum 20 minutes</td></tr>
+      <tr><td>Light snack — chocolate or fruit</td><td>Upon request</td></tr>
+    </table>
+
+    <h3 class="section-title">Article 7 · Special Requests &amp; Desires</h3>
+    <p class="quote"><strong>Submissive:</strong> “Extra focus on teasing and edging — draw out the anticipation. The vibrator stays on its lowest setting through the first half of Phase 3.”</p>
+    <p class="quote"><strong>Dominant:</strong> “I wish to alternate ice with warm breath across her skin immediately after each trail, heightening the contrast. No new toys — only a new tenderness.”</p>
+
+    <h3 class="section-title">Article 8 · Safewords &amp; Withdrawal of Consent</h3>
+    <table>
+      <tr><th>Safeword</th><th>Meaning</th><th>Action required</th></tr>
+      <tr><td><em>“RED”</em></td><td>Full stop — withdrawal of consent.</td><td>Scene ends immediately; all restraints removed; aftercare begins.</td></tr>
+      <tr><td><em>“YELLOW”</em></td><td>Pause — check-in required.</td><td>Dominant pauses, checks in verbally, adjusts as needed.</td></tr>
+      <tr><td><em>“GREEN”</em></td><td>All good — continue.</td><td>Dominant proceeds.</td></tr>
+    </table>
+
+    <h3 class="section-title">Article 9 · Safety Protocols</h3>
+    <ul class="bullets">
+      <li>Handcuff key visible and easily accessible at all times.</li>
+      <li>Clamp timer set for 10 minutes, without exception.</li>
+      <li>Ice safety: no stationary ice for more than 5 seconds.</li>
+      <li>Circulation checks every 10 minutes.</li>
+    </ul>
+
+    <h3 class="section-title">Signatories</h3>
+    <div class="sig-cards sign-cards">
+      <div class="sig-card" data-area="signatories" data-party="Honey">
+        <!-- Sign image: https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI/view?usp=sharing (kept exactly as provided, local copy) -->
+        <img class="sig-photo" src="img/signature-honey.png" alt="Honey's signature" loading="lazy">
+        <span class="sig-name">Honey · Submissive</span>
+        <span class="sig-status">Awaiting acceptance…</span>
+        <button class="accept-btn" data-area="signatories" data-party="Honey" type="button">Accept</button>
+      </div>
+      <div class="sig-card" data-area="signatories" data-party="Deep">
+        <!-- Sign image: https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj/view?usp=sharing (kept exactly as provided, local copy) -->
+        <img class="sig-photo" src="img/signature-deep.png" alt="Deep's signature" loading="lazy">
+        <span class="sig-name">Deep · Dominant</span>
+        <span class="sig-status">Awaiting acceptance…</span>
+        <button class="accept-btn" data-area="signatories" data-party="Deep" type="button">Accept</button>
+      </div>
+    </div>
+    <div class="sign-row">
+      <div class="sign-field"><label>Submissive / Bottom — signature</label><span class="initials-slot" data-area="signatories" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+      <div class="sign-field"><label>Printed name</label><input class="editable-field" placeholder="Type printed name"></div>
+      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
+    </div>
+    <div class="sign-row">
+      <div class="sign-field"><label>Dominant / Top — signature</label><span class="initials-slot" data-area="signatories" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+      <div class="sign-field"><label>Printed name</label><input class="editable-field" placeholder="Type printed name"></div>
+      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
+    </div>
+    <p class="witness-line"><label>Witness (optional):</label> <span class="initials-slot"><input type="text" class="editable-field inline-input" placeholder="Signature"></span></p>
+
+    <h3 class="section-title">Pre-Scene Execution Affidavit — Day 1</h3>
+    <p class="exec-line"><strong>Date of execution:</strong> <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span> <strong>Time:</strong> <span class="datetime-group time-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="HH"><i>:</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minutes"></span></p>
+    <div class="checklist-item"><input type="checkbox" id="d1-a1"><label for="d1-a1">We have BOTH read and understood the entire Master Contract and this Scene Contract.</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-a2"><label for="d1-a2">We have BOTH used the bathroom and are physically comfortable.</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-a3"><label for="d1-a3">We have BOTH had water within the last 30 minutes.</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-a4"><label for="d1-a4">All toys and props are clean, safe, and positioned within arm's reach.</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-a5"><label for="d1-a5">The play area is private, secured against interruption, and free from hazards.</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-a6"><label for="d1-a6">Mobile phones are on silent or switched off.</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-a7"><label for="d1-a7">We have agreed on the specific activities for today (Article 3).</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-a8"><label for="d1-a8">We have agreed on the duration: 75 minutes of play plus minimum 20 minutes aftercare.</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-a9"><label for="d1-a9">We have BOTH said our safewords out loud to confirm we remember them.</label></div>
+
+    <h4>Safeword Verification</h4>
+    <table class="verify-table">
+      <tr><th>Safeword</th><th>Spoken by Submissive?</th><th>Spoken by Dominant?</th></tr>
+      <tr><td>“RED”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
+      <tr><td>“YELLOW”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
+      <tr><td>“GREEN”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
+    </table>
+    <div class="checklist-item"><input type="checkbox" id="d1-nv"><label for="d1-nv">Non-verbal signal: dropping a held object (bell, scarf) — understood.</label></div>
+
+    <h4>Final Consent Declaration</h4>
+    <p class="quote"><em>“I freely and enthusiastically consent to this scene.”</em></p>
+    <div class="checklist-item"><input type="checkbox" id="d1-c1"><label for="d1-c1">Given without coercion, pressure, or manipulation.</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-c2"><label for="d1-c2">Given while sober and of sound mind.</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-c3"><label for="d1-c3">Given with full knowledge of all risks involved.</label></div>
+    <div class="checklist-item"><input type="checkbox" id="d1-c4"><label for="d1-c4">Revocable at ANY time, for ANY reason.</label></div>
+
+    <h4>Toy Inventory — Day 1</h4>
+    <table class="toy-table">
+      <tr><th>Item</th><th>Condition</th><th>Location</th></tr>
+      <tr><td>Silk blindfold</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Safe</label></td><td><input class="inline-input" placeholder="Within reach"></td></tr>
+      <tr><td>Silk ties / scarves</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Safe</label></td><td><input class="inline-input" placeholder="Location"></td></tr>
+      <tr><td>Metal handcuffs (key visible)</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Safe</label></td><td><input class="inline-input" placeholder="Location"></td></tr>
+      <tr><td>Ice cubes / bowl</td><td><label class="yn"><input type="checkbox"> Fresh</label><label class="yn"><input type="checkbox"> Safe</label></td><td><input class="inline-input" placeholder="Location"></td></tr>
+      <tr><td>Clothespins / clamps</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Safe</label></td><td><input class="inline-input" placeholder="Location"></td></tr>
+      <tr><td>Vibrator</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Charged</label></td><td><input class="inline-input" placeholder="Location"></td></tr>
+    </table>
+
+    <h4>Scene Debrief — Day 1 (after scene)</h4>
+    <div class="debrief-grid">
+      <div><label>Overall satisfaction</label> <input class="inline-input score" inputmode="numeric" maxlength="2" placeholder="x/10"></div>
+      <div><label>Aftercare effectiveness</label> <input class="inline-input score" inputmode="numeric" maxlength="2" placeholder="x/10"></div>
+      <div><label>Safeword used?</label> <label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label> If yes, which? <input class="inline-input sw" placeholder="RED / YELLOW"></div>
+      <div><label>Adjustments for next time?</label> <input class="inline-input adj editable-field" placeholder="Type adjustments…"></div>
+      <div class="full"><label>Debrief notes</label> <textarea class="note-box" placeholder="Write any observations, incidents, or adjustments…"></textarea></div>
+    </div>
+    <div class="sign-row">
+      <div class="sign-field"><label>Deep's signature (debrief)</label><span class="initials-slot" data-area="debrief" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
+    </div>
+    <div class="sign-row">
+      <div class="sign-field"><label>Honey's signature (debrief)</label><span class="initials-slot" data-area="debrief" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
+    </div>
+  </section>
+
+  <!-- ==================== SUMMARY ==================== -->
+  <section class="page" id="summary">
+    <div class="page-head"><h2>Summary — What To Do &amp; What Never To Do</h2></div>
+
+    <div class="dos-donts">
+      <div class="do-card">
+        <h4>✅ Do</h4>
+        <ul>
+          <li>Complete pre-scene preparation together, out loud.</li>
+          <li>Confirm safewords before every scene.</li>
+          <li>Follow the “Contrast &amp; Control” protocol.</li>
+          <li>Treat aftercare as mandatory, generous, and unhurried.</li>
+        </ul>
+      </div>
+      <div class="dont-card">
+        <h4>❌ Don't</h4>
+        <ul>
+          <li>Introduce new, unvetted activities.</li>
+          <li>Violate a hard limit — ever.</li>
+          <li>Skip or shorten aftercare.</li>
+          <li>Ignore a safeword, verbal or non-verbal.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 class="section-title">Chronological Guide — Day 1</h3>
+    <table>
+      <tr><th>Time</th><th>Step / action</th><th>Who</th><th>Notes</th></tr>
+      <tr><td>T−60 min</td><td>Hydrate, prepare space, lock door, lay out toys</td><td>Both</td><td>Comfort &amp; safety</td></tr>
+      <tr><td>T−10 min</td><td>Pre-scene affidavit read aloud</td><td>Both</td><td>Critical</td></tr>
+      <tr><td>T+0</td><td>Restraint — blindfold, silk ties or handcuffs</td><td>Deep</td><td>Never both on one limb</td></tr>
+      <tr><td>T+10</td><td>Ice trails — moving motion only</td><td>Deep</td><td>Respect hard limits</td></tr>
+      <tr><td>T+20</td><td>Clamps applied + 10-min timer</td><td>Deep</td><td>Remove on alarm</td></tr>
+      <tr><td>T+20–30</td><td>Teasing &amp; edging (vibrator low, first half)</td><td>Deep</td><td>Honey's request</td></tr>
+      <tr><td>T+30</td><td>Remove clamps; continue toward climax</td><td>Both</td><td>Peak</td></tr>
+      <tr><td>T+75</td><td>Scene ends; aftercare begins</td><td>Both</td><td>Mandatory</td></tr>
+    </table>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer-note">
+    <p class="confidential"><strong>Confidentiality notice:</strong> this document is strictly private between Deep &amp; Honey. Any unauthorised disclosure is prohibited.</p>
+    <p>Safewords: RED · YELLOW · GREEN · Non-verbal: dropped object</p>
+  </footer>
+
+  <!-- ACTIONS -->
+  <div class="btn-group">
+    <button class="btn btn-outline" id="save-contract" type="button">💾 Save locally</button>
+    <button class="btn btn-primary" id="print-pdf" type="button">📄 Print / PDF</button>
+    <button class="btn btn-outline" id="email-contract" type="button">✉ Email data</button>
+    <button class="btn btn-outline" id="ai-assistant" type="button">✨ AI write a day</button>
+  </div>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/app.js" defer></script>
+</body>
+</html>
