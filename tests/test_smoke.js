@@ -36,6 +36,14 @@ window.CloudStore = null;
   };
 }
 
+/* image-embed stubs so buildEmail works headless (same as test_flow.js) */
+window.fetch = async () => ({ ok: true, blob: async () => ({ size: 10, type: 'image/png' }) });
+if (!window.URL.createObjectURL) { window.URL.createObjectURL = () => 'blob:x'; window.URL.revokeObjectURL = () => {}; }
+window.HTMLCanvasElement.prototype.getContext = () => ({ drawImage() {}, fillRect() {} });
+window.HTMLCanvasElement.prototype.toDataURL = () => 'data:image/jpeg;base64,TINYEMBED';
+class FakeImg { constructor(){ this._s=''; } set src(v){ this._s=v; setTimeout(()=>this.onload&&this.onload(),0);} get src(){return this._s;} }
+window.Image = FakeImg;
+
 try { window.eval(src); } catch (e) { console.log('FATAL during app init:', e.stack.split('\n').slice(0,4).join('\n')); process.exit(1); }
 
 const $ = s => window.document.querySelector(s);
@@ -72,7 +80,7 @@ check('Day deleted from DOM', !$('#day2'));
   const fin = $('#df-day1');
   if (fin) { fin.value = 'yes'; fin.dispatchEvent(new window.Event('change', { bubbles: true })); }
   $('#email-contract').click();
-  await new Promise(r => setTimeout(r, 800));
+  await new Promise(r => setTimeout(r, 1500));
   check('Email modal opens', $('#email-modal').classList.contains('active'));
   const bodyHtml = $('#modal-body')?.innerHTML || '';
   check('Email preview has styled HTML (tables/gradients)', /background|linear-gradient|<table/i.test(bodyHtml));
