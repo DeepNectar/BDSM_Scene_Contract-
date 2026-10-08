@@ -172,14 +172,28 @@
     </ul>
 
     <h3 class="section-title">Signatories</h3>
+    <div class="sig-cards sign-cards">
+      <div class="sig-card" data-party="Honey">
+        <img class="sig-photo" src="img/signature-honey.png" alt="Honey's signature" loading="lazy">
+        <span class="sig-name">Honey · Submissive</span>
+        <span class="sig-status">Awaiting acceptance…</span>
+        <button class="accept-btn" data-party="Honey" type="button">Accept as Honey</button>
+      </div>
+      <div class="sig-card" data-party="Deep">
+        <img class="sig-photo" src="img/signature-deep.png" alt="Deep's signature" loading="lazy">
+        <span class="sig-name">Deep · Dominant</span>
+        <span class="sig-status">Awaiting acceptance…</span>
+        <button class="accept-btn" data-party="Deep" type="button">Accept as Deep</button>
+      </div>
+    </div>
     <div class="sign-row">
-      <div class="sign-field"><label>Submissive / Bottom</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Printed name</label><input placeholder="Honey"></div>
+      <div class="sign-field"><label>Submissive / Bottom — signature</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+      <div class="sign-field"><label>Printed name</label><input class="editable-field" placeholder="Type printed name"></div>
       <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
     </div>
     <div class="sign-row">
-      <div class="sign-field"><label>Dominant / Top</label><span class="initials-slot" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Printed name</label><input placeholder="Deep"></div>
+      <div class="sign-field"><label>Dominant / Top — signature</label><span class="initials-slot" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+      <div class="sign-field"><label>Printed name</label><input class="editable-field" placeholder="Type printed name"></div>
       <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
     </div>
     <p class="witness-line"><label>Witness (optional):</label> <span class="initials-slot"><input type="text" class="editable-field inline-input" placeholder="Signature"></span></p>
@@ -225,10 +239,10 @@
 
     <h4>Scene Debrief — Day 1 (after scene)</h4>
     <div class="debrief-grid">
-      <div><label>Overall satisfaction</label> <input class="inline-input score" placeholder="__ / 10"></div>
-      <div><label>Aftercare effectiveness</label> <input class="inline-input score" placeholder="__ / 10"></div>
+      <div><label>Overall satisfaction</label> <input class="inline-input score" inputmode="numeric" maxlength="2" placeholder="x/10"></div>
+      <div><label>Aftercare effectiveness</label> <input class="inline-input score" inputmode="numeric" maxlength="2" placeholder="x/10"></div>
       <div><label>Safeword used?</label> <label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label> If yes, which? <input class="inline-input sw" placeholder="RED / YELLOW"></div>
-      <div><label>Adjustments for next time?</label> <input class="inline-input adj" placeholder="Notes"></div>
+      <div><label>Adjustments for next time?</label> <input class="inline-input adj editable-field" placeholder="Type adjustments…"></div>
       <div class="full"><label>Debrief notes</label> <textarea class="note-box" placeholder="Write any observations, incidents, or adjustments…"></textarea></div>
     </div>
     <div class="sign-row">
@@ -237,366 +251,6 @@
     </div>
     <div class="sign-row">
       <div class="sign-field"><label>Honey's signature (debrief)</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-  </section>
-
-  <!-- ==================== DAY 2 ==================== -->
-  <section class="page" id="day2">
-    <div class="page-head">
-      <h2>Day 2 · 31 July 2026 — Private Dressing Room / Walk-in Closet</h2>
-      <span class="day-badge">♾ Infinity</span>
-    </div>
-    <div class="day-finished">
-      <label for="df-day2">📌 Day finished:</label>
-      <select class="day-finished-select" id="df-day2" data-day="day2">
-        <option value="no">❌ No</option>
-        <option value="yes">✅ Yes</option>
-      </select>
-      <button class="clear-day-btn" type="button" data-day="day2">🗑 Clear this day</button>
-    </div>
-
-    <p><strong>Between:</strong> Deep &amp; Honey</p>
-    <p><strong>Duration:</strong> Valid for ♾ infinity, from 30 July 2026 onwards.</p>
-
-    <h3 class="section-title">Article 2 · Session Parameters</h3>
-    <table>
-      <tr><th>Clause</th><th>Specification</th></tr>
-      <tr><td>2.1 Date of scene</td><td><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></td></tr>
-      <tr><td>2.2 Planned duration</td><td>Seventy-five (75) minutes of active scene play, exclusive of aftercare.</td></tr>
-      <tr><td>2.3 Venue</td><td>Private dressing room / walk-in closet with full-length mirror.</td></tr>
-    </table>
-
-    <h3 class="section-title">Article 3 · Scheduled Activities</h3>
-    <table>
-      <tr><th>Category</th><th>Specific implement / toy</th></tr>
-      <tr><td>Visual exposure</td><td>Forced eye contact / full-length mirror access</td></tr>
-      <tr><td>Restraint (positioning)</td><td>Leather wrist cuffs connected to waist belt / soft rope</td></tr>
-      <tr><td>Sensation play</td><td>Warm massage oil (tactile heat contrast)</td></tr>
-      <tr><td>Stimulation / impact</td><td>Lightweight leather paddle / slap paddle</td></tr>
-      <tr><td>Touch &amp; connection</td><td>Mirror-surface contact, manual teasing, standing alignment</td></tr>
-    </table>
-
-    <h3 class="section-title">Article 5 · Hard Limits — Session Specific</h3>
-    <table>
-      <tr><th>Clause</th><th>Prohibition</th></tr>
-      <tr><td>5.1.1</td><td>The paddle shall not strike the spine, kidneys, or lower back.</td></tr>
-      <tr><td>5.1.2</td><td>Standing / bent-over mirror positions pause every 15 minutes for joint relief.</td></tr>
-      <tr><td>5.1.3</td><td>No gag, no breath play, no choking, no suffocation of any kind.</td></tr>
-      <tr><td>5.1.4</td><td>Face and chest must never be pressed harshly against glass; breathing is guaranteed.</td></tr>
-    </table>
-
-    <h3 class="section-title">Article 6 · Aftercare Provision</h3>
-    <table>
-      <tr><th>Aftercare deliverable</th><th>Duration</th></tr>
-      <tr><td>Oversized plush robe wrap and comfortable seating</td><td>Immediate</td></tr>
-      <tr><td>Hydration — chilled electrolyte or coconut water</td><td>Upon request</td></tr>
-      <tr><td>Warm damp towel wipe-down to remove excess oil</td><td>5 minutes</td></tr>
-      <tr><td>Soothing aloe vera applied to impact zones</td><td>5 minutes</td></tr>
-      <tr><td>Undistracted holding, reflection reassurance, verbal debrief</td><td>Minimum 20 minutes</td></tr>
-      <tr><td>Light snack — fresh fruit slices or berries</td><td>Upon request</td></tr>
-    </table>
-
-    <h3 class="section-title">Special Requests</h3>
-    <p class="quote"><strong>Submissive:</strong> “Make me look at our reflection in the intense moments — anchor my gaze with your voice.”</p>
-    <p class="quote"><strong>Dominant:</strong> “Slow, rhythmic paddle strikes to build deep warmth before anything else. Patience as foreplay.”</p>
-
-    <h3 class="section-title">Signatories</h3>
-    <div class="sign-row">
-      <div class="sign-field"><label>Submissive / Bottom</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Printed name</label><input placeholder="Honey"></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-    <div class="sign-row">
-      <div class="sign-field"><label>Dominant / Top</label><span class="initials-slot" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Printed name</label><input placeholder="Deep"></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-
-    <h3 class="section-title">Pre-Scene Execution Affidavit — Day 2</h3>
-    <p class="exec-line"><strong>Date:</strong> <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span> <strong>Time:</strong> <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="HH"><i>:</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minutes"></span></p>
-    <div class="checklist-item"><input type="checkbox" id="d2-a1"><label for="d2-a1">We have BOTH read and understood the entire Master Contract and this Scene Contract.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d2-a2"><label for="d2-a2">We have BOTH used the bathroom and are physically comfortable.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d2-a3"><label for="d2-a3">We have BOTH had water within the last 30 minutes.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d2-a4"><label for="d2-a4">All toys and props are clean, safe, and positioned within arm's reach.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d2-a5"><label for="d2-a5">The play area is private, secured against interruption, and free from hazards.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d2-a6"><label for="d2-a6">Mobile phones are on silent or switched off.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d2-a7"><label for="d2-a7">We have agreed on the specific activities for today (Article 3).</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d2-a8"><label for="d2-a8">We have agreed on the duration: 75 minutes of play plus minimum 20 minutes aftercare.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d2-a9"><label for="d2-a9">We have BOTH said our safewords out loud to confirm we remember them.</label></div>
-
-    <h4>Safeword Verification</h4>
-    <table class="verify-table">
-      <tr><th>Safeword</th><th>Spoken by Submissive?</th><th>Spoken by Dominant?</th></tr>
-      <tr><td>“RED”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
-      <tr><td>“YELLOW”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
-      <tr><td>“GREEN”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
-    </table>
-
-    <h4>Toy Inventory — Day 2</h4>
-    <table class="toy-table">
-      <tr><th>Item</th><th>Condition</th><th>Location</th></tr>
-      <tr><td>Leather cuffs / rope</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Safe</label></td><td><input class="inline-input" placeholder="Dressing table"></td></tr>
-      <tr><td>Warm massage oil</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Safe</label></td><td><input class="inline-input" placeholder="Location"></td></tr>
-      <tr><td>Leather paddle</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Safe</label></td><td><input class="inline-input" placeholder="Location"></td></tr>
-      <tr><td>Non-slip floor mat</td><td><label class="yn"><input type="checkbox"> Positioned</label></td><td><input class="inline-input" placeholder="Under feet"></td></tr>
-      <tr><td>Warm damp towels</td><td><label class="yn"><input type="checkbox"> Ready</label></td><td><input class="inline-input" placeholder="Location"></td></tr>
-    </table>
-
-    <h4>Scene Debrief — Day 2</h4>
-    <div class="debrief-grid">
-      <div><label>Overall satisfaction</label> <input class="inline-input score" placeholder="__ / 10"></div>
-      <div><label>Aftercare effectiveness</label> <input class="inline-input score" placeholder="__ / 10"></div>
-      <div><label>Safeword used?</label> <label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label> If yes, which? <input class="inline-input sw" placeholder="RED / YELLOW"></div>
-      <div><label>Adjustments for next time?</label> <input class="inline-input adj" placeholder="Notes"></div>
-      <div class="full"><label>Debrief notes</label> <textarea class="note-box" placeholder="Write any observations…"></textarea></div>
-    </div>
-    <div class="sign-row">
-      <div class="sign-field"><label>Deep's signature</label><span class="initials-slot" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-    <div class="sign-row">
-      <div class="sign-field"><label>Honey's signature</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-  </section>
-
-  <!-- ==================== DAY 3 ==================== -->
-  <section class="page" id="day3">
-    <div class="page-head">
-      <h2>Day 3 · 1 August 2026 — Private Study / Living Space</h2>
-      <span class="day-badge">♾ Infinity</span>
-    </div>
-    <div class="day-finished">
-      <label for="df-day3">📌 Day finished:</label>
-      <select class="day-finished-select" id="df-day3" data-day="day3">
-        <option value="no">❌ No</option>
-        <option value="yes">✅ Yes</option>
-      </select>
-      <button class="clear-day-btn" type="button" data-day="day3">🗑 Clear this day</button>
-    </div>
-
-    <p><strong>Between:</strong> Deep &amp; Honey</p>
-    <p><strong>Duration:</strong> Valid for ♾ infinity, from 30 July 2026 onwards.</p>
-
-    <h3 class="section-title">Article 2 · Session Parameters</h3>
-    <table>
-      <tr><th>Clause</th><th>Specification</th></tr>
-      <tr><td>2.1 Date of scene</td><td><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></td></tr>
-      <tr><td>2.2 Planned duration</td><td>Seventy-five (75) minutes of active scene play, exclusive of aftercare.</td></tr>
-      <tr><td>2.3 Venue</td><td>Private study / living space with high-backed armchair and sofa.</td></tr>
-    </table>
-
-    <h3 class="section-title">Article 3 · Scheduled Activities</h3>
-    <table>
-      <tr><th>Category</th><th>Specific implement / toy</th></tr>
-      <tr><td>Sensory deprivation</td><td>Opaque sleep mask</td></tr>
-      <tr><td>Restraint (furniture)</td><td>High-backed armchair straps / thigh spreaders</td></tr>
-      <tr><td>Sensation play</td><td>Wartenberg neuro-pinwheel / feather tickler</td></tr>
-      <tr><td>Stimulation / impact</td><td>External wand vibrator / internal silicone pleasures</td></tr>
-      <tr><td>Touch &amp; connection</td><td>Immobilised chair positioning, then open sofa play</td></tr>
-    </table>
-
-    <h3 class="section-title">Article 5 · Hard Limits</h3>
-    <table>
-      <tr><th>Clause</th><th>Prohibition</th></tr>
-      <tr><td>5.1.1</td><td>Submissive is NEVER left unattended while strapped to the armchair.</td></tr>
-      <tr><td>5.1.2</td><td>Thigh spreaders never extended to joint hyperextension.</td></tr>
-      <tr><td>5.1.3</td><td>No gag, no breath play, no choking, no suffocation of any kind.</td></tr>
-      <tr><td>5.1.4</td><td>Pinwheel applied with light pressure only — it must never pierce the skin.</td></tr>
-    </table>
-
-    <h3 class="section-title">Article 6 · Aftercare Provision</h3>
-    <table>
-      <tr><th>Aftercare deliverable</th><th>Duration</th></tr>
-      <tr><td>Horizontal placement on sofa with heavy fleece blanket</td><td>Immediate</td></tr>
-      <tr><td>Hydration — warm lemon water or chamomile tea</td><td>Upon request</td></tr>
-      <tr><td>Gentle manual stretching of hips and thighs</td><td>5 minutes</td></tr>
-      <tr><td>Soft massage of lower back and shoulder blades</td><td>10 minutes</td></tr>
-      <tr><td>Extended cuddling, breathing synchronised</td><td>Minimum 20 minutes</td></tr>
-      <tr><td>Dark chocolate or a sweet biscuit</td><td>Upon request</td></tr>
-    </table>
-
-    <h3 class="section-title">Special Requests</h3>
-    <p class="quote"><strong>Submissive:</strong> “Immobilise me completely — let me wonder where the pinwheel or the wand will bloom next.”</p>
-    <p class="quote"><strong>Dominant:</strong> “Absolute stillness under sensory tracking, held in place by nothing but my voice.”</p>
-
-    <h3 class="section-title">Signatories</h3>
-    <div class="sign-row">
-      <div class="sign-field"><label>Submissive / Bottom</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Printed name</label><input placeholder="Honey"></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-    <div class="sign-row">
-      <div class="sign-field"><label>Dominant / Top</label><span class="initials-slot" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Printed name</label><input placeholder="Deep"></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-
-    <h3 class="section-title">Pre-Scene Execution Affidavit — Day 3</h3>
-    <p class="exec-line"><strong>Date:</strong> <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span> <strong>Time:</strong> <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="HH"><i>:</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minutes"></span></p>
-    <div class="checklist-item"><input type="checkbox" id="d3-a1"><label for="d3-a1">We have BOTH read and understood the entire Master Contract and this Scene Contract.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d3-a2"><label for="d3-a2">We have BOTH used the bathroom and are physically comfortable.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d3-a3"><label for="d3-a3">We have BOTH had water within the last 30 minutes.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d3-a4"><label for="d3-a4">All toys and props are clean, safe, and positioned within arm's reach.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d3-a5"><label for="d3-a5">The play area is private, secured against interruption, and free from hazards.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d3-a6"><label for="d3-a6">Mobile phones are on silent or switched off.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d3-a7"><label for="d3-a7">We have agreed on the specific activities for today (Article 3).</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d3-a8"><label for="d3-a8">We have agreed on the duration: 75 minutes of play plus minimum 20 minutes aftercare.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d3-a9"><label for="d3-a9">We have BOTH said our safewords out loud to confirm we remember them.</label></div>
-
-    <h4>Safeword Verification</h4>
-    <table class="verify-table">
-      <tr><th>Safeword</th><th>Spoken by Submissive?</th><th>Spoken by Dominant?</th></tr>
-      <tr><td>“RED”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
-      <tr><td>“YELLOW”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
-      <tr><td>“GREEN”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
-    </table>
-
-    <h4>Toy Inventory — Day 3</h4>
-    <table class="toy-table">
-      <tr><th>Item</th><th>Condition</th><th>Location</th></tr>
-      <tr><td>Opaque sleep mask</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Safe</label></td><td><input class="inline-input" placeholder="Study desk"></td></tr>
-      <tr><td>Armchair straps</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Vetted</label></td><td><input class="inline-input" placeholder="Pre-fitted"></td></tr>
-      <tr><td>Wartenberg pinwheel</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Sanitised</label></td><td><input class="inline-input" placeholder="Within reach"></td></tr>
-      <tr><td>Wand vibrator</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Charged</label></td><td><input class="inline-input" placeholder="Beside chair"></td></tr>
-      <tr><td>Safety shears</td><td><label class="yn"><input type="checkbox"> Sharp</label><label class="yn"><input type="checkbox"> Ready</label></td><td><input class="inline-input" placeholder="Openly visible"></td></tr>
-    </table>
-
-    <h4>Scene Debrief — Day 3</h4>
-    <div class="debrief-grid">
-      <div><label>Overall satisfaction</label> <input class="inline-input score" placeholder="__ / 10"></div>
-      <div><label>Aftercare effectiveness</label> <input class="inline-input score" placeholder="__ / 10"></div>
-      <div><label>Safeword used?</label> <label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label> If yes, which? <input class="inline-input sw" placeholder="RED / YELLOW"></div>
-      <div><label>Adjustments for next time?</label> <input class="inline-input adj" placeholder="Notes"></div>
-      <div class="full"><label>Debrief notes</label> <textarea class="note-box" placeholder="Write any observations…"></textarea></div>
-    </div>
-    <div class="sign-row">
-      <div class="sign-field"><label>Deep's signature</label><span class="initials-slot" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-    <div class="sign-row">
-      <div class="sign-field"><label>Honey's signature</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-  </section>
-
-  <!-- ==================== DAY 4 ==================== -->
-  <section class="page" id="day4">
-    <div class="page-head">
-      <h2>Day 4 · 2 August 2026 — Private Master Bathroom / Ensuite</h2>
-      <span class="day-badge">♾ Infinity</span>
-    </div>
-    <div class="day-finished">
-      <label for="df-day4">📌 Day finished:</label>
-      <select class="day-finished-select" id="df-day4" data-day="day4">
-        <option value="no">❌ No</option>
-        <option value="yes">✅ Yes</option>
-      </select>
-      <button class="clear-day-btn" type="button" data-day="day4">🗑 Clear this day</button>
-    </div>
-
-    <p><strong>Between:</strong> Deep &amp; Honey</p>
-    <p><strong>Duration:</strong> Valid for ♾ infinity, from 30 July 2026 onwards.</p>
-
-    <h3 class="section-title">Article 2 · Session Parameters</h3>
-    <table>
-      <tr><th>Clause</th><th>Specification</th></tr>
-      <tr><td>2.1 Date of scene</td><td><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></td></tr>
-      <tr><td>2.2 Planned duration</td><td>Seventy-five (75) minutes of active scene play, exclusive of aftercare.</td></tr>
-      <tr><td>2.3 Venue</td><td>Private master bathroom / ensuite with large bathtub.</td></tr>
-    </table>
-
-    <h3 class="section-title">Article 3 · Scheduled Activities</h3>
-    <table>
-      <tr><th>Category</th><th>Specific implement / toy</th></tr>
-      <tr><td>Sensory deprivation</td><td>Neoprene waterproof blindfold</td></tr>
-      <tr><td>Restraint (water-safe)</td><td>Non-porous vinyl cuffs (grab-bar connection) / manual hold</td></tr>
-      <tr><td>Sensation play</td><td>Hydro-thermal contrast — warm immersion + ice-water pours</td></tr>
-      <tr><td>Stimulation / impact</td><td>Waterproof submersible bullet vibrator</td></tr>
-      <tr><td>Touch &amp; connection</td><td>Slick skin-on-skin aquatic friction, edge-of-tub bracing</td></tr>
-    </table>
-
-    <h3 class="section-title">Article 5 · Hard Limits</h3>
-    <table>
-      <tr><th>Clause</th><th>Prohibition</th></tr>
-      <tr><td>5.1.1</td><td>Honey's nose, mouth, and face shall NEVER be submerged.</td></tr>
-      <tr><td>5.1.2</td><td>No fabric, leather, or rope that contracts when wet may serve as restraint.</td></tr>
-      <tr><td>5.1.3</td><td>No gag, no breath play, no choking, no suffocation of any kind.</td></tr>
-      <tr><td>5.1.4</td><td>Ice-water pours bypass the face entirely — no involuntary gasping.</td></tr>
-    </table>
-
-    <h3 class="section-title">Article 6 · Aftercare Provision</h3>
-    <table>
-      <tr><th>Aftercare deliverable</th><th>Duration</th></tr>
-      <tr><td>Pull plug, assist out, wrap in pre-warmed bath sheets</td><td>Immediate</td></tr>
-      <tr><td>Hydration — warm water or hot tea to restore core heat</td><td>Upon request</td></tr>
-      <tr><td>Rich body oil / lotion applied to damp skin</td><td>5 minutes</td></tr>
-      <tr><td>Gentle blow-drying and brushing of Honey's hair</td><td>10 minutes</td></tr>
-      <tr><td>Transfer to bed for warm, dry holding and grounding</td><td>Minimum 20 minutes</td></tr>
-      <tr><td>Warm light snack — broth or hot cocoa</td><td>Upon request</td></tr>
-    </table>
-
-    <h3 class="section-title">Special Requests</h3>
-    <p class="quote"><strong>Submissive:</strong> “The thermal rush of ice-water over warm skin, held securely by Deep's hands the whole time.”</p>
-    <p class="quote"><strong>Dominant:</strong> “Guide her legs over the tub's edge and use the buoyancy to find elevated, unhurried angles.”</p>
-
-    <h3 class="section-title">Signatories</h3>
-    <div class="sign-row">
-      <div class="sign-field"><label>Submissive / Bottom</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Printed name</label><input placeholder="Honey"></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-    <div class="sign-row">
-      <div class="sign-field"><label>Dominant / Top</label><span class="initials-slot" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Printed name</label><input placeholder="Deep"></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-
-    <h3 class="section-title">Pre-Scene Execution Affidavit — Day 4</h3>
-    <p class="exec-line"><strong>Date:</strong> <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span> <strong>Time:</strong> <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="HH"><i>:</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minutes"></span></p>
-    <div class="checklist-item"><input type="checkbox" id="d4-a1"><label for="d4-a1">We have BOTH read and understood the entire Master Contract and this Scene Contract.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d4-a2"><label for="d4-a2">We have BOTH used the bathroom and are physically comfortable.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d4-a3"><label for="d4-a3">We have BOTH had water within the last 30 minutes.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d4-a4"><label for="d4-a4">All toys and props are clean, safe, and positioned within arm's reach.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d4-a5"><label for="d4-a5">The play area is private, secured against interruption, and free from hazards.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d4-a6"><label for="d4-a6">Mobile phones are on silent or switched off.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d4-a7"><label for="d4-a7">We have agreed on the specific activities for today (Article 3).</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d4-a8"><label for="d4-a8">We have agreed on the duration: 75 minutes of play plus minimum 20 minutes aftercare.</label></div>
-    <div class="checklist-item"><input type="checkbox" id="d4-a9"><label for="d4-a9">We have BOTH said our safewords out loud to confirm we remember them.</label></div>
-
-    <h4>Safeword Verification</h4>
-    <table class="verify-table">
-      <tr><th>Safeword</th><th>Spoken by Submissive?</th><th>Spoken by Dominant?</th></tr>
-      <tr><td>“RED”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
-      <tr><td>“YELLOW”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
-      <tr><td>“GREEN”</td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td><td><label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label></td></tr>
-    </table>
-
-    <h4>Toy Inventory — Day 4</h4>
-    <table class="toy-table">
-      <tr><th>Item</th><th>Condition</th><th>Location</th></tr>
-      <tr><td>Neoprene blindfold</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Safe</label></td><td><input class="inline-input" placeholder="Bathroom counter"></td></tr>
-      <tr><td>Waterproof vibrator</td><td><label class="yn"><input type="checkbox"> Clean</label><label class="yn"><input type="checkbox"> Sealed OK</label></td><td><input class="inline-input" placeholder="Beside tub"></td></tr>
-      <tr><td>Ice-water pitcher</td><td><label class="yn"><input type="checkbox"> Filled</label><label class="yn"><input type="checkbox"> Ready</label></td><td><input class="inline-input" placeholder="Next to sink"></td></tr>
-      <tr><td>Bath thermometer</td><td><label class="yn"><input type="checkbox"> Calibrated</label></td><td><input class="inline-input" placeholder="Floating"></td></tr>
-      <tr><td>Pre-warmed sheets</td><td><label class="yn"><input type="checkbox"> Dry</label><label class="yn"><input type="checkbox"> Hot</label></td><td><input class="inline-input" placeholder="Heated towel rack"></td></tr>
-    </table>
-
-    <h4>Scene Debrief — Day 4</h4>
-    <div class="debrief-grid">
-      <div><label>Overall satisfaction</label> <input class="inline-input score" placeholder="__ / 10"></div>
-      <div><label>Aftercare effectiveness</label> <input class="inline-input score" placeholder="__ / 10"></div>
-      <div><label>Safeword used?</label> <label class="yn"><input type="checkbox"> Yes</label><label class="yn"><input type="checkbox"> No</label> If yes, which? <input class="inline-input sw" placeholder="RED / YELLOW"></div>
-      <div><label>Adjustments for next time?</label> <input class="inline-input adj" placeholder="Notes"></div>
-      <div class="full"><label>Debrief notes</label> <textarea class="note-box" placeholder="Write any observations…"></textarea></div>
-    </div>
-    <div class="sign-row">
-      <div class="sign-field"><label>Deep's signature</label><span class="initials-slot" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-      <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
-    </div>
-    <div class="sign-row">
-      <div class="sign-field"><label>Honey's signature</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
       <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
     </div>
   </section>
@@ -637,46 +291,6 @@
       <tr><td>T+20–30</td><td>Teasing &amp; edging (vibrator low, first half)</td><td>Deep</td><td>Honey's request</td></tr>
       <tr><td>T+30</td><td>Remove clamps; continue toward climax</td><td>Both</td><td>Peak</td></tr>
       <tr><td>T+75</td><td>Scene ends; aftercare begins</td><td>Both</td><td>Mandatory</td></tr>
-    </table>
-
-    <h3 class="section-title">Chronological Guide — Day 2</h3>
-    <table>
-      <tr><th>Time</th><th>Step / action</th><th>Who</th><th>Notes</th></tr>
-      <tr><td>T−60 min</td><td>Clean mirror, lay non-slip mat, warm oil</td><td>Both</td><td>Secure space</td></tr>
-      <tr><td>T−10 min</td><td>Pre-scene affidavit read aloud</td><td>Both</td><td>Verify posture</td></tr>
-      <tr><td>T+0</td><td>Position at mirror, restrain wrists</td><td>Deep</td><td>Forced visual focus</td></tr>
-      <tr><td>T+10</td><td>Pour warm massage oil</td><td>Deep</td><td>Slow sensory</td></tr>
-      <tr><td>T+20</td><td>Rhythmic leather paddle impact</td><td>Deep</td><td>Circulation check</td></tr>
-      <tr><td>T+30</td><td>Mandatory position pause</td><td>Both</td><td>Joint relief</td></tr>
-      <tr><td>T+35–75</td><td>Standing mirror play</td><td>Both</td><td>Eye contact via glass</td></tr>
-      <tr><td>T+75</td><td>Wrap in robe; aftercare</td><td>Both</td><td>Warm towel wipe-down</td></tr>
-    </table>
-
-    <h3 class="section-title">Chronological Guide — Day 3</h3>
-    <table>
-      <tr><th>Time</th><th>Step / action</th><th>Who</th><th>Notes</th></tr>
-      <tr><td>T−60 min</td><td>Fit chair straps, sanitise pinwheel, check wand</td><td>Both</td><td>Safety shears on desk</td></tr>
-      <tr><td>T−10 min</td><td>Pre-scene affidavit read aloud</td><td>Both</td><td>Check lumbar pillow</td></tr>
-      <tr><td>T+0</td><td>Seat, sleep mask on, straps locked</td><td>Deep</td><td>Immobilisation</td></tr>
-      <tr><td>T+10</td><td>Pinwheel &amp; feather tickler</td><td>Deep</td><td>Sharp / soft alternation</td></tr>
-      <tr><td>T+20</td><td>External wand vibrator</td><td>Deep</td><td>Circulation check</td></tr>
-      <tr><td>T+35</td><td>Transition to structural chair play</td><td>Both</td><td>Positional control</td></tr>
-      <tr><td>T+50</td><td>Release straps; move to sofa</td><td>Both</td><td>Support her weight</td></tr>
-      <tr><td>T+55–75</td><td>Sofa play to climax</td><td>Both</td><td>Fluid, driven</td></tr>
-      <tr><td>T+75</td><td>Wrap in fleece; aftercare</td><td>Both</td><td>Specialised</td></tr>
-    </table>
-
-    <h3 class="section-title">Chronological Guide — Day 4</h3>
-    <table>
-      <tr><th>Time</th><th>Step / action</th><th>Who</th><th>Notes</th></tr>
-      <tr><td>T−60 min</td><td>Scrub tub, check suction mats, fill water 37–39 °C</td><td>Both</td><td>Safety first</td></tr>
-      <tr><td>T−10 min</td><td>Pre-scene affidavit read aloud</td><td>Both</td><td>Open-palm splash = safeword</td></tr>
-      <tr><td>T+0</td><td>Honey enters tub; waterproof blindfold</td><td>Deep</td><td>Continuous hand contact</td></tr>
-      <tr><td>T+10</td><td>Ice-water pours over shoulders / chest</td><td>Deep</td><td>Thermal shock — bypass face</td></tr>
-      <tr><td>T+25</td><td>Submersible bullet vibrator introduced</td><td>Deep</td><td>Check water level</td></tr>
-      <tr><td>T+40</td><td>Reposition; legs over tub edge</td><td>Deep</td><td>Brace hips</td></tr>
-      <tr><td>T+45–75</td><td>Buoyant bathtub play to climax</td><td>Both</td><td>Low friction</td></tr>
-      <tr><td>T+75</td><td>Plug pulled, assist out, wrap, dry hair</td><td>Both</td><td>Warm aftercare</td></tr>
     </table>
   </section>
 

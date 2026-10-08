@@ -113,7 +113,9 @@
     try { data = JSON.parse(localStorage.getItem(STORE_KEY)); } catch { return; }
     if (!data) return;
     $$('#main-contract input, #main-contract textarea, #main-contract select').forEach(el => {
-      if (el.closest('.initials-slot.slot-filled')) return;   // sealed signature owns this field
+      const slot = el.closest('.initials-slot');
+      if (slot?.classList.contains('slot-filled')) return;   // sealed signature owns this field
+      if (el.readOnly) return;                               // accept-date pills own their value
       const k = keyFor(el);
       if (!(k in data)) return;
       if (el.type === 'checkbox') el.checked = !!data[k];
@@ -163,9 +165,21 @@
       if (inp) inp.readOnly = true;
       slot.classList.add('slot-filled');
     });
+    /* debrief / signatory date pills: auto-fill today's date when empty */
+    const pad = n => String(n).padStart(2, '0');
+    const now = new Date();
+    const dmy = [pad(now.getDate()), pad(now.getMonth() + 1), String(now.getFullYear())];
+    $$('.page').forEach(page => {
+      $$('.sign-row', page).forEach(row => {
+        if (!$(`.initials-slot[data-party="${party}"]`, row)) return;
+        const pill = $('.datetime-group', row);
+        if (!pill) return;
+        $$('input', pill).forEach((inp, i) => { if (!inp.value.trim()) inp.value = dmy[i] || ''; });
+      });
+    });
   };
 
-  /* undo: remove image, unlock input, clear only our auto-filled name */
+  /* undo: remove image, unlock input, clear only our auto-filled name/date */
   const clearSlots = party => {
     $$('.initials-slot[data-party="' + party + '"]').forEach(slot => {
       const img = $('.slot-sig', slot);
@@ -176,6 +190,18 @@
         if (inp.value.trim() === party) inp.value = '';     // never delete user-typed text
       }
       slot.classList.remove('slot-filled');
+    });
+    /* clear only the dates we auto-filled (still matching today) */
+    const pad = n => String(n).padStart(2, '0');
+    const now = new Date();
+    const dmy = [pad(now.getDate()), pad(now.getMonth() + 1), String(now.getFullYear())];
+    $$('.page').forEach(page => {
+      $$('.sign-row', page).forEach(row => {
+        if (!$(`.initials-slot[data-party="${party}"]`, row)) return;
+        const pill = $('.datetime-group', row);
+        if (!pill) return;
+        $$('input', pill).forEach((inp, i) => { if (inp.value.trim() === (dmy[i] || '')) inp.value = ''; });
+      });
     });
   };
 
@@ -224,8 +250,9 @@
     save();
   });
 
-  /* re-apply on initial page load too */
-  applySignatures();
+  /* re-apply on initial page load too — AFTER restoring saved values so that
+     sealed slots/dates take ownership instead of being overwritten by old data */
+  document.addEventListener('DOMContentLoaded', () => { loadSaved(); applySignatures(); });
 
   /* ---------- clear a day ---------- */
   $$('.clear-day-btn').forEach(btn => {
