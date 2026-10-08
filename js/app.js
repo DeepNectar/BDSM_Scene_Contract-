@@ -53,6 +53,7 @@
   const unlock = () => {
     overlay.classList.add('hidden');
     loadSaved();
+    applySignatures();   // re-restore accepted signatures after the gate opens
     setTimeout(() => pwInput.blur(), 300);
   };
 
@@ -112,6 +113,7 @@
     try { data = JSON.parse(localStorage.getItem(STORE_KEY)); } catch { return; }
     if (!data) return;
     $$('#main-contract input, #main-contract textarea, #main-contract select').forEach(el => {
+      if (el.closest('.initials-slot.slot-filled')) return;   // sealed signature owns this field
       const k = keyFor(el);
       if (!(k in data)) return;
       if (el.type === 'checkbox') el.checked = !!data[k];
@@ -125,6 +127,106 @@
   setInterval(writeStore, 60000);          // gentle autosave
   window.addEventListener('beforeunload', writeStore);
 
+  /* ============================================================
+     PHOTO SIGNATURES ON ACCEPT
+     Local images only — never hotlink Google Drive /view URLs
+     (blocked by browsers & print/email contexts).
+       Deep  ref: https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj/view?usp=sharing → img/signature-deep.png
+       Honey ref: https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI/view?usp=sharing → img/signature-honey.png
+     ============================================================ */
+  const SIG_CONFIG = {
+    Deep:  'img/signature-deep.png',
+    Honey: 'img/signature-honey.png',
+  };
+  const SIG_KEY   = 'signAccepted';
+  const UNDO_MS   = 5 * 60 * 1000;         // undo window: 5 minutes
+
+  const readAccepts = () => {
+    try { return JSON.parse(localStorage.getItem(SIG_KEY)) || {}; }
+    catch { return {}; }
+  };
+  const writeAccepts = a => localStorage.setItem(SIG_KEY, JSON.stringify(a));
+
+  /* overlay the signature image onto every slot of one party */
+  const fillSlots = party => {
+    $$('.initials-slot[data-party="' + party + '"]').forEach(slot => {
+      if (slot.classList.contains('slot-filled')) return;   // prevent duplicates
+      const inp = $('input.editable-field', slot) || $('input', slot);
+      const img = document.createElement('img');
+      img.className = 'slot-sig';
+      img.src = SIG_CONFIG[party] || '';
+      img.alt = party + '\u2019s signature';
+      img.loading = 'lazy';
+      img.onerror = () => { img.remove(); if (inp) { inp.readOnly = false; slot.classList.remove('slot-filled'); } };
+      slot.appendChild(img);
+      if (inp && !inp.value.trim()) inp.value = party;      // prefill ONLY if empty
+      if (inp) inp.readOnly = true;
+      slot.classList.add('slot-filled');
+    });
+  };
+
+  /* undo: remove image, unlock input, clear only our auto-filled name */
+  const clearSlots = party => {
+    $$('.initials-slot[data-party="' + party + '"]').forEach(slot => {
+      const img = $('.slot-sig', slot);
+      if (img) img.remove();
+      const inp = $('input.editable-field', slot) || $('input', slot);
+      if (inp) {
+        inp.readOnly = false;
+        if (inp.value.trim() === party) inp.value = '';     // never delete user-typed text
+      }
+      slot.classList.remove('slot-filled');
+    });
+  };
+
+  const syncPartyUI = (party, accepted) => {
+    $$('.accept-btn[data-party="' + party + '"]').forEach(b => {
+      b.textContent = accepted ? 'Signed \u2014 tap to undo' : 'Accept as ' + party;
+    });
+    $$('.sig-card[data-party="' + party + '"]').forEach(card => {
+      card.classList.toggle('signed', !!accepted);
+      const st = $('.sig-status', card);
+      if (st) st.textContent = accepted ? 'Accepted & signed' : 'Awaiting acceptance\u2026';
+    });
+  };
+
+  const applySignatures = () => {
+    const accepts = readAccepts();
+    Object.keys(SIG_CONFIG).forEach(party => {
+      const acc = accepts[party];
+      if (acc) { fillSlots(party); syncPartyUI(party, true); }
+      else     { clearSlots(party); syncPartyUI(party, false); }
+    });
+  };
+
+  /* event delegation on document */
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.accept-btn');
+    if (!btn) return;
+    const party = btn.dataset.party;
+    if (!SIG_CONFIG[party]) return;
+    const accepts = readAccepts();
+    const acc = accepts[party];
+    if (acc) {
+      if (Date.now() - acc.ts > UNDO_MS) { toast('\ud83d\udd12 Sealed \u2014 the undo window has closed. Signed with love.', 3200); return; }
+      delete accepts[party];
+      writeAccepts(accepts);
+      clearSlots(party);
+      syncPartyUI(party, false);
+      toast(`\u21a9 ${party}'s signature withdrawn.`);
+    } else {
+      accepts[party] = { ts: Date.now() };
+      writeAccepts(accepts);
+      fillSlots(party);
+      syncPartyUI(party, true);
+      toast(`\u2764 ${party} accepted & signed \u2014 sealed in five minutes.`);
+    }
+    save();
+  });
+
+  /* re-apply on initial page load too */
+  applySignatures();
+
   /* ---------- clear a day ---------- */
   $$('.clear-day-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -133,6 +235,8 @@
       if (!page) return;
       if (!confirm(`Clear ALL entries for ${dayId.toUpperCase()}? This cannot be undone.`)) return;
       $$('input:not([type="password"]), textarea, select', page).forEach(el => {
+        const slot = el.closest('.initials-slot');
+        if (slot?.classList.contains('slot-filled')) return;   // keep sealed signatures intact
         if (el.type === 'checkbox') el.checked = false;
         else if (el.tagName === 'SELECT') el.selectedIndex = 0;
         else el.value = '';
@@ -217,6 +321,14 @@
     /* every labelled text-ish input inside tables & sign fields */
     $$('.sign-field', page).forEach(f => {
       const label = $('label', f)?.textContent.trim() || 'Field';
+      const slot  = $('.initials-slot', f);
+      if (slot) {
+        const party = slot.dataset.party;
+        const acc   = readAccepts()[party];
+        const inp   = $('input', slot);
+        add(label, acc ? `Signed by ${party} \u2014 accepted ${new Date(acc.ts).toLocaleString()}` : (inp?.value.trim() || '(awaiting signature)'));
+        return;
+      }
       const inp   = $('input:not([type="checkbox"])', f);
       const pill  = $('.datetime-group', f);
       if (pill) add(label, pillText(pill));
@@ -300,11 +412,29 @@
     const now = new Date().toLocaleString();
     const days = done.map(s => ({ id: s.dataset.day, rows: collectDay($('#' + s.dataset.day)) }));
 
-    let plain = `♥ DEEP & HONEY — SCENE CONTRACT EXPORT ♥\nExported: ${now}\nCompleted: ${days.map(d => d.id.toUpperCase()).join(', ')}\n${'='.repeat(52)}\n`;
+    /* signature status block for the export (accepted → embed img; else awaiting) */
+    const accepts = readAccepts();
+    let sigPlain = '';
+    let sigHtml  = '<div style="margin:0 0 14px">';
+    Object.keys(SIG_CONFIG).forEach(party => {
+      const acc = accepts[party];
+      if (acc) {
+        sigPlain += `  ${party}: signed (${new Date(acc.ts).toLocaleString()})\n`;
+        sigHtml += `<div style="padding:4px 0"><strong>${esc(party)}:</strong> accepted &amp; signed ` +
+                   `<img src="${SIG_CONFIG[party]}" alt="${esc(party)} signature" style="height:40px;vertical-align:middle;margin-left:8px"></div>`;
+      } else {
+        sigPlain += `  ${party}: (awaiting signature)\n`;
+        sigHtml += `<div style="padding:4px 0"><strong>${esc(party)}:</strong> <em>(awaiting signature)</em></div>`;
+      }
+    });
+    sigHtml += '</div>';
+
+    let plain = `♥ DEEP & HONEY — SCENE CONTRACT EXPORT ♥\nExported: ${now}\nCompleted: ${days.map(d => d.id.toUpperCase()).join(', ')}\n${'='.repeat(52)}\n\nSignatures:\n${sigPlain}`;
     let html  = `<div style="font-family:Georgia,serif;color:#2a1c16">` +
                 `<h2 style="letter-spacing:.05em;margin:0 0 4px">♥ Deep &amp; Honey — Scene Contract Export</h2>` +
                 `<p style="margin:0 0 4px;color:#5b4437">Exported: ${esc(now)}</p>` +
-                `<p style="margin:0 0 16px;color:#5b4437">Completed: <strong>${days.map(d => esc(d.id.toUpperCase())).join(', ')}</strong></p>`;
+                `<p style="margin:0 0 8px;color:#5b4437">Completed: <strong>${days.map(d => esc(d.id.toUpperCase())).join(', ')}</strong></p>` +
+                `<h3 style="border-bottom:2px solid #dccdbd;padding-bottom:4px;margin:14px 0 8px">Signatures</h3>` + sigHtml;
 
     days.forEach(({ id, rows }) => {
       const title = $(`#${id} h2`)?.textContent.trim() || id.toUpperCase();
