@@ -30,12 +30,13 @@
      APP_VERSION is the single source of truth: it drives the badge shown on
      the home screen (header) so the version always stays in sync. When you
      bump a release here, also prepend one WHATS_NEW line describing it. */
-  const APP_VERSION = 'v2.5 DH';
+  const APP_VERSION = 'v2.6 DH';
   const WHATS_NEW = [
-    '♥ HTML email images are now COMPRESSED real copies embedded as small base64 data URIs — sign, stamp & logo preview reliably in every viewer (large/uncompressed embeds were being dropped).',
-    'Email keeps only the main, important things: header banner, Contract Overview (key fields only), Signatures and each finished day’s entries — long rule lists and other bulk removed.',
-    'Every image stays clickable: opens the original full-resolution file on Google Drive.',
-    'Previous releases: finished days auto-collapse (▾/▸ toggle), bigger header logo, version badge + What’s new toast.'
+    '♥ HTML email is now fully self-contained: sign, stamp & logo preview everywhere (compressed base64 embeds + pixel-link and SVG fallbacks) — no broken images in any HTML previewer.',
+    'No "View on Google Drive" text or links anywhere in the HTML email — clean, professional look only.',
+    'Email carries ALL important data: Contract Overview (contract no., dates, names, safewords, consent), every finished day’s entries (even collapsed ones), and both signatures with status.',
+    'Romantic & professional style: rose-bordered banner, Soulmate Code wordmark, heart divider, love-stamp footer with quote.',
+    'Previous releases: auto-collapse of finished days (▾/▸ toggle), bigger header logo, version badge + What’s new toast.'
   ];
   const versionBadge = $('#version-badge');
   if (versionBadge) {
@@ -264,11 +265,20 @@
   const wrapSvg = inner => 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="160" viewBox="0 0 480 160">` +
     `<rect width="480" height="160" rx="14" fill="#fdf6f0" stroke="#c98a97" stroke-width="3"/>${inner}</svg>`);
+  /* v2.6 DH — per-key canvas sizes so each SVG fallback keeps its true aspect
+     ratio (the old fixed 480x160 viewBox squashed the square stamp/logo). */
+  const SVG_SIZE = { Deep: [480, 160], Honey: [480, 160], stamp: [300, 300], logo: [300, 260] };
+  const wrapSvgFor = (k, inner) => {
+    const [w, h] = SVG_SIZE[k] || [480, 160];
+    return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+      `<rect width="${w}" height="${h}" rx="14" fill="#fdf6f0" stroke="#c98a97" stroke-width="3"/>${inner}</svg>`);
+  };
   const SIG_SVG = {
-    Deep:  wrapSvg(`<text x="240" y="86" font-family="Georgia,serif" font-style="italic" font-size="52" fill="#7b2d3b" text-anchor="middle">&#10022; Deep &#9829;</text><text x="240" y="128" font-family="Arial,sans-serif" font-size="16" letter-spacing="4" fill="#a04b5c" text-anchor="middle">DOMINANT / TOP &#8212; SEALED</text>`),
-    Honey: wrapSvg(`<text x="240" y="86" font-family="Georgia,serif" font-style="italic" font-size="52" fill="#a04b5c" text-anchor="middle">&#10022; Honey &#9829;</text><text x="240" y="128" font-family="Arial,sans-serif" font-size="16" letter-spacing="4" fill="#7b2d3b" text-anchor="middle">SUBMISSIVE / BOTTOM &#8212; SEALED</text>`),
-    stamp: wrapSvg(`<circle cx="240" cy="80" r="58" fill="none" stroke="#7b2d3b" stroke-width="3" stroke-dasharray="6 4"/><text x="240" y="74" font-family="Georgia,serif" font-style="italic" font-size="26" fill="#7b2d3b" text-anchor="middle">Our love</text><text x="240" y="102" font-family="Georgia,serif" font-size="20" fill="#a04b5c" text-anchor="middle">&#9829; stamp &#9829;</text>`),
-    logo:  wrapSvg(`<text x="240" y="72" font-family="Georgia,serif" font-size="34" letter-spacing="6" fill="#7b2d3b" text-anchor="middle">SOULMATE</text><text x="240" y="110" font-family="Georgia,serif" font-size="26" letter-spacing="10" fill="#a04b5c" text-anchor="middle">CODE</text><text x="240" y="138" font-family="Georgia,serif" font-style="italic" font-size="14" fill="#5b4437" text-anchor="middle">&#9829; two hearts, one covenant &#9829;</text>`),
+    Deep:  wrapSvgFor('Deep',  `<text x="240" y="86" font-family="Georgia,serif" font-style="italic" font-size="52" fill="#7b2d3b" text-anchor="middle">&#10022; Deep &#9829;</text><text x="240" y="128" font-family="Arial,sans-serif" font-size="16" letter-spacing="4" fill="#a04b5c" text-anchor="middle">DOMINANT / TOP &#8212; SEALED</text>`),
+    Honey: wrapSvgFor('Honey', `<text x="240" y="86" font-family="Georgia,serif" font-style="italic" font-size="52" fill="#a04b5c" text-anchor="middle">&#10022; Honey &#9829;</text><text x="240" y="128" font-family="Arial,sans-serif" font-size="16" letter-spacing="4" fill="#7b2d3b" text-anchor="middle">SUBMISSIVE / BOTTOM &#8212; SEALED</text>`),
+    stamp: (() => { const c = wrapSvgFor('stamp', `<circle cx="150" cy="150" r="105" fill="none" stroke="#7b2d3b" stroke-width="3" stroke-dasharray="6 4"/><text x="150" y="140" font-family="Georgia,serif" font-style="italic" font-size="30" fill="#7b2d3b" text-anchor="middle">Our love</text><text x="150" y="178" font-family="Georgia,serif" font-size="24" fill="#a04b5c" text-anchor="middle">&#9829; stamp &#9829;</text>`); return c; })(),
+    logo:  (() => { const c = wrapSvgFor('logo', `<text x="150" y="110" font-family="Georgia,serif" font-size="32" letter-spacing="4" fill="#7b2d3b" text-anchor="middle">SOULMATE</text><text x="150" y="150" font-family="Georgia,serif" font-size="26" letter-spacing="8" fill="#a04b5c" text-anchor="middle">CODE</text><text x="150" y="190" font-family="Georgia,serif" font-style="italic" font-size="13" fill="#5b4437" text-anchor="middle">&#9829; two hearts, one covenant &#9829;</text>`); return c; })(),
   };
   const UNDO_MS   = Infinity;              // v1.9 DH: undo is ALWAYS allowed — no sealing window
 
@@ -1207,7 +1217,17 @@
     }
     await loadImageUris();   // v2.4 DH: embed base64 copies so images preview even offline / when Drive links are blocked
     const now = new Date().toLocaleString();
-    const days = done.map(s => ({ id: s.dataset.day, rows: collectDay($('#' + s.dataset.day)) }));
+    /* v2.6 DH — ALL IMPORTANT DATA MUST EXPORT: finished days auto-collapse and
+       collapsed fields keep their values (CSS display:none only), but to be 100%
+       safe we temporarily reveal each collapsed day while collecting, then restore. */
+    const days = done.map(s => {
+      const page = $('#' + s.dataset.day);
+      const wasCollapsed = page?.classList.contains('day-collapsed');
+      if (wasCollapsed) page.classList.remove('day-collapsed');
+      const rows = collectDay(page);
+      if (wasCollapsed) page.classList.add('day-collapsed');
+      return { id: s.dataset.day, rows };
+    });
 
     /* signature status block for the export — per AREA: accepted there → embed img; else awaiting */
     const accepts = readAccepts();
@@ -1221,40 +1241,37 @@
        warning page instead), and every image is ALSO a clickable anchor to its
        Drive /view link, with a text fallback if the preview blocks remote imgs. */
     const partyImg = p => ghUrl(p, 480, 160);          // embed-safe direct pixel URL
-    const partyView = p => viewUrl(p);                 // human-clickable Drive link
-    /* v2.4 DH — <img> tag builder: primary src = embedded base64 copy of the real
-       PNG (previews in EVERY viewer, even offline); lh3 Drive link kept as a
-       srcset alternative; onerror falls back to the inline SVG mark. */
+    /* v2.6 DH — user request: NO "View on Google Drive" text/links anywhere inside
+       the HTML email. The exported HTML now uses ONLY self-contained images:
+       src = compact base64 embed (renders in every HTML previewer, even offline);
+       onerror chain: public lh3 pixel link → inline SVG mark. Never blank. */
     const imgTag = (k, w, h, alt, style) => {
-      /* v2.5 DH — src = COMPRESSED embedded copy (small → never dropped by previewers);
-         if even that fails to decode, onerror swaps to the public Drive https link,
-         and a second failure draws the inline SVG mark. No srcset → keeps the HTML lean. */
-      const main = DATA_URIS[k] || ghUrl(k, w, h);     // compressed embed, else plain Drive link
+      const main = DATA_URIS[k] || ghUrl(k, w, h);     // compressed embed, else plain pixel link
       return `<img src="${escA(main)}" alt="${esc(alt)}" width="${w}" onerror="this.onerror=null;this.src='${ghUrl(k, w, h)}';this.onerror=function(){this.onerror=null;this.src='${SIG_SVG[k]}'}" style="${style}">`;
     };
-    /* v2.5 DH — MAIN THINGS ONLY: one clean row per person (not per area), with the
-       real sign image, an accepted/pending note and a single clickable Drive link. */
+    /* v2.6 DH — MAIN THINGS ONLY: one clean row per person (not per area), with the
+       real sign image and its accepted status. No Drive links shown. */
     Object.keys(SIG_CONFIG).forEach(party => {
       const acceptedAreas = AREAS.filter(a => (accepts[a] || {})[party]);
       const status = acceptedAreas.length === AREAS.length ? 'Accepted &amp; signed'
                    : acceptedAreas.length ? `Accepted: ${acceptedAreas.map(nameOf).join(', ')}`
                    : 'Awaiting in-app accept';
-      sigPlain += `  ${party}: ${status.replace(/&amp;/g, '&')} — ${partyView(party)}\n`;
+      sigPlain += `  ${party}: ${status.replace(/&amp;/g, '&')}\n`;
       sigHtml += `<tr>` +
-        `<td style="padding:12px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c;width:46%"><strong style="color:#7b2d3b">${esc(party)}</strong><br><span style="font-size:12px;color:#5b4437">${status}</span><br>` +
-        `<a href="${partyView(party)}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">View full signature on Google Drive</a></td>` +
+        `<td style="padding:12px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c;width:46%"><strong style="color:#7b2d3b">${esc(party)}</strong><br><span style="font-size:12px;color:#5b4437">${status}</span></td>` +
         `<td align="right" style="padding:12px 0;border-bottom:1px solid #f3e6da">` +
-        `<a href="${partyView(party)}" target="_blank" style="text-decoration:none">` +
         imgTag(party, 200, 56, `${party} signature`, 'height:56px;width:auto;max-width:220px;display:inline-block;vertical-align:middle;border:0') +
-        `</a></td></tr>`;
+        `</td></tr>`;
     });
     sigHtml = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${sigHtml}</table>`;
 
-    /* header banner + footer branding — all via https links (professional & romantic look) */
+    /* v2.6 DH — header banner + footer branding: NO Google Drive links/anchors
+       anywhere in the HTML email (user request). Images are self-contained
+       base64 embeds with pixel-link → SVG fallback chain only. */
     const headHtml =
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#fdf6f0;border-left:4px solid #c98a97;border-right:4px solid #c98a97;border-top:4px solid #c98a97">` +
       `<tr><td align="center" style="padding:30px 20px 10px">` +
-      `<a href="${viewUrl('logo')}" target="_blank" style="text-decoration:none">` + imgTag('logo', 120, 104, 'Soulmate code logo', 'height:104px;width:auto;max-width:120px;display:block;margin:0 auto;border:0') + `</a>` +
+      imgTag('logo', 120, 104, 'Soulmate code logo', 'height:104px;width:auto;max-width:120px;display:block;margin:0 auto;border:0') +
       `<div style="font-family:Georgia,'Times New Roman',serif;font-size:30px;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:#7b2d3b;margin-top:12px">Soulmate&nbsp;Code</div>` +
       `<div style="font-family:Georgia,serif;font-style:italic;font-size:14px;color:#a04b5c;margin-top:6px">&#9829; Two hearts, one covenant &#9829;</div>` +
       `<div style="width:80px;height:2px;background:#c98a97;margin:16px auto"></div>` +
@@ -1264,15 +1281,14 @@
     const footHtml =
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:30px">` +
       `<tr><td align="center" style="padding:26px 20px;background:#faf1ea;border:1px solid #e7d6c8;border-top:3px double #c98a97">` +
-      `<a href="${viewUrl('stamp')}" target="_blank" style="text-decoration:none">` + imgTag('stamp', 140, 116, 'Our love stamp', 'height:116px;width:auto;max-width:140px;display:block;margin:0 auto;border:0') + `</a>` +
+      imgTag('stamp', 140, 116, 'Our love stamp', 'height:116px;width:auto;max-width:140px;display:block;margin:0 auto;border:0') +
       `<div style="font-size:13px;color:#7b2d3b;letter-spacing:.12em;margin-top:8px">&#10022; OUR LOVE STAMP &#10022;</div>` +
-      `<div style="margin-top:6px"><a href="${viewUrl('stamp')}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">View stamp on Google Drive</a></div>` +
       `<p style="margin:16px 0 4px;font-style:italic;font-size:14px;color:#5b4437;font-family:Georgia,serif">&ldquo;Every scene a promise, every promise kept &mdash; with all our love, Deep &amp; Honey &#9829;&rdquo;</p>` +
       `<p style="margin:0;font-size:12px;color:#8a6f5f">Confidentiality notice: strictly private between Deep &amp; Honey.</p>` +
       `</td></tr></table>`;
 
     let plain = `\u2665 DEEP & HONEY \u2014 SCENE CONTRACT EXPORT \u2665\nExported: ${now}\nCompleted: ${days.map(d => d.id.toUpperCase()).join(', ')}\n${'='.repeat(52)}\n\nSignatures:\n${sigPlain.replace(/<\/?[^>]+>/g, '')}`;
-    plain += `\nOur love stamp: ${viewUrl('stamp')}\nSoulmate code logo: ${viewUrl('logo')}\nDeep's signature: ${viewUrl('Deep')}\nHoney's signature: ${viewUrl('Honey')}\n`;
+    /* v2.6 DH — plain text export: no Drive links, main things only */
 
     /* contract-level important data block (names/dates/pledge/rules) */
     const globalRows = collectGlobalRows();
