@@ -43,8 +43,10 @@
      APP_VERSION is the single source of truth: it drives the badge shown on
      the home screen (header) so the version always stays in sync. When you
      bump a release here, also prepend one WHATS_NEW line describing it. */
-  const APP_VERSION = 'v3.2 DH';
+  const APP_VERSION = 'v3.3 DH';
   const WHATS_NEW = [
+    '🆕 v3.3: ALL existing days wiped clean as you asked — the contract starts empty. Add days back anytime with “➕ Add blank day”, or let “✨ AI write a day” draft one for you. Every single day page carries a red “✖ Delete day” button that permanently removes it from the contract AND the cloud.',
+    '💘 The AI writer now truly drafts the WHOLE day from your selections: pick COUPLE TYPE (romantic lovers / spicy & naughty / vanilla-sweet / brat tamer / service-devotion / new D/s / long-distance / experienced kinksters), MOOD, INTENSITY, LEAD, VENUE and any BDSM category+subcategory chips — every chip changes the preamble tone, the play bill, protocols, hard limits, aftercare and the romantic narrative woven through the day.',
     '🔧 v3.2: Delete-day button now visible on EVERY day (Day 1 included) and fully working; “✉ Email data” & “✨ AI write a day” hardened with an error-toast watchdog + no-JS fallback so buttons can never appear dead.',
     '✨ AI day-writer upgraded: pick MOOD (romantic / spicy / playful / intense / tender / slow burn), INTENSITY, WHO LEADS, VENUE, aftercare focus, special requests per partner, extra limits — plus a huge BDSM category & subcategory menu (sensory, bondage & rope, impact, sensation, power exchange, protocol, edging & denial, worship, roleplay, fetish, ritual, scene extras, aftercare & drop care) with safety rules baked into every choice.',
     '🗑 Delete a day manually: EVERY day page (Day 1 included) now shows a red “✖ Delete day” button next to “Clear this day”. Confirm once and the day vanishes from the contract AND from the cloud sync — it stays gone after reload.',
@@ -87,7 +89,7 @@
   const unlock = () => {
     overlay.classList.add('hidden');
     /* cloud state was already pulled at DOMContentLoaded — replay it after the gate opens */
-    restoreDays(window.CloudStore.days());   // re-attach AI-created day pages first…
+    if (!window.CloudStore.wiped()) restoreDays(window.CloudStore.days());   // re-attach AI-created day pages first…
     loadSaved(window.CloudStore.fields());
     applySignatures();   // re-restore accepted signatures after the gate opens
     setTimeout(() => pwInput.blur(), 300);
@@ -495,11 +497,16 @@
      overlay sealed signatures. Nothing is read from local storage. */
   document.addEventListener('DOMContentLoaded', async () => {
     const state = await window.CloudStore.load();
-    restoreDays(state ? state.days : []);
+    if (!window.CloudStore.wiped()) restoreDays(state ? state.days : []);
     loadSaved(window.CloudStore.fields());
     applySignatures();
     const cs = $('#cloud-status');
     if (cs && window.CloudStore.ready) cs.textContent = '☁️ Synced with Supabase';
+    /* v3.3 DH — the user asked to clear ALL days: strip every day page that is
+       still in the document (static + restored), wipe saved fields & accepts of
+       per-day data, persist the empty state and show the romantic empty banner. */
+    if (!window.CloudStore.wiped()) wipeAllDays(true);   // silent first-pass clear on boot
+    updateEmptyState();
   });
 
   /* ---------- clear a day ---------- */
@@ -558,12 +565,95 @@
     persistDays();                       // cloud day list no longer contains it
     save();
     refreshAiDayOptions();               // keep the AI target list in sync
+    updateEmptyState();                  // v3.3 DH — show the empty banner when no days remain
     toast(`🗑 ${title} deleted — the contract and the cloud are updated.`, 3400);
   };
   document.addEventListener('click', e => {
     const btn = e.target.closest('.delete-day-btn');
     if (btn) deleteDay(btn);
   });
+
+  /* ============================================================
+     v3.3 DH — WIPE ALL DAYS + EMPTY STATE + ADD BLANK DAY
+     • wipeAllDays(silent): removes EVERY day page (static & AI),
+       prunes all per-day fields/accepts and persists the cleared
+       state to the cloud so the contract stays empty on reload.
+     • updateEmptyState(): romantic "no days yet" banner with big
+       ✨ Write a day with AI / ➕ Add blank day buttons whenever
+       zero day pages exist.
+     • addBlankDay(): instantly appends an empty Day N page that is
+       fully editable and carries the ✖ Delete day button like every
+       other day.
+     ============================================================ */
+  const dayPages = () => $$('.page').filter(p => dayNumber(p.id));
+  const nextDayNumber = () => dayPages().reduce((mx, p) => Math.max(mx, dayNumber(p.id)), 0) + 1;
+
+  const wipeAllDays = silent => {
+    dayPages().forEach(p => {
+      const dayId = p.id;
+      const accepts = readAccepts();
+      Object.keys(accepts).forEach(area => { if (area.endsWith('-' + dayId)) delete accepts[area]; });
+      writeAccepts(accepts);
+      AREAS = AREAS.filter(a => !(a.endsWith('-' + dayId) && !BASE_AREAS.includes(a)));
+      collapsedOverride.delete(dayId);
+      p.remove();
+    });
+    /* prune every saved value that belonged to a day page */
+    const fields = window.CloudStore.fields();
+    Object.keys(fields).forEach(k => { if (/^day\d+[>#]/.test(k)) delete fields[k]; });
+    window.CloudStore.saveFields(fields);
+    window.CloudStore.saveWiped(true);   // sticky: days stay cleared after reload
+    persistDays();
+    refreshAiDayOptions();
+    updateEmptyState();
+    if (!silent) { save(); toast('🧹 All days cleared — the contract is a fresh page now. Create new days anytime ♥', 3800); }
+  };
+
+  const updateEmptyState = () => {
+    const hasDays = dayPages().length > 0;
+    let banner = $('#days-empty');
+    if (!hasDays && !banner) {
+      banner = document.createElement('section');
+      banner.id = 'days-empty';
+      banner.className = 'empty-state';
+      banner.innerHTML =
+        `<div class="empty-heart">♥</div>` +
+        `<h2>No days written yet</h2>` +
+        `<p class="empty-sub">Our contract is a fresh, open page — waiting for the first scene you two dream up together.</p>` +
+        `<div class="empty-actions">` +
+          `<button class="btn btn-primary" id="empty-ai-btn" type="button">✨ Write a day with AI</button>` +
+          `<button class="btn btn-outline" id="empty-blank-btn" type="button">➕ Add blank day</button>` +
+        `</div>` +
+        `<p class="muted empty-tip">Tip: every day you create carries a red “✖ Delete day” button to remove it any time.</p>`;
+      const summary = $('#summary');
+      $('#main-contract').insertBefore(banner, summary);
+    } else if (hasDays && banner) {
+      banner.remove();
+    }
+  };
+
+  /* delegated so the banner buttons work even though it is created dynamically */
+  document.addEventListener('click', e => {
+    if (e.target.closest('#empty-ai-btn')) { openAi(); return; }
+    if (e.target.closest('#empty-blank-btn')) { addBlankDay(); return; }
+    if (e.target.closest('#wipe-all-days')) {
+      if (!dayPages().length) { toast('💤 There are no days to clear right now.'); return; }
+      if (!confirm(`Clear ALL ${dayPages().length} day(s) from the contract?\nEvery entry, check and signature inside them is permanently removed. You can create fresh days afterwards.`)) return;
+      wipeAllDays(false);
+    }
+  });
+
+  /* ---------- add a brand-new BLANK day (manual creation) ---------- */
+  const addBlankDay = () => {
+    const N = nextDayNumber();
+    const section = addDayPage(blankPlan(N));
+    persistDays();
+    save();
+    refreshAiDayOptions();
+    updateEmptyState();
+    try { section.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
+    toast(`➕ Day ${N} added — fill it in by hand, or press “✨ AI write a day” to draft it for you ♥`, 3600);
+  };
 
   /* ============================================================
      DAY LOCK — a day is editable (its fields AND its signature
@@ -659,6 +749,63 @@
   let aiMode = 'create';           // 'create' | 'write'
   let aiDraft = null;              // last generated plan, applied on demand
 
+  /* ============================================================
+     v3.3 DH — COUPLE TYPE drives the whole draft.
+     Each couple archetype carries its own romantic/spicy preamble,
+     opening narrative line, protocol flavour, default mood presets
+     and aftercare accent — so the AI writes THE DAY differently for
+     romantic lovers vs. spicy & naughty vs. every other type.
+     ============================================================ */
+  const COUPON_LIB = {
+    romantic:   { label:'🌹 Romantic lovers',
+      preamble:'Wherefore two hearts, bound by tenderness and trust, enter this accord freely and fully; tonight is less a scene than a love-letter written in touches — every restraint a promise, every sensation a verse, signed in devotion.',
+      opening:'He begins slowly — forehead to forehead, whispered vows before any tie — because for these two, desire always travels arm-in-arm with romance.',
+      protocolFlavour:'slow kisses between every stage · spoken endearments · eye contact before each touch',
+      moods:['romantic','tender','slowburn'], care:'cuddle' },
+    spicy:      { label:'🌶️ Spicy & naughty',
+      preamble:'Wherefore both parties confess they are hopelessly, gloriously bad for each other in the best possible way; this accord governs one deliciously wicked session — brattiness expected, mischief encouraged, surrender earned, and aftercare non-negotiable.',
+      opening:'The air is already electric — a raised eyebrow, a smirk, the first rule broken on purpose. Tonight he answers naughtiness with firm, well-deserved attention.',
+      protocolFlavour:'warning counts before consequence · cheeky permission requests · earned release only',
+      moods:['spicy','playful','slowburn'], care:'praise' },
+    vanilla:    { label:'🍦 Soft vanilla-sweet',
+      preamble:'Wherefore two sweethearts step gently across the threshold of kink for the very first time together; softness is the law of this land — feather-light restraint, warm curiosity, endless reassurance, and a safeword sweeter than any command.',
+      opening:'Nothing rushed, nothing scary — just candles, soft scarves and slow discovery. Tonight proves that gentle can still be deeply intoxicating.',
+      protocolFlavour:'check-in before every new touch · everything explainable and reversible · lots of praise',
+      moods:['tender','romantic'], care:'cuddle' },
+    brat:       { label:'😜 Brat tamer & brat',
+      preamble:'Wherefore the submissive hereby claims her right to brat with magnificent audacity, and the Dominant claims his matching right to delightfully correct her; this contract recognises sass as foreplay and structure as love language — with genuine care beneath all the games.',
+      opening:'She tests the first rule within sixty seconds — grinning. He pretends to sigh, secretly delighted. The real negotiation tonight is written in consequences and giggles.',
+      protocolFlavour:'brat behaviour answered with calm firmness · drop-act rewarded with extra attention · no real punishment without YELLOW/GREEN check',
+      moods:['playful','spicy'], care:'praise' },
+    service:    { label:'🕯️ Service & devotion',
+      preamble:'Wherefore love is expressed through acts of devoted service — tea poured at the perfect temperature, slippers offered, posture held like a prayer; this accord frames tonight\u2019s service as worship, and commands as gifts exchanged between equals in devotion.',
+      opening:'She kneels not because she must but because she wishes to — the first cup of tea is served with both hands and steady eyes. Devotion, practised aloud.',
+      protocolFlavour:'ritual greeting · tasks framed as offerings · gratitude spoken after every act of service',
+      moods:['tender','romantic','slowburn'], care:'words' },
+    transition: { label:'🌱 New / transitioning D/s',
+      preamble:'Wherefore both parties, honest and hopeful, take careful steps into a power exchange newly named between them; this accord is a training-wheels contract — small protocols, generous debriefs, zero assumptions, and consent treated as the holiest of house rules.',
+      opening:'They start with one kneeling check-in and three simple orders — learning, in real time, how good it feels to give and to hold control.',
+      protocolFlavour:'one new protocol at a time · debrief after every beat · encouragement over correction',
+      moods:['tender','romantic'], care:'words' },
+    longdistance:{ label:'✈️ Long-distance / weekend reunion',
+      preamble:'Wherefore distance has made their hunger patient and their joy enormous; this accord covers the sacred reunion hours — anticipation built across screens, spent lavishly in person, with restraints reserved for the last night and cuddles for the entire morning after.',
+      opening:'The countdown ends at the door. Bags drop. The first hour belongs to nothing but holding on — and the contract quietly protects every minute that follows.',
+      protocolFlavour:'build-up texts agreed beforehand · reunion hour kept unstructured · scene only after both have arrived emotionally',
+      moods:['slowburn','romantic','spicy'], care:'cuddle' },
+    experienced:{ label:'⛓️ Experienced kinksters',
+      preamble:'Wherefore two seasoned practitioners negotiate with the precision of artists and the trust of veterans; this accord assumes deep knowledge and demands deeper communication — complex play, rigorous safety checks, timed intervals, and aftercare planned as seriously as the scene itself.',
+      opening:'The kit is inspected, the knots rehearsed, the limits recited from memory — and then the real craft begins, at a depth only long practice allows.',
+      protocolFlavour:'pre-scene safety briefing aloud · interval timers honoured to the second · hard-limits list read fresh tonight',
+      moods:['intense','slowburn','spicy'], care:'massage' },
+  };
+  const INTENSITY_RULES = {
+    soft:     'Softest register only: light touch, no marks, no breath play, single gentle implements, long warm pauses between stages.',
+    medium:   'Medium register: clear firmness allowed, light impact and standard clamps within listed limits, rhythm built gradually.',
+    firm:     'Firm register permitted: stronger impact within safe zones, longer bondage holds, denial/edge counts may rise — every escalation needs a fresh verbal GREEN.',
+    deepend:  'Deep-end register: highest negotiated intensity ONLY — extended bondage, heavy impact patterns, electro/partial suspension where selected, with mandatory spotter checks, medical info verified pre-scene, and an agreed cool-down ramp.'
+  };
+
+
   aiChipsM.forEach(b => b.addEventListener('click', () => {
     aiChipsM.forEach(x => x.classList.remove('active'));
     b.classList.add('active');
@@ -680,7 +827,18 @@
       chip.classList.add('active');
     });
   };
-  ['ai-mood-chips', 'ai-intensity-chips', 'ai-lead-chips', 'ai-venue-chips'].forEach(wireSingle);
+  /* v3.3 DH — couple type is now a REAL driver of the draft (it used to be a dead
+     row of chips): single-select like mood/intensity, and choosing it also nudges
+     the mood chips toward that archetype's natural moods + its aftercare accent. */
+  ['ai-couple-chips', 'ai-mood-chips', 'ai-intensity-chips', 'ai-lead-chips', 'ai-venue-chips'].forEach(wireSingle);
+  $('#ai-couple-chips')?.addEventListener('click', e => {
+    const chip = e.target.closest('.ai-chip'); if (!chip) return;
+    const C = COUPON_LIB[chip.dataset.couple]; if (!C) return;
+    $$('#ai-mood-chips .ai-chip').forEach(x => x.classList.toggle('active', C.moods.includes(x.dataset.mood) && x.dataset.mood === C.moods[0]));
+    $$('#ai-aftercare-chips .ai-chip').forEach(x => x.classList.toggle('active', x.dataset.care === C.care));
+    aiDraft = null; aiApplyBtn.disabled = true;
+    toast(`💞 ${C.label} — the AI will write the whole day in this voice.`);
+  });
   /* multi-select groups (subcategory rows + aftercare focus) */
   document.addEventListener('click', e => {
     const chip = e.target.closest('.ai-subchips .ai-chip, #ai-aftercare-chips .ai-chip');
@@ -955,17 +1113,20 @@
   /* escH hoisted to the top of the IIFE (v3.1 DH) */
 
   const buildPlan = () => {
-    /* v3.0 DH — read every selectable option: mood, intensity, lead, venue,
-       the full BDSM category/subcategory chip menu, aftercare focus, special
-       requests per partner and extra limits, so the written day truly matches
-       what the two of you picked. */
+    /* v3.3 DH — the draft is now driven by EVERY selection: couple type sets the
+       romantic/spicy voice (preamble, opening narrative, protocol flavour and a
+       default aftercare accent), mood/intensity/lead/venue set the tone ladder,
+       the full BDSM category+subcategory menu sets the play bill, hard limits and
+       chronological guide; special requests & extra limits are woven in verbatim. */
     const pickedSeq = k => { const el = $(`.ai-subchips [data-seq="${k}"]`); return !!el && el.classList.contains('active'); };
     const picked = SEQ_ORDER.filter(pickedSeq);
-    const mood      = $('#ai-mood-chips .ai-chip.active')?.dataset.mood      || 'romantic';
+    const couple    = pickedChip('#ai-couple-chips .ai-chip.active', 'couple') || 'romantic';
+    const mood      = $('#ai-mood-chips .ai-chip.active')?.dataset.mood      || (COUPON_LIB[couple]?.moods[0] || 'romantic');
     const intensity = $('#ai-intensity-chips .ai-chip.active')?.dataset.intensity || 'medium';
     const lead      = $('#ai-lead-chips .ai-chip.active')?.dataset.lead      || 'Deep';
     const venue     = $('#ai-venue-chips .ai-chip.active')?.dataset.venue    || 'bedroom';
-    const care      = $$('#ai-aftercare-chips .ai-chip.active').map(b => CARE_LABELS[b.dataset.care]).filter(Boolean);
+    let care        = $$('#ai-aftercare-chips .ai-chip.active').map(b => CARE_LABELS[b.dataset.care]).filter(Boolean);
+    if (!care.length && COUPON_LIB[couple]?.care) care = [CARE_LABELS[COUPON_LIB[couple].care]];
     const specialSub = $('#ai-special-sub') ? $('#ai-special-sub').value.trim() : '';
     const specialDom = $('#ai-special-dom') ? $('#ai-special-dom').value.trim() : '';
     const extraLimits = $('#ai-limits') ? $('#ai-limits').value.trim() : '';
@@ -975,15 +1136,31 @@
     const notes    = $('#ai-notes').value.trim();
     const target   = aiDaySel.value;
     const n        = dayNumber(target.startsWith('new:') ? target.slice(4) : target) || 99;
-    const dateStr  = n === 1 ? '30 July 2026' : 'to be filled in ✍️';
+    const dateStr  = 'to be filled in ✍️';
     const protocol = seqs.map(k => SEQ_LIB[k].name).join(' → ');
+    const C = COUPON_LIB[couple] || COUPON_LIB.romantic;
     return { n, seqs, duration, notes, target, dateStr, protocol,
-             mood, intensity, lead, venue, care, specialSub, specialDom, extraLimits };
+             couple, mood, intensity, lead, venue, care, specialSub, specialDom, extraLimits,
+             preamble: C.preamble, opening: C.opening, protocolFlavour: C.protocolFlavour,
+             coupleLabel: C.label, intensityRule: INTENSITY_RULES[intensity] || INTENSITY_RULES.medium };
   };
+
+  /* v3.3 DH — a clean, empty Day N plan for manual "Add blank day" creation.
+     Same page structure as an AI day, but nothing pre-filled except defaults. */
+  const blankPlan = N => ({
+    n: N, seqs: ['aftercare'], duration: '', notes: '', target: `day${N}`, dateStr: 'to be filled in ✍️',
+    protocol: 'To be written together — or press “✨ AI write a day” to draft it ♥',
+    couple: 'romantic', mood: 'romantic', intensity: 'medium', lead: 'Deep', venue: 'bedroom',
+    care: [], specialSub: '', specialDom: '', extraLimits: '',
+    preamble: 'Wherefore both parties enter this agreement freely, willingly, and with full capacity to consent; this scene-specific accord is effective only on the dates stated herein, operating alongside — and superseding only where explicitly stated — the standing D/s agreement. Lovingly, cautiously, and without exception.',
+    opening: 'This page is deliberately blank — tonight\u2019s story is yours to write, one tender line at a time.',
+    protocolFlavour: 'to be negotiated aloud before the scene begins',
+    coupleLabel: '📝 Blank day — you write it', intensityRule: INTENSITY_RULES.medium, blank: true });
 
   const renderPreview = p => {
     const acts = p.seqs.map(k => `<li><strong>${escH(SEQ_LIB[k].name)}</strong> — ${escH(SEQ_LIB[k].toy)}</li>`).join('');
     const lims = p.seqs.map(k => `<li>${escH(SEQ_LIB[k].hard)}</li>`).join('')
+      + `<li><em>Intensity ladder:</em> ${escH(p.intensityRule)}</li>`
       + (p.extraLimits ? `<li><em>Your extra limits:</em> ${escH(p.extraLimits)}</li>` : '');
     const steps = p.seqs.map((k, i) => `<li>T+${i * 10} · <strong>${escH(SEQ_LIB[k].name)}</strong>: ${escH(SEQ_LIB[k].step.join('; '))}</li>`).join('');
     const care = (p.care && p.care.length)
@@ -994,14 +1171,15 @@
         (p.specialDom ? `<li><strong>Deep:</strong> ${escH(p.specialDom)}</li>` : '') + `</ul>` : '';
     aiPreview.innerHTML =
       `<p><strong>Day ${p.n} · ${escH(p.dateStr)} — ${escH(VENUE_LABELS[p.venue] || 'Private Bedroom / Play Space')}</strong></p>` +
-      `<p><em>Mood:</em> ${escH(MOOD_LABELS[p.mood] || p.mood)} · <em>Intensity:</em> ${escH(INTENSITY_LABELS[p.intensity] || p.intensity)} · <em>Lead:</em> ${escH(p.lead)}</p>` +
+      `<p><em>Couple type:</em> ${escH(p.coupleLabel || '🌹 Romantic lovers')} · <em>Mood:</em> ${escH(MOOD_LABELS[p.mood] || p.mood)} · <em>Intensity:</em> ${escH(INTENSITY_LABELS[p.intensity] || p.intensity)} · <em>Lead:</em> ${escH(p.lead)}</p>` +
+      `<p class="ai-voice">“${escH(p.opening || '')}”</p>` +
       `<p><em>Duration:</em> ${escH(p.duration)}</p>` +
-      `<p><em>Protocol:</em> ${escH(p.protocol)}</p>` +
+      `<p><em>Protocol:</em> ${escH(p.protocol)}<br><em>Protocol flavour:</em> ${escH(p.protocolFlavour || '')}</p>` +
       (p.notes ? `<p><em>Your notes:</em> ${escH(p.notes)}</p>` : '') +
       `<p><em>Play bill:</em></p><ul>${acts}</ul>` + care + specials +
       `<p><em>Hard limits generated:</em></p><ul>${lims}</ul>` +
       `<p><em>Chronological guide:</em></p><ol>${steps}</ol>` +
-      `<p class="muted">Everything above is drafted with consent-first safeguards — review, tweak, then apply.</p>`;
+      `<p class="muted">Everything above is drafted in your chosen couple voice with consent-first safeguards — review, tweak, then apply.</p>`;
   };
 
   $('#ai-generate-btn').addEventListener('click', () => {
@@ -1019,16 +1197,21 @@
 
   const dayPageHTML = p => {
     const N = p.n, low = 'd' + N;
-    const acts = p.seqs.map(k => `<tr><td>${escH(SEQ_LIB[k].name)}</td><td>${escH(SEQ_LIB[k].toy)}</td></tr>`).join('');
-    const lims = p.seqs.map((k, i) => `<tr><td>5.${i + 1}</td><td>${escH(SEQ_LIB[k].hard)}</td></tr>`).join('')
+    const acts = p.blank
+      ? `<tr><td><em>(to be written)</em></td><td><input class="inline-input editable-field" style="width:100%" placeholder="Add activity / implement…"></td></tr>`
+      : p.seqs.map(k => `<tr><td>${escH(SEQ_LIB[k].name)}</td><td>${escH(SEQ_LIB[k].toy)}</td></tr>`).join('');
+    const lims = (p.blank ? '' : p.seqs.map((k, i) => `<tr><td>5.${i + 1}</td><td>${escH(SEQ_LIB[k].hard)}</td></tr>`).join(''))
+      + `<tr><td>5.I</td><td>${escH(p.intensityRule || INTENSITY_RULES.medium)}</td></tr>`
       + (p.extraLimits ? `<tr><td>5.x</td><td>${escH(p.extraLimits)}</td></tr>` : '');
-    const steps = p.seqs.map((k, i) =>
+    const steps = p.blank
+      ? `<tr><td>T−60</td><td>Prepare the space &amp; each other — write tonight's timeline together ✍️</td><td>Both</td><td>Blank day — you decide</td></tr>`
+      : p.seqs.map((k, i) =>
       `<tr><td>T+${i * 10}</td><td>${escH(SEQ_LIB[k].step.join(' — '))}</td><td>${i % 2 ? 'Both' : escH(p.lead || 'Deep')}</td><td>Consent checks throughout</td></tr>`).join('');
     return `
     <section class="page" id="day${N}">
       <div class="page-head">
         <h2>Day ${N} · ${escH(p.dateStr)} — ${escH(VENUE_LABELS[p.venue] || 'Private Bedroom / Play Space')}</h2>
-        <span class="day-badge">✨ AI-drafted · ${escH(MOOD_LABELS[p.mood] || '♥ Consent first')} · ${escH(INTENSITY_LABELS[p.intensity] || 'Medium')}</span>
+        <span class="day-badge">${p.blank ? '📝 Blank day' : '✨ AI-drafted'} · ${escH(p.coupleLabel || '♥ Consent first')} · ${escH(MOOD_LABELS[p.mood] || '♥ Consent first')} · ${escH(INTENSITY_LABELS[p.intensity] || 'Medium')}</span>
       </div>
       <div class="day-finished">
         <label for="df-day${N}">📌 Day finished:</label>
@@ -1042,17 +1225,19 @@
       </div>
       <p class="lock-note">🔒 This day is marked as finished — everything (signatures included) is sealed. Set “Day finished” to ❌ No to edit again.</p>
 
-      <p><strong>Between:</strong> Deep (the Dominant) &amp; Honey (the Submissive)</p>
+      <p><strong>Between:</strong> Deep (the Dominant) &amp; Honey (the Submissive) · <em>${escH(p.coupleLabel || '')}</em></p>
 
       <h3 class="section-title">Article 1 · Preamble &amp; Scope</h3>
-      <p>Wherefore both parties enter this agreement freely, willingly, and with full capacity to consent; this scene-specific accord is effective only on the dates stated herein, operating alongside — and superseding only where explicitly stated — the standing D/s agreement. Lovingly, cautiously, and without exception.</p>
+      <p>${escH(p.preamble || 'Wherefore both parties enter this agreement freely, willingly, and with full capacity to consent.')}</p>
+      ${p.opening ? `<p class="quote"><em>“${escH(p.opening)}”</em></p>` : ''}
 
       <h3 class="section-title">Article 2 · Session Parameters</h3>
       <table>
         <tr><th>Clause</th><th>Specification</th></tr>
         <tr><td>2.1 Date of scene</td><td>${dmyPill()}</td></tr>
-        <tr><td>2.2 Planned duration</td><td><input class="inline-input editable-field" style="width:100%" value="${escH(p.duration)}"></td></tr>
+        <tr><td>2.2 Planned duration</td><td><input class="inline-input editable-field" style="width:100%" placeholder="${p.blank ? 'e.g. 60 minutes + aftercare' : ''}" value="${escH(p.duration)}"></td></tr>
         <tr><td>2.3 Venue</td><td>${escH(VENUE_LABELS[p.venue] || 'Private bedroom / play space')}. No third parties present.</td></tr>
+        <tr><td>2.4 Lead &amp; intensity</td><td>${escH(p.lead || 'Deep')} leads · ${escH(INTENSITY_LABELS[p.intensity] || 'Medium')} register — ${escH(p.intensityRule || '')}</td></tr>
       </table>
 
       <h3 class="section-title">Article 3 · Scheduled Activities (The Play Bill)</h3>
@@ -1061,6 +1246,7 @@
         ${acts}
       </table>
       <p><strong>3.2 Protocol:</strong> ${escH(p.protocol)}.</p>
+      <p><strong>3.3 Protocol flavour (${escH(p.coupleLabel || 'our style')}):</strong> ${escH(p.protocolFlavour || '')}.</p>
 
       <h3 class="section-title">Article 4 · New Activities Clause</h3>
       <div class="checklist-item"><input type="checkbox" id="${low}-new"><label for="${low}-new">4.1 Are any NEW activities being introduced today?</label></div>
