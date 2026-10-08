@@ -30,13 +30,13 @@
      APP_VERSION is the single source of truth: it drives the badge shown on
      the home screen (header) so the version always stays in sync. When you
      bump a release here, also prepend one WHATS_NEW line describing it. */
-  const APP_VERSION = 'v2.7 DH';
+  const APP_VERSION = 'v3.0 DH';
   const WHATS_NEW = [
-    '♥ HTML email now includes EVERY important field from the Day section and the Pre-Scene Execution Affidavit: execution date & time, all checklist items (✓ Confirmed / ○ Pending), safeword verification (RED/YELLOW/GREEN spoken by each partner), non-verbal signal, consent declarations, full toy inventory, debrief scores/notes/safeword-used, signature dates — plus Contract Overview and both signatures.',
-    'Sign, stamp & logo preview everywhere — compressed base64 embeds with pixel-link and SVG fallbacks; no broken images in any HTML previewer.',
-    'No "View on Google Drive" text or links anywhere in the HTML email — clean, professional look only.',
-    'Romantic & professional style: rose-bordered banner, Soulmate Code wordmark, heart divider, love-stamp footer with quote.',
-    'Previous releases: auto-collapse of finished days (▾/▸ toggle), bigger header logo, version badge + What’s new toast.'
+    '✨ AI day-writer upgraded: pick MOOD (romantic / spicy / playful / intense / tender / slow burn), INTENSITY, WHO LEADS, VENUE, aftercare focus, special requests per partner, extra limits — plus a huge BDSM category & subcategory menu (sensory, bondage & rope, impact, sensation, power exchange, protocol, edging & denial, worship, roleplay, fetish, ritual, scene extras, aftercare & drop care) with safety rules baked into every choice.',
+    '🗑 Delete a day manually: every day page now has a “✖ Delete day” button (the permanent Day 1 is protected). Deleted days vanish from the contract AND from the cloud sync.',
+    '💌 HTML email completely restyled: romantic gradient banner, gold-rose dividers, labelled data cards, zebra-striped tables with wine headers, ✓ confirmed / ○ pending chips, RED-YELLOW-GREEN safeword pills, numbered day badges, signature panels and an elegant framed love-stamp footer — formatted data, not plain label dumps.',
+    '♥ HTML email still carries EVERY important field from the Day section and the Pre-Scene Execution Affidavit: execution date & time, all checklist items, safeword verification, non-verbal signal, consent declarations, full toy inventory, debrief scores/notes/safeword-used, signature dates — plus Contract Overview and both signatures.',
+    'Sign, stamp & logo preview everywhere — compressed base64 embeds with pixel-link and SVG fallbacks; no “View on Google Drive” text or links anywhere.'
   ];
   const versionBadge = $('#version-badge');
   if (versionBadge) {
@@ -498,6 +498,47 @@
   };
   $$('.clear-day-btn').forEach(btn => btn.addEventListener('click', () => clearDay(btn)));
 
+  /* ---------- v3.0 DH — delete a whole day (manual removal) ----------
+     Every AI-created / restored day carries a ✖ Delete day button. Day 1 is the
+     permanent founding page of the contract and can only be CLEARED, never
+     deleted. Deleting removes the page from the DOM, drops its per-day
+     signature areas, prunes its saved field values and re-syncs the cloud day
+     list so it stays gone on every device. */
+  const STATIC_DAY_IDS = new Set(['day1']);
+  const deleteDay = btn => {
+    const dayId = btn.dataset.day;
+    const page  = $('#' + dayId);
+    if (!page) return;
+    if (STATIC_DAY_IDS.has(dayId)) {
+      toast('💍 Day 1 is our founding page — it can be cleared, but never deleted.', 3600);
+      return;
+    }
+    const title = $('h2', page)?.textContent.trim() || dayId.toUpperCase();
+    if (!confirm(`Delete “${title}” completely?\nAll its entries, checks and signatures are removed from the contract and the cloud. This cannot be undone.`)) return;
+    /* drop per-day signature state (signatories-dayN / debrief-dayN) */
+    const accepts = readAccepts();
+    let accChanged = false;
+    Object.keys(accepts).forEach(area => {
+      if (area.endsWith('-' + dayId)) { delete accepts[area]; accChanged = true; }
+    });
+    if (accChanged) writeAccepts(accepts);
+    AREAS = AREAS.filter(a => !(a.endsWith('-' + dayId) && !BASE_AREAS.includes(a)));
+    /* prune saved field values belonging to this page */
+    const fields = window.CloudStore.fields();
+    Object.keys(fields).forEach(k => { if (k.startsWith(dayId + '#') || k.startsWith(dayId + '>')) delete fields[k]; });
+    window.CloudStore.saveFields(fields);
+    collapsedOverride.delete(page.id);
+    page.remove();
+    persistDays();                       // cloud day list no longer contains it
+    save();
+    refreshAiDayOptions();               // keep the AI target list in sync
+    toast(`🗑 ${title} deleted — the contract and the cloud are updated.`, 3400);
+  };
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.delete-day-btn');
+    if (btn) deleteDay(btn);
+  });
+
   /* ============================================================
      DAY LOCK — a day is editable (its fields AND its signature
      accept buttons) until it is marked as finished.
@@ -579,7 +620,6 @@
   const aiModal    = $('#ai-modal');
   const aiDaySel   = $('#ai-day-select');
   const aiChipsM   = $$('#ai-mode-chips .ai-chip');
-  const aiChipsS   = $$('#ai-seq-chips .ai-chip');
   const aiPreview  = $('#ai-preview');
   const aiApplyBtn = $('#ai-apply-btn');
   const openAi  = () => { refreshAiDayOptions(); aiModal.classList.add('active'); };
@@ -602,7 +642,51 @@
     aiDraft = null;
     refreshAiDayOptions();
   }));
-  aiChipsS.forEach(b => b.addEventListener('click', () => b.classList.toggle('active')));
+
+  /* ---------- v3.0 DH — build the category/subcategory chip menu from CAT_LIB ----------
+     Each play category becomes a labelled row of toggleable subcategory chips, so
+     every corner of BDSM play & scene-building is selectable for the AI writer. */
+  const CHIP_ICONS = { senses:'🌗', bondage:'⛓️', sensation:'🔥', power:'👑', intimacy:'💞', roleplay:'🎭', service:'🕯️', extras:'📸', care:'🤍' };
+  const buildSubchips = () => {
+    $$('.ai-subchips').forEach(row => {
+      const cat = CAT_LIB[row.dataset.cat];
+      if (!cat) return;
+      row.innerHTML = Object.entries(cat.items)
+        .map(([k, it]) => `<button class="ai-chip" data-seq="${k}" title="${escA(it.hard)}">${escH(it.name)}</button>`)
+        .join('');
+    });
+  };
+  buildSubchips();
+  /* single-select chip groups (mood / intensity / lead / venue) */
+  const wireSingle = containerId => {
+    const c = $('#' + containerId);
+    if (!c) return;
+    c.addEventListener('click', e => {
+      const chip = e.target.closest('.ai-chip');
+      if (!chip) return;
+      $$('.ai-chip', c).forEach(x => x.classList.remove('active'));
+      chip.classList.add('active');
+    });
+  };
+  ['ai-mood-chips', 'ai-intensity-chips', 'ai-lead-chips', 'ai-venue-chips'].forEach(wireSingle);
+  /* multi-select groups (subcategory rows + aftercare focus) */
+  document.addEventListener('click', e => {
+    const chip = e.target.closest('.ai-subchips .ai-chip, #ai-aftercare-chips .ai-chip');
+    if (chip) chip.classList.toggle('active');
+  });
+  const pickedChip = (sel, attr) => { const el = $(sel); return el && el.classList.contains('active') ? el.dataset[attr] : ''; };
+  $('#ai-select-all')?.addEventListener('click', () => {
+    const mood = pickedChip('#ai-mood-chips .ai-chip.active', 'mood') || 'romantic';
+    $$('.ai-subchips .ai-chip').forEach(c => c.classList.remove('active'));
+    (MOOD_PRESETS[mood] || MOOD_PRESETS.romantic).forEach(k => {
+      const el = $(`.ai-subchips [data-seq="${k}"]`);
+      if (el) el.classList.add('active');
+    });
+    toast('🪄 Curated full scene selected — tweak any chip you like.');
+  });
+  $('#ai-clear-all')?.addEventListener('click', () => {
+    $$('.ai-subchips .ai-chip').forEach(c => c.classList.remove('active'));
+  });
 
   const dayNumber = id => { const m = /^day(\d+)$/.exec(id); return m ? +m[1] : null; };
   const existingDayIds = () => $$('.page').map(p => p.id).filter(id => dayNumber(id));
@@ -634,55 +718,204 @@
     }
   };
 
-  /* ---- sequence knowledge base (everything stays SSC/RACK-safe) ---- */
-  const SEQ_LIB = {
-    sensory: {
-      name: 'Sensory deprivation', toy: 'Silk blindfold / noise-reducing headphones',
-      hard: 'Blindfold removed instantly on RED or any non-verbal signal; never combined with positional restraint that hides distress.',
-      step: ['blindfold on, narrate every touch before it lands', 'build anticipation through sound & silence']
-    },
-    restraint: {
-      name: 'Restraint (upper body)', toy: 'Silk ties / scarves and/or metal handcuffs — never simultaneously on the same limb',
-      hard: 'Circulation & comfort check every 10 minutes; key visible and within reach at all times.',
-      step: ['wrists bound softly, padding under every knot', 'reassurance check-in before leaving her still']
-    },
-    bondage: {
-      name: 'Bondage / rope', toy: 'Soft cotton rope — single-column wraps, quick-release safety knots',
-      hard: 'Every tie carries a quick-release; safety shears beside the mat; no rope on the neck.',
-      step: ['rope dressing at a slow, deliberate pace', 'single-column tie with constant verbal check-ins']
-    },
-    impact: {
-      name: 'Impact play', toy: 'Soft flogger / leather paddle',
-      hard: 'Strikes only over muscle or flesh-safe zones — never kidneys, spine, or joints; warm-up strokes first.',
-      step: ['warm-up taps, rising rhythm', 'steady strokes with afterglow rub between sets']
-    },
-    sensation: {
-      name: 'Temperature / sensation', toy: 'Ice cubes + warm breath contrast, feathers, clothespins/clamps',
-      hard: 'Ice never contacts neck, face, or mucosa and never rests longer than 5 seconds; clamps max 10 consecutive minutes with a timer.',
-      step: ['ice trails across shoulders and spine', 'clamps applied + 10-minute timer set', 'alternating warm breath after each trail']
-    },
-    powerexchange: {
-      name: 'Power exchange / orders', toy: 'Voice, posture, ritual of address ("Sir" / "Ma’am")',
-      hard: 'Orders stop instantly on YELLOW; negotiation of scenes-of-authority happens pre-scene, never mid-play.',
-      step: ['kneeling check-in, three simple escalating orders', 'praise woven between commands']
-    },
-    service: {
-      name: 'Service submission', toy: 'Small rituals — pouring tea, offering slippers, attentive tasks',
-      hard: 'Service tasks are framed as gifts, never tests; correction stays gentle and in-negotiation.',
-      step: ['tea ceremony performed slowly, eyes lowered', 'task list read aloud, one graceful act at a time']
-    },
-    edging: {
-      name: 'Teasing & edging', toy: 'Hands, lips, vibrator on lowest setting',
-      hard: 'Edge count agreed beforehand; GREEN/YELLOW governs pace; orgasm denial ends on request.',
-      step: ['slow tease, drawn-out anticipation', 'first edge held, then released with praise']
-    },
-    aftercare: {
-      name: 'Aftercare', toy: 'Warm blanket, herbal tea, moisturiser, massage, unhurried cuddles',
-      hard: 'Aftercare is mandatory and never shortened; debrief begins only once both are warm, hydrated and settled.',
-      step: ['blanket wrap + hydration immediately at scene end', 'massage, debrief and ≥20 minutes of undistracted cuddling']
-    }
+  /* ---- sequence knowledge base (everything stays SSC/RACK-safe) ----
+     v3.0 DH — massively expanded: every entry is a BDSM play SUBCATEGORY grouped
+     under a CATEGORY. Each subcategory carries its name, implements/toys, hard
+     safety rules and chronological scene steps, so any pick produces a complete,
+     consent-first day. */
+  const CAT_LIB = {
+    senses: { label: 'Mind & senses', items: {
+      sensory:   { name: 'Sensory deprivation', toy: 'Silk blindfold / noise-reducing headphones',
+        hard: 'Blindfold removed instantly on RED or any non-verbal signal; never combined with positional restraint that hides distress.',
+        step: ['blindfold on, narrate every touch before it lands', 'build anticipation through sound & silence'] },
+      overstim:  { name: 'Overstimulation / stimulation flood', toy: 'Soft-bristle brushes, flogger fringe, dual vibrators',
+        hard: 'Flood scenes capped at agreed minutes; constant check-ins; stop on YELLOW without question.',
+        step: ['gentle brush warming of skin', 'rising layers of touch until overwhelmed, then sudden stillness'] },
+      quietroom: { name: 'Quiet room / stillness play', toy: 'Mat, eye mask, timed silence card',
+        hard: 'Time limit agreed beforehand; dominant present in the room at all times.',
+        step: ['settled on the mat, one instruction, then held silence', 'soft verbal return and grounding at timer end'] },
+      anticipation:{ name: 'Anticipation & waiting rituals', toy: 'Timer, candle, agreed posture',
+        hard: 'Waiting time negotiated, never extended punitively beyond agreement.',
+        step: ['positioned to wait, told only "soon"', 'reward the patience with full attention'] },
+    }},
+    bondage: { label: 'Bondage & restraint', items: {
+      restraint: { name: 'Restraint (upper body)', toy: 'Silk ties / scarves and/or metal handcuffs — never simultaneously on the same limb',
+        hard: 'Circulation & comfort check every 10 minutes; key visible and within reach at all times.',
+        step: ['wrists bound softly, padding under every knot', 'reassurance check-in before leaving her still'] },
+      bondage:   { name: 'Bondage / rope', toy: 'Soft cotton rope — single-column wraps, quick-release safety knots',
+        hard: 'Every tie carries a quick-release; safety shears beside the mat; no rope on the neck.',
+        step: ['rope dressing at a slow, deliberate pace', 'single-column tie with constant verbal check-ins'] },
+      spreader:  { name: 'Spreaders & position holding', toy: 'Padded wooden/metal spreader bar, ankle cuffs',
+        hard: 'Joints never hyperextended; positions changed at least every 15 minutes; quick-release on every cuff.',
+        step: ['ankles gently spaced, weight checked', 'held open pose for a short agreed count, then released and rubbed'] },
+      stocks:    { name: 'Stocks / frame play', toy: 'Padded stocks or doorframe cuffs with spotters',
+        hard: 'Never leave the restrained partner alone in stocks; head and neck always free; exit path clear.',
+        step: ['wrists settled into padded stocks', 'slow orbit of attention, release after agreed interval'] },
+      selfbond:  { name: 'Self-bondage (supervised)', toy: 'Mitts, soft wrist straps worn by the submissive herself',
+        hard: 'Dominant holds the master release at all times; no keys around the neck; she can always call RED.',
+        step: ['she binds her own wrists while he narrates', 'held, admired, then freed with praise'] },
+      suspension:{ name: 'Partial suspension / hoisting', toy: 'Ceiling-rated rig, overhead anchor, professional rope',
+        hard: 'Only with trained partners and rated hardware; feet stay near the floor; circulation checks every few minutes; never unsupervised.',
+        step: ['test-hang at low height, breathing checked', 'brief lift, slow descent, immediate release and rub-down'] },
+    }},
+    sensation: { label: 'Sensation & impact', items: {
+      sensation: { name: 'Temperature / sensation', toy: 'Ice cubes + warm breath contrast, feathers, clothespins/clamps',
+        hard: 'Ice never contacts neck, face, or mucosa and never rests longer than 5 seconds; clamps max 10 consecutive minutes with a timer.',
+        step: ['ice trails across shoulders and spine', 'clamps applied + 10-minute timer set', 'alternating warm breath after each trail'] },
+      wax:       { name: 'Low-temperature candle wax', toy: 'SOY/paraffin massage candles rated for skin (low-temp only)',
+        hard: 'Only low-temperature play candles; test drip on inner wrist first; never on face, breasts nipples direct, or broken skin; hair kept covered or tied back.',
+        step: ['first warm drip traced down the spine', 'slow pools on the back, cooled with breath before brushing off'] },
+      impact:    { name: 'Impact play', toy: 'Soft flogger / leather paddle',
+        hard: 'Strikes only over muscle or flesh-safe zones — never kidneys, spine, or joints; warm-up strokes first.',
+        step: ['warm-up taps, rising rhythm', 'steady strokes with afterglow rub between sets'] },
+      spanking:  { name: 'Spanking / hand impact', toy: 'Open hand, optional padded hairbrush (agreed only)',
+        hard: 'Cheek of buttocks only; hand never strikes harder than a firm slap; count and intensity pre-agreed.',
+        step: ['hand-positioning and warning counts', 'rising sets with rub-out between rounds'] },
+      edgingtool:{ name: 'Vibe-on-skin sensation', toy: 'Wand / bullet vibrator on lowest setting',
+        hard: 'Lowest setting through early phases unless requested; never pressed to throat; battery checked pre-scene.',
+        step: ['broad circles far from the peak', 'narrowing patterns as permission is given'] },
+      electro:   { name: 'Electrostimulation (TENS/violet wand)', toy: 'Body-safe TENS unit with padded electrodes ONLY',
+        hard: 'Strictly OFF-LIMITS for anyone with a pacemaker/heart condition, pregnancy, epilepsy; electrodes never on neck, head, chest across the heart, or genitals; lowest power first; hard-limit friendly — many couples keep this out entirely.',
+        step: ['pads placed on thigh/shoulder muscle, level 1 test', 'short agreed bursts, always ending on a low'] },
+      scratch:   { name: 'Nail tracing / light marking', toy: 'Manicured nails, gentle fingertip pressure',
+        hard: 'Skin is never broken; marks only where she has said yes; pressure stays at tracing level.',
+        step: ['slow nail trails down the back', 'light press-and-hold on approved spots'] },
+    }},
+    power: { label: 'Power & protocol', items: {
+      powerexchange: { name: 'Power exchange / orders', toy: 'Voice, posture, ritual of address ("Sir" / "Ma’am")',
+        hard: 'Orders stop instantly on YELLOW; negotiation of scenes-of-authority happens pre-scene, never mid-play.',
+        step: ['kneeling check-in, three simple escalating orders', 'praise woven between commands'] },
+      protocol:  { name: 'Protocol & etiquette training', toy: 'Posture cues, greeting ritual, permitted-speech rules',
+        hard: 'Rules stated clearly before scene start; correction stays inside the negotiated range; safe word overrides all protocol.',
+        step: ['greeting posture rehearsed slowly', 'a short evening under agreed etiquette, debrief after'] },
+      collar:    { name: 'Collaring / ownership ritual', toy: 'The collar, a locked moment, spoken vows',
+        hard: 'Collar symbolises trust, never trap — removal is always available to her; ceremony negotiated in advance.',
+        step: ['kneel, spoken intention, collar placed', 'first command is always "you may rise"'] },
+      obedience: { name: 'Obedience drills & tasks', toy: 'Written task card, timer, posture holds',
+        hard: 'Tasks are achievable and pre-agreed; failure triggers kindness and re-teaching, not escalation.',
+        step: ['one clear instruction, repeated once', 'hold completed, acknowledged with praise'] },
+      denial:    { name: 'Orgasm control / denial & ruin', toy: 'Hands, voice, timing',
+        hard: 'Edge/denial count agreed beforehand; denial ends immediately on request; afterglow never withheld as punishment.',
+        step: ['approach the edge, hold, step back with praise', 'final release granted or lovingly ruined per prior agreement'] },
+      tease:     { name: 'Teasing & edging', toy: 'Hands, lips, vibrator on lowest setting',
+        hard: 'Edge count agreed beforehand; GREEN/YELLOW governs pace; orgasm denial ends on request.',
+        step: ['slow tease, drawn-out anticipation', 'first edge held, then released with praise'] },
+      chastity:  { name: 'Chastity device play', toy: 'Properly-fitted cage/belt with hygiene breaks',
+        hard: 'Correct sizing checked pre-scene; skin inspected daily; emergency key always accessible; remove on any pain or numbness.',
+        step: ['device locked with ceremony, ownership words spoken', 'release at agreed time with care and inspection'] },
+      servitude: { name: 'Total-service weekend style authority', toy: 'Agreed rule list for the day',
+        hard: 'Rules limited to what was written and initialled beforehand; renegotiation allowed at any hour.',
+        step: ['morning briefing of the day’s rules', 'evening accounting, gratitude, rules lifted'] },
+    }},
+    intimacy: { label: 'Intimacy & pleasure', items: {
+      worship:   { name: 'Body worship / devotion', toy: 'Oil, warm hands, unhurried mouth',
+        hard: 'Worship follows her stated yes-list; no touching past a boundary even mid-bliss; check-in between zones.',
+        step: ['feet-to-spine slow adoration', 'paused eye-contact gratitude before continuing'] },
+      oral:      { name: 'Oral attention & service', toy: 'Nothing but tongue, hands and eye contact',
+        hard: 'Barrier methods if agreed; direction and pace governed by YELLOW/GREEN; stops instantly on request.',
+        step: ['slow build with feedback invited', 'finish exactly how she asked to be finished'] },
+      rough:     { name: 'Rough consensual lovemaking', toy: 'Gripping hands, hair hold (scalp only), pinned wrists',
+        hard: 'Hair pulled at the scalp never the strands; choking is a hard limit — pinning replaces it; intensity ramps only with verbal yes.',
+        step: ['pinned, paced, loud consent checked', 'peak, then immediate softening and embrace'] },
+      ponyplay:  { name: 'Pony play / training', toy: 'Long reins, riding crop as pointer only, soft collar',
+        hard: 'Reins steer, never yank; gait changes on voice; rest and water every 10 minutes; no jumps.',
+        step: ['tack-up ritual and posture drill', 'walk-trot patterns, trotting toward praise'] },
+      age:       { name: 'Age-regression D/s (little space)', toy: 'Comfort objects, onesie, bottle, colouring pages',
+        hard: 'Strictly non-sexual little-space care; adult decisions stay with the caregiver; drop-care planned ahead.',
+        step: ['transition ritual into little space', 'nurture, play, gentle transition out with cuddles'] },
+      hz:        { name: 'Hypno / deep-trance play', toy: 'Induction script, fixation pendant, countdown out',
+        hard: 'No post-hypnotic suggestions beyond negotiated scene window; nothing degrading implanted; explicit wake-out count every session.',
+        step: ['progressive relaxation induction', 'agreed trance scenes, full alert count-back and grounding'] },
+    }},
+    roleplay: { label: 'Roleplay & fetish', items: {
+      rpauthority:{ name: 'Authority roleplay (officer/teacher/boss)', toy: 'Costume pieces, written "citations", desk',
+        hard: 'Real-world threats (job, legal trouble) are fiction only — announced as such pre-scene; safewords run the scene.',
+        step: ['character entrance and "inspection"', 'sentencing playful, served with winks and aftercare'] },
+      rpstruggle:{ name: 'Consensual-non-consent fantasy', toy: 'Scripted scenario agreed line-by-line beforehand',
+        hard: 'Detailed negotiation, explicit green-light list, safeword rehearsal mandatory; scene never starts without a fresh GREEN.',
+        step: ['scripted "capture" beat by beat', 'break-character check-ins, warm re-embrace at the end'] },
+      rpservant: { name: 'Maid / servant roleplay', toy: 'Apron, checklist, silver tray',
+        hard: 'Tasks pre-listed and doable; humiliation limited to agreed playful register.',
+        step: ['uniform donned, duties read aloud', 'service rewarded with recognition and rest'] },
+      petplay:   { name: 'Pet play (puppy/kitten)', toy: 'Ears/tail, soft bed, treat pouch',
+        hard: 'Commands stay playful; no real degradation; physical handling gentle; hydration nearby.',
+        step: ['collar-up transformation ritual', 'tricks, affection, settle command at the end'] },
+      lingerie:  { name: 'Clothing & lingerie control', toy: 'Chosen outfits, "dress-for-me" rules, wardrobe commands',
+        hard: 'Anything she has vetoed stays vetoed; outfit reveals negotiated; modesty breaks always allowed.',
+        step: ['outfit selection by the Dominant', 'slow reveal, admiration, photo only if she asks'] },
+      foot:      { name: 'Foot & shoe fetish', toy: 'Heels, stockings, foot bench, massage oil',
+        hard: 'Stepping on partner only with agreed weight, never on spine/ribs/throat; nails filed smooth.',
+        step: ['worship and massage of feet', 'light trampling pass with balance held'] },
+      latex:     { name: 'Latex / rubber / PVC', toy: 'Suit, gloves, polish, tape-on boots',
+        hard: 'Dressing watched for overheating; powder/lubricant for fitting; never sealed over head; breaks for water.',
+        step: ['slow dressing ritual with polish', 'squeak-and-shine showcase, careful undressing'] },
+      tabu:      { name: 'Exhibitionism / voyeurism (risk-aware)', toy: 'Balcony curtain, "almost-seen" scenarios',
+        hard: 'STRICTLY consensual-partners-only and private-property-only — no non-consenting public exposure (illegal); camera use requires explicit ongoing consent.',
+        step: ['dressed-to-impress behind closed curtains', "thrill of 'almost caught', safely home"] },
+    }},
+    service: { label: 'Service & ritual', items: {
+      service:   { name: 'Service submission', toy: 'Small rituals — pouring tea, offering slippers, attentive tasks',
+        hard: 'Service tasks are framed as gifts, never tests; correction stays gentle and in-negotiation.',
+        step: ['tea ceremony performed slowly, eyes lowered', 'task list read aloud, one graceful act at a time'] },
+      ritual:    { name: 'Scene ritual & altar', toy: 'Candles, sigil cloth, spoken invocation',
+        hard: 'Fire never left unattended and always in a holder; ritual content pre-agreed; flame kept away from bindings and hair.',
+        step: ['candles lit, threshold words spoken', 'scene closes with the same words, flames snuffed together'] },
+      grooming:  { name: 'Grooming & dressing rituals', toy: 'Brush, oils, hair pins, chosen outfit',
+        hard: 'Skin checks during grooming; anything painful stops immediately.',
+        step: ['hair-brushing counted strokes', 'dressing ceremony, final look admired'] },
+      devotions: { name: 'Daily-devonment ledger', toy: 'Shared notebook, stamps, tally marks',
+        hard: 'Ledger reflects negotiated goals only; missing entries never cost affection.',
+        step: ['morning entry written together', 'evening stamp and one line of gratitude'] },
+    }},
+    extras: { label: 'Scene extras', items: {
+      mirror:    { name: 'Mirror & observation play', toy: 'Standing mirror, angled lighting',
+        hard: 'Appearance talk restricted to agreed compliments; no forced self-viewing if it causes distress.',
+        step: ['posed before the mirror, narrated admiration', 'watched together through one chosen scene beat'] },
+      photo:     { name: 'Photo / film keepsakes', toy: 'Camera on tripod, agreed shot list',
+        hard: 'Explicit consent before recording, again before keeping, again before ANY sharing; deletion honoured instantly; faces/identifiers excluded unless she says otherwise.',
+        step: ['three agreed shots, reviewed together', 'kept in the private vault or deleted by her choice'] },
+      foodplay:  { name: 'Food & body play', toy: 'Chocolate, whipped cream, strawberries, honey',
+        hard: 'Allergy list checked pre-scene; nothing on broken skin; temperature of food checked; clean-up part of aftercare.',
+        step: ['blind-tasting game', 'slow edible trail across the agreed zones'] },
+      thrills:   { name: 'Risk-aware "getaway" thrill', toy: 'Locked-door scenario, whispered escape plan',
+        hard: 'Purely fictional stakes, announced as fiction; real exits always unlocked and known; no actual being trapped.',
+        step: ['pretend curfew and stolen moments', 'safe return home, debrief over tea'] },
+      treasure:  { name: 'Toy box roulette', toy: 'Bagged implements chosen by touch',
+        hard: 'Anything pulled must already be on the yes-list; veto-without-question on every draw.',
+        step: ['blind draw of tonight’s implement', 'negotiated use, then boxed back together'] },
+    }},
+    care: { label: 'Care & closure', items: {
+      aftercare: { name: 'Aftercare', toy: 'Warm blanket, herbal tea, moisturiser, massage, unhurried cuddles',
+        hard: 'Aftercare is mandatory and never shortened; debrief begins only once both are warm, hydrated and settled.',
+        step: ['blanket wrap + hydration immediately at scene end', 'massage, debrief and ≥20 minutes of undistracted cuddling'] },
+      dropprotection:{ name: 'Sub-drop / dom-drop watch', toy: 'Check-in texts, comfort list, next-day plan',
+        hard: 'Drop can arrive 1–3 days later; promises made in scene are honoured after; professional help sought if low mood persists.',
+        step: ['next-morning message and coffee ritual agreed', 'two-day gentle check-ins logged in the debrief'] },
+      debrief:   { name: 'Structured debrief', toy: 'Score sheets, notes page, tea',
+        hard: 'Both voices heard fully before any adjustment is decided; nothing raised in debrief is punished.',
+        step: ['scores exchanged, one pride and one wish each', 'adjustments written into the next day draft'] },
+    }},
   };
-  const SEQ_ORDER = Object.keys(SEQ_LIB);
+
+  /* flat order + lookup used everywhere */
+  const SEQ_ORDER = Object.values(CAT_LIB).flatMap(c => Object.keys(c.items));
+  const SEQ_LIB   = Object.assign({}, ...Object.values(CAT_LIB).map(c => c.items));
+  const catOfKey  = k => { for (const [ck, c] of Object.entries(CAT_LIB)) if (c.items[k]) return ck; return null; };
+
+  /* curated defaults per mood — used when nothing is picked */
+  const MOOD_PRESETS = {
+    romantic:  ['sensory', 'worship', 'tease', 'aftercare'],
+    spicy:     ['restraint', 'spanking', 'rough', 'edgingtool', 'aftercare'],
+    playful:   ['petplay', 'treasure', 'foodplay', 'tease', 'aftercare'],
+    intense:   ['bondage', 'impact', 'protocol', 'denial', 'dropprotection'],
+    tender:    ['quietroom', 'worship', 'grooming', 'dropprotection'],
+    slowburn:  ['anticipation', 'sensory', 'tease', 'worship', 'aftercare'],
+  };
+  const MOOD_LABELS = { romantic:'🌹 Romantic', spicy:'🌶️ Spicy', playful:'😈 Playful', intense:'⛓️ Intense', tender:'🕊️ Tender', slowburn:'🔥 Slow burn' };
+  const INTENSITY_LABELS = { soft:'Soft & gentle', medium:'Medium', firm:'Firm', deepend:'Deep end' };
+  const VENUE_LABELS = { bedroom:'Private Bedroom / Play Space', playroom:'Play Room / Dungeon Corner', bathroom:'Bath & Shower Suite', outdoor:'Balcony / Secluded Outdoor Nook', anywhere:'A Surprise Venue (TBA together)' };
+  const CARE_LABELS = { cuddle:'Warm blanket wrap + ≥20 minutes of unhurried cuddles', massage:'Gentle massage of bound / played areas — 5 min per limb', praise:'Verbal praise, reassurance and eye contact throughout cool-down', treats:'Hydration — warm herbal tea, water and a light sweet snack', quiet:'Quiet presence: same room, no demands, soft company', words:'Talk-it-through debrief: scores, feelings, one pride and one wish' };
+  const BASE_AFTERCARE = [['Warm blanket wrap (thermal regulation)','Immediate'],['Hydration — warm herbal tea or still water','Upon request'],['Light snack — chocolate or fruit','Upon request']];
 
   const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 
