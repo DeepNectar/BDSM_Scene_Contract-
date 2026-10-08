@@ -643,20 +643,6 @@
     refreshAiDayOptions();
   }));
 
-  /* ---------- v3.0 DH — build the category/subcategory chip menu from CAT_LIB ----------
-     Each play category becomes a labelled row of toggleable subcategory chips, so
-     every corner of BDSM play & scene-building is selectable for the AI writer. */
-  const CHIP_ICONS = { senses:'🌗', bondage:'⛓️', sensation:'🔥', power:'👑', intimacy:'💞', roleplay:'🎭', service:'🕯️', extras:'📸', care:'🤍' };
-  const buildSubchips = () => {
-    $$('.ai-subchips').forEach(row => {
-      const cat = CAT_LIB[row.dataset.cat];
-      if (!cat) return;
-      row.innerHTML = Object.entries(cat.items)
-        .map(([k, it]) => `<button class="ai-chip" data-seq="${k}" title="${escA(it.hard)}">${escH(it.name)}</button>`)
-        .join('');
-    });
-  };
-  buildSubchips();
   /* single-select chip groups (mood / intensity / lead / venue) */
   const wireSingle = containerId => {
     const c = $('#' + containerId);
@@ -716,6 +702,24 @@
         });
       }
     }
+  };
+
+  /* ---------- v3.0 DH — build the category/subcategory chip menu from CAT_LIB ----------
+     Each play category becomes a labelled row of toggleable subcategory chips, so
+     every corner of BDSM play & scene-building is selectable for the AI writer.
+     NOTE: this function is only *called* further below, after CAT_LIB has been
+     initialised — calling it earlier throws a TDZ ReferenceError and kills the
+     whole script (which is what silently broke the "✉ Email data" and
+     "✨ AI write a day" buttons). */
+  const CHIP_ICONS = { senses:'🌗', bondage:'⛓️', sensation:'🔥', power:'👑', intimacy:'💞', roleplay:'🎭', service:'🕯️', extras:'📸', care:'🤍' };
+  const buildSubchips = () => {
+    $$('.ai-subchips').forEach(row => {
+      const cat = CAT_LIB[row.dataset.cat];
+      if (!cat) return;
+      row.innerHTML = Object.entries(cat.items)
+        .map(([k, it]) => `<button class="ai-chip" data-seq="${k}" title="${escA(it.hard)}">${escH(it.name)}</button>`)
+        .join('');
+    });
   };
 
   /* ---- sequence knowledge base (everything stays SSC/RACK-safe) ----
@@ -920,27 +924,50 @@
   const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 
   const buildPlan = () => {
-    const picked = SEQ_ORDER.filter(k => $(`#ai-seq-chips [data-seq="${k}"]`).classList.contains('active'));
-    const seqs = picked.length ? picked : ['sensory', 'restraint', 'sensation', 'edging', 'aftercare'];
+    /* v3.0 DH — read every selectable option: mood, intensity, lead, venue,
+       the full BDSM category/subcategory chip menu, aftercare focus, special
+       requests per partner and extra limits, so the written day truly matches
+       what the two of you picked. */
+    const pickedSeq = k => { const el = $(`.ai-subchips [data-seq="${k}"]`); return !!el && el.classList.contains('active'); };
+    const picked = SEQ_ORDER.filter(pickedSeq);
+    const mood      = $('#ai-mood-chips .ai-chip.active')?.dataset.mood      || 'romantic';
+    const intensity = $('#ai-intensity-chips .ai-chip.active')?.dataset.intensity || 'medium';
+    const lead      = $('#ai-lead-chips .ai-chip.active')?.dataset.lead      || 'Deep';
+    const venue     = $('#ai-venue-chips .ai-chip.active')?.dataset.venue    || 'bedroom';
+    const care      = $$('#ai-aftercare-chips .ai-chip.active').map(b => CARE_LABELS[b.dataset.care]).filter(Boolean);
+    const specialSub = $('#ai-special-sub') ? $('#ai-special-sub').value.trim() : '';
+    const specialDom = $('#ai-special-dom') ? $('#ai-special-dom').value.trim() : '';
+    const extraLimits = $('#ai-limits') ? $('#ai-limits').value.trim() : '';
+    let seqs = picked.length ? picked : (MOOD_PRESETS[mood] || MOOD_PRESETS.romantic).slice();
+    if (!seqs.includes('aftercare') && !seqs.some(k => CAT_LIB.care && CAT_LIB.care.items[k])) seqs = seqs.concat(['aftercare']);
     const duration = $('#ai-duration').value.trim() || 'Seventy-five (75) minutes of active scene play, plus generous aftercare';
     const notes    = $('#ai-notes').value.trim();
     const target   = aiDaySel.value;
     const n        = dayNumber(target.startsWith('new:') ? target.slice(4) : target) || 99;
     const dateStr  = n === 1 ? '30 July 2026' : 'to be filled in ✍️';
     const protocol = seqs.map(k => SEQ_LIB[k].name).join(' → ');
-    return { n, seqs, duration, notes, target, dateStr, protocol };
+    return { n, seqs, duration, notes, target, dateStr, protocol,
+             mood, intensity, lead, venue, care, specialSub, specialDom, extraLimits };
   };
 
   const renderPreview = p => {
     const acts = p.seqs.map(k => `<li><strong>${escH(SEQ_LIB[k].name)}</strong> — ${escH(SEQ_LIB[k].toy)}</li>`).join('');
-    const lims = p.seqs.map(k => `<li>${escH(SEQ_LIB[k].hard)}</li>`).join('');
+    const lims = p.seqs.map(k => `<li>${escH(SEQ_LIB[k].hard)}</li>`).join('')
+      + (p.extraLimits ? `<li><em>Your extra limits:</em> ${escH(p.extraLimits)}</li>` : '');
     const steps = p.seqs.map((k, i) => `<li>T+${i * 10} · <strong>${escH(SEQ_LIB[k].name)}</strong>: ${escH(SEQ_LIB[k].step.join('; '))}</li>`).join('');
+    const care = (p.care && p.care.length)
+      ? `<p><em>Aftercare focus:</em></p><ul>${p.care.map(c => `<li>${escH(c)}</li>`).join('')}</ul>` : '';
+    const specials = (p.specialSub || p.specialDom)
+      ? `<p><em>Special requests:</em></p><ul>` +
+        (p.specialSub ? `<li><strong>Honey:</strong> ${escH(p.specialSub)}</li>` : '') +
+        (p.specialDom ? `<li><strong>Deep:</strong> ${escH(p.specialDom)}</li>` : '') + `</ul>` : '';
     aiPreview.innerHTML =
-      `<p><strong>Day ${p.n} · ${escH(p.dateStr)} — Private Bedroom / Play Space</strong></p>` +
+      `<p><strong>Day ${p.n} · ${escH(p.dateStr)} — ${escH(VENUE_LABELS[p.venue] || 'Private Bedroom / Play Space')}</strong></p>` +
+      `<p><em>Mood:</em> ${escH(MOOD_LABELS[p.mood] || p.mood)} · <em>Intensity:</em> ${escH(INTENSITY_LABELS[p.intensity] || p.intensity)} · <em>Lead:</em> ${escH(p.lead)}</p>` +
       `<p><em>Duration:</em> ${escH(p.duration)}</p>` +
       `<p><em>Protocol:</em> ${escH(p.protocol)}</p>` +
       (p.notes ? `<p><em>Your notes:</em> ${escH(p.notes)}</p>` : '') +
-      `<p><em>Play bill:</em></p><ul>${acts}</ul>` +
+      `<p><em>Play bill:</em></p><ul>${acts}</ul>` + care + specials +
       `<p><em>Hard limits generated:</em></p><ul>${lims}</ul>` +
       `<p><em>Chronological guide:</em></p><ol>${steps}</ol>` +
       `<p class="muted">Everything above is drafted with consent-first safeguards — review, tweak, then apply.</p>`;
@@ -962,14 +989,15 @@
   const dayPageHTML = p => {
     const N = p.n, low = 'd' + N;
     const acts = p.seqs.map(k => `<tr><td>${escH(SEQ_LIB[k].name)}</td><td>${escH(SEQ_LIB[k].toy)}</td></tr>`).join('');
-    const lims = p.seqs.map((k, i) => `<tr><td>5.${i + 1}</td><td>${escH(SEQ_LIB[k].hard)}</td></tr>`).join('');
+    const lims = p.seqs.map((k, i) => `<tr><td>5.${i + 1}</td><td>${escH(SEQ_LIB[k].hard)}</td></tr>`).join('')
+      + (p.extraLimits ? `<tr><td>5.x</td><td>${escH(p.extraLimits)}</td></tr>` : '');
     const steps = p.seqs.map((k, i) =>
-      `<tr><td>T+${i * 10}</td><td>${escH(SEQ_LIB[k].step.join(' — '))}</td><td>${i % 2 ? 'Both' : 'Deep'}</td><td>Consent checks throughout</td></tr>`).join('');
+      `<tr><td>T+${i * 10}</td><td>${escH(SEQ_LIB[k].step.join(' — '))}</td><td>${i % 2 ? 'Both' : escH(p.lead || 'Deep')}</td><td>Consent checks throughout</td></tr>`).join('');
     return `
     <section class="page" id="day${N}">
       <div class="page-head">
-        <h2>Day ${N} · ${escH(p.dateStr)} — Private Bedroom / Play Space</h2>
-        <span class="day-badge">✨ AI-drafted · ♥ Consent first</span>
+        <h2>Day ${N} · ${escH(p.dateStr)} — ${escH(VENUE_LABELS[p.venue] || 'Private Bedroom / Play Space')}</h2>
+        <span class="day-badge">✨ AI-drafted · ${escH(MOOD_LABELS[p.mood] || '♥ Consent first')} · ${escH(INTENSITY_LABELS[p.intensity] || 'Medium')}</span>
       </div>
       <div class="day-finished">
         <label for="df-day${N}">📌 Day finished:</label>
@@ -979,6 +1007,7 @@
         </select>
         <button class="collapse-toggle" type="button" aria-expanded="true" title="Collapse / expand this day">▾ Collapse</button>
         <button class="clear-day-btn" type="button" data-day="day${N}">🗑 Clear this day</button>
+        <button class="delete-day-btn danger" type="button" data-day="day${N}" title="Permanently remove Day ${N} from the contract and the cloud">✖ Delete day</button>
       </div>
       <p class="lock-note">🔒 This day is marked as finished — everything (signatures included) is sealed. Set “Day finished” to ❌ No to edit again.</p>
 
@@ -992,7 +1021,7 @@
         <tr><th>Clause</th><th>Specification</th></tr>
         <tr><td>2.1 Date of scene</td><td>${dmyPill()}</td></tr>
         <tr><td>2.2 Planned duration</td><td><input class="inline-input editable-field" style="width:100%" value="${escH(p.duration)}"></td></tr>
-        <tr><td>2.3 Venue</td><td>Private bedroom / play space. No third parties present.</td></tr>
+        <tr><td>2.3 Venue</td><td>${escH(VENUE_LABELS[p.venue] || 'Private bedroom / play space')}. No third parties present.</td></tr>
       </table>
 
       <h3 class="section-title">Article 3 · Scheduled Activities (The Play Bill)</h3>
@@ -1015,16 +1044,18 @@
       <h3 class="section-title">Article 6 · Aftercare Provision</h3>
       <table>
         <tr><th>Aftercare deliverable</th><th>Duration</th></tr>
-        <tr><td>Warm blanket wrap (thermal regulation)</td><td>Immediate</td></tr>
-        <tr><td>Hydration — warm herbal tea or still water</td><td>Upon request</td></tr>
-        <tr><td>Gentle massage of bound / played areas</td><td>5 minutes per limb</td></tr>
-        <tr><td>Undistracted cuddling, verbal debrief, emotional reconnection</td><td>Minimum 20 minutes</td></tr>
-        <tr><td>Light snack — chocolate or fruit</td><td>Upon request</td></tr>
+        ${p.care && p.care.length
+          ? p.care.map(c => `<tr><td>${escH(c)}</td><td>Throughout cool-down</td></tr>`).join('')
+          : `<tr><td>Warm blanket wrap (thermal regulation)</td><td>Immediate</td></tr>
+             <tr><td>Hydration — warm herbal tea or still water</td><td>Upon request</td></tr>
+             <tr><td>Gentle massage of bound / played areas</td><td>5 minutes per limb</td></tr>
+             <tr><td>Undistracted cuddling, verbal debrief, emotional reconnection</td><td>Minimum 20 minutes</td></tr>
+             <tr><td>Light snack — chocolate or fruit</td><td>Upon request</td></tr>`}
       </table>
 
       <h3 class="section-title">Article 7 · Special Requests &amp; Desires</h3>
-      <p class="quote"><strong>Submissive:</strong> <input class="inline-input editable-field" style="width:80%" placeholder="Type Honey's request…"></p>
-      <p class="quote"><strong>Dominant:</strong> <input class="inline-input editable-field" style="width:80%" placeholder="Type Deep's wish…"></p>
+      <p class="quote"><strong>Submissive:</strong> <input class="inline-input editable-field" style="width:80%" placeholder="${escA(p.specialSub || "Type Honey's request…")}" value="${escA(p.specialSub || '')}"></p>
+      <p class="quote"><strong>Dominant:</strong> <input class="inline-input editable-field" style="width:80%" placeholder="${escA(p.specialDom || "Type Deep's wish…")}" value="${escA(p.specialDom || '')}"></p>
       ${p.notes ? `<p class="quote"><strong>AI note carried over:</strong> “${escH(p.notes)}”</p>` : ''}
 
       <h3 class="section-title">Article 8 · Safewords &amp; Withdrawal of Consent</h3>

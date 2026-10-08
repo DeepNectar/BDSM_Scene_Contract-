@@ -203,6 +203,11 @@ select{border:1px solid var(--line);border-radius:8px;padding:3px 7px;font-size:
   border:1px solid rgba(140,59,59,.4);border-radius:8px;padding:4px 12px;cursor:pointer;transition:.2s;
 }
 .clear-day-btn:hover{background:rgba(140,59,59,.08)}
+.delete-day-btn{
+  font:inherit;font-size:13px;color:#fff;background:linear-gradient(120deg,#8c3b3b,#b0413e);
+  border:1px solid rgba(140,59,59,.55);border-radius:8px;padding:4px 12px;cursor:pointer;transition:.2s;
+}
+.delete-day-btn:hover{background:linear-gradient(120deg,#a34444,#c94b47);box-shadow:0 2px 8px rgba(140,59,59,.3)}
 
 /* ---------- signature blocks (compact) ---------- */
 .sign-row{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0;align-items:flex-end}
