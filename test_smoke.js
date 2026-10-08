@@ -20,7 +20,7 @@ window.addEventListener('error', e => errors.push(String(e.message)));
 const src = fs.readFileSync('js/app.js', 'utf8');
 
 /* ---------- test stubs for the cloud layer (normally js/cloud.js) ---------- */
-window.localStorage.setItem('dh_accepts', JSON.stringify({}));
+window.CloudStore = null;
 {
   let F = {}, D = [], A = {};
   window.CloudStore = {

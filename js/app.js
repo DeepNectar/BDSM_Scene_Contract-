@@ -484,6 +484,12 @@
     const dayId = btn.dataset.day;
     const page  = $('#' + dayId);
     if (!page) return;
+    /* v3.0 DH — a finished (locked) day must be unlocked before it can be cleared,
+       otherwise the user clicked "Clear this day" and nothing visibly happened. */
+    if (dayLocked(page)) {
+      toast('🔒 That day is marked finished — set “Day finished” to ❌ No first, then clear it.', 3600);
+      return;
+    }
     if (!confirm(`Clear ALL entries for ${dayId.toUpperCase()}? This cannot be undone.`)) return;
     $$('input:not([type="password"]), textarea, select', page).forEach(el => {
       const slot = el.closest('.initials-slot');
@@ -906,6 +912,11 @@
   const SEQ_LIB   = Object.assign({}, ...Object.values(CAT_LIB).map(c => c.items));
   const catOfKey  = k => { for (const [ck, c] of Object.entries(CAT_LIB)) if (c.items[k]) return ck; return null; };
 
+  /* v3.0 DH — CRITICAL: now that CAT_LIB exists, actually render the category /
+     subcategory chip menu into the AI modal. Without this call the play-menu rows
+     stayed empty and the "curated full scene" picker had nothing to select. */
+  buildSubchips();
+
   /* curated defaults per mood — used when nothing is picked */
   const MOOD_PRESETS = {
     romantic:  ['sensory', 'worship', 'tease', 'aftercare'],
@@ -1217,7 +1228,7 @@
       aiApplyBtn.disabled = true;
       closeAi();
       save();
-      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      try { section.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch {}
       toast(created, 3400);
     } else {
       const targetName = String(aiDraft.target).toUpperCase();
@@ -1576,42 +1587,150 @@
     const sectionH3 = t => `<h3 style="font-family:Georgia,serif;color:#7b2d3b;border-bottom:2px solid #dccdbd;padding-bottom:4px;margin:24px 0 10px;font-size:16px;letter-spacing:.08em;text-transform:uppercase">${t}</h3>`;
     /* v2.7 DH — sub-heading used to split each day's export into its two big blocks */
     const sectionH4 = t => `<h4 style="font-family:Georgia,serif;color:#a04b5c;margin:18px 0 6px;font-size:14px;letter-spacing:.06em">&#9825; ${t}</h4>`;
-    const rowHtml = r => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr><td style="padding:6px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong style="color:#7b2d3b">${esc(r.label)}:</strong> ${esc(r.value)}</td></tr></table>`;
+
+    /* ── v3.1 DH — STYLISH ROMANTIC EMAIL RENDERERS ─────────────────────────
+       The old export printed one <table> per field ("only text everywhere").
+       Now every block is a real styled layout: gradient banner with fallback
+       colour, wine-header zebra data tables, ✓ confirmed / ○ pending status
+       chips, RED·YELLOW·GREEN safeword pills, toy & debrief tables and
+       signature panels. (linear-gradient + solid background fallback so the
+       banner still colours correctly in Outlook.)                       */
+    const SERIF = "Georgia,'Times New Roman',serif";
+    const SANS  = "'Segoe UI',Helvetica,Arial,sans-serif";
+    const rowHtml = r => {
+      const confirmed = r.label.startsWith('✓');
+      const pending   = r.label.startsWith('○');
+      const label     = confirmed ? 'Confirmed' : pending ? 'Pending' : esc(r.label);
+      const chipBg    = confirmed ? '#e9f6ec' : pending ? '#fdf3e2' : '#faf1ea';
+      const chipTx    = confirmed ? '#2f7a42' : pending ? '#b07a2a' : '#7b2d3b';
+      const chip      = (confirmed || pending)
+        ? `<span style="display:inline-block;background:${chipBg};color:${chipTx};font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:10px;font-family:${SANS};vertical-align:middle">${chipTxt(confirmed)}</span>&nbsp;`
+        : '';
+      return `<tr>` +
+        `<td width="38%" valign="top" style="padding:9px 12px;border-bottom:1px solid #f3e6da;font-size:13px;font-family:${SANS};color:#7b2d3b"><strong>${chip}${label}</strong></td>` +
+        `<td valign="top" style="padding:9px 12px;border-bottom:1px solid #f3e6da;font-size:13.5px;font-family:${SANS};color:#4a362c;line-height:1.55">${esc(r.value)}</td>` +
+        `</tr>`;
+    };
+    const chipTxt = ok => ok ? '&#10003; Confirmed' : '&#9711; Pending';
+    const dataTable = rows => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e7d6c8;border-radius:8px;overflow:hidden">` +
+      `<tr><th colspan="2" align="left" style="background:#7b2d3b;color:#fff7f2;font-family:${SERIF};font-size:12px;letter-spacing:.14em;text-transform:uppercase;padding:8px 12px">&#9829;&nbsp; Recorded details</th></tr>` +
+      rows.map((r, i) => rowHtml(r).replace('<tr>', `<tr style="background:${i % 2 ? '#fdf8f3' : '#ffffff'}">`)).join('') +
+      `</table>`;
+    const cardWrap = (title, inner) =>
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:14px 0;background:#fffdf9;border:1px solid #eadbd0;border-left:4px solid #c98a97;border-radius:10px;box-shadow:0 1px 4px rgba(90,50,40,.06)">` +
+      `<tr><td style="padding:16px 18px">` +
+      (title ? `<div style="font-family:${SERIF};font-size:15px;color:#7b2d3b;letter-spacing:.04em;margin-bottom:10px">${title}</div>` : '') +
+      inner + `</td></tr></table>`;
+    const divider = () => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:6px 0 18px"><tr>` +
+      `<td style="border-top:1px solid #e2c9bf;width:34%"></td>` +
+      `<td align="center" style="font-family:${SERIF};color:#c98a97;font-size:15px;padding:0 10px">&#10086;</td>` +
+      `<td style="border-top:1px solid #e2c9bf;width:34%"></td></tr></table>`;
+    const swPill = (word, color, meaning) =>
+      `<span style="display:inline-block;background:${color};color:#fff;font-family:${SANS};font-size:11px;font-weight:600;letter-spacing:.1em;padding:5px 12px;border-radius:14px;margin:3px 6px 3px 0">&#9679; ${word} &#9679;&nbsp;<span style="font-weight:400">${meaning}</span></span>`;
+    const safewordPills = () =>
+      `<p style="margin:8px 0 2px;font-family:${SANS};font-size:13px;color:#4a362c">` +
+      swPill('RED', '#b3282d', 'full stop') +
+      swPill('YELLOW', '#c98a1f', 'pause &amp; check-in') +
+      swPill('GREEN', '#2f7a42', 'all good, continue') + `</p>`;
+    /* 3-column table for safeword verification / toy inventory / debrief scores */
+    const gridTable = (headers, rows) =>
+      `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #e7d6c8;margin:6px 0 10px">` +
+      `<tr>${headers.map(h => `<th align="left" style="background:#f6e8de;color:#7b2d3b;font-family:${SANS};font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:7px 10px;border:1px solid #eadbd0">${h}</th>`).join('')}</tr>` +
+      rows.map((cells, i) => `<tr style="background:${i % 2 ? '#fdf8f3' : '#ffffff'}">${cells.map(c => `<td style="padding:8px 10px;border:1px solid #f0e2d6;font-family:${SANS};font-size:13px;color:#4a362c;line-height:1.5">${c}</td>`).join('')}</tr>`).join('') +
+      `</table>`;
+    /* ── v3.1 DH — DAY BLOCK RENDERERS ───────────────────────────────────────
+       Each collected row is routed to the block it belongs to and rendered as a
+       proper styled element instead of a bare "label: value" line:
+         • affidavit checklist   → ✓/○ status-chip rows in one table
+         • safeword verification → 3-column grid table + R/Y/G pills legend
+         • toy inventory         → Item / Condition & location grid table
+         • debrief scores/notes  → labelled metrics table
+         • everything else       → classic two-column zebra data table        */
+    const AFFIDAVIT_MARKERS = [
+      '✓ Confirmed', '○ Pending',
+      'Date of execution', 'Time',
+      /^Safeword "/i, /^Toy · /i,
+      /signature \(debrief\)/i,
+      /Overall satisfaction|Aftercare effectiveness|Safeword used|Adjustments for next time|Debrief notes/i
+    ];
+    const isAffidavit = r => AFFIDAVIT_MARKERS.some(m => typeof m === 'string' ? r.label.startsWith(m) : m.test(r.label));
+    const isCheck = r => /^(✓|○)/.test(r.label);
+    const isSwVer = r => /^Safeword "/i.test(r.label);
+    const isToy   = r => /^Toy · /i.test(r.label);
+    const isDebr  = r => /Overall satisfaction|Aftercare effectiveness|Safeword used|Adjustments for next time|Debrief notes/i.test(r.label);
+
+    const renderGroup = list => {
+      if (!list.length) return;
+      const checks = list.filter(isCheck);
+      const swv    = list.filter(isSwVer);
+      const toys   = list.filter(isToy);
+      const debr   = list.filter(isDebr);
+      const plainR = list.filter(r => !isCheck(r) && !isSwVer(r) && !isToy(r) && !isDebr(r));
+
+      plainR.forEach(r => { plain += `  ${r.label}: ${r.value}\n`; });
+      if (plainR.length) bodyHtml += dataTable(plainR);
+
+      if (swv.length) {
+        bodyHtml += `<div style="font-family:${SERIF};font-size:14px;color:#a04b5c;margin:16px 0 4px">&#9825; Safeword verification</div>` + safewordPills();
+        const words = {};
+        swv.forEach(r => {
+          const m = /^Safeword "([^"]+)" — spoken by (\S+)/.exec(r.label);
+          if (!m) return;
+          const entry = words[m[1]] || (words[m[1]] = { Submissive: '&#9711; —', Dominant: '&#9711; —' });
+          entry[m[2]] = esc(r.value);
+        });
+        bodyHtml += gridTable(['Safeword', 'Spoken by Submissive', 'Spoken by Dominant'],
+          Object.entries(words).map(([word, s]) => [`<strong style="color:#7b2d3b">${esc(word)}</strong>`, s.Submissive, s.Dominant]));
+        swv.forEach(r => { plain += `  ${r.label}: ${r.value}\n`; });
+      }
+
+      if (toys.length) {
+        bodyHtml += `<div style="font-family:${SERIF};font-size:14px;color:#a04b5c;margin:16px 0 4px">&#9825; Toy inventory</div>`;
+        bodyHtml += gridTable(['Item', 'Condition &amp; location'],
+          toys.map(r => [`<strong style="color:#7b2d3b">${esc(r.label.replace(/^Toy · /, ''))}</strong>`, esc(r.value) || '&#9711; not confirmed']));
+        toys.forEach(r => { plain += `  ${r.label}: ${r.value}\n`; });
+      }
+
+      if (debr.length) {
+        bodyHtml += `<div style="font-family:${SERIF};font-size:14px;color:#a04b5c;margin:16px 0 4px">&#9825; Scene debrief</div>`;
+        bodyHtml += dataTable(debr);
+        debr.forEach(r => { plain += `  ${r.label}: ${r.value}\n`; });
+      }
+
+      if (checks.length) {
+        bodyHtml += `<div style="font-family:${SERIF};font-size:14px;color:#a04b5c;margin:16px 0 4px">&#9825; Pre-scene checklist status</div>`;
+        bodyHtml += dataTable(checks);
+        checks.forEach(r => { plain += `  ${r.label}: ${r.value}\n`; });
+      }
+    };
+
     let bodyHtml =
       headHtml +
-      (globalHtml ? sectionH3('Contract Overview') + globalHtml : '') +
-      sectionH3('Signatures') + sigHtml;
+      divider() +
+      (globalRows.length ? sectionH3('Contract Overview') + cardWrap('', dataTable(globalRows)) + divider() : '') +
+      sectionH3('Signatures') + cardWrap('&#9829; Sealed with our signatures', sigHtml) + divider();
 
     days.forEach(({ id, rows }) => {
       const title = $(`#${id} h2`)?.textContent.trim() || id.toUpperCase();
+      const dayNo = (/Day\s*(\d+)/i.exec(title) || [])[1] || '';
       plain += `\n── ${title} ──\n`;
-      bodyHtml += sectionH3(esc(title));
-      if (!rows.length) { plain += '  (no entries recorded)\n'; bodyHtml += '<p style="color:#5b4437;font-size:14px;margin:0 0 10px">(no entries recorded)</p>'; }
+      /* numbered romantic day header (wine disc + serif title + rose gradient rule) */
+      bodyHtml +=
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:26px 0 12px"><tr>` +
+        (dayNo
+          ? `<td valign="middle" align="center" width="54" style="background:#7b2d3b;color:#fff7f2;font-family:${SERIF};font-size:22px;border-radius:50%;width:54px;height:54px;text-align:center;line-height:54px;padding:0">${esc(dayNo)}</td><td style="padding-left:14px">`
+          : `<td colspan="2">`) +
+        `<div style="font-family:${SERIF};font-size:19px;color:#7b2d3b;letter-spacing:.04em">${esc(title)}</div>` +
+        `<div style="width:120px;height:2px;background:linear-gradient(90deg,#c98a97,rgba(201,138,151,0));margin-top:6px"></div>` +
+        `</td></tr></table>`;
+      if (!rows.length) { plain += '  (no entries recorded)\n'; bodyHtml += cardWrap('', `<p style="color:#5b4437;font-size:14px;margin:0;font-family:${SANS}">(&#9825; no entries recorded)</p>`); }
 
-      /* v2.7 DH — the collected rows are grouped so the HTML email clearly shows
-         both big blocks the couple asked for:
-         1) "Day Section"        → activities, timings, requests, signatures …
-         2) "Pre-Scene Execution Affidavit" → exec date/time, checklist confirmations,
-            safeword verification, toy inventory, debrief, debrief signatures.
-         Rows carrying an affidavit marker go to block 2; everything else to block 1. */
-      const AFFIDAVIT_MARKERS = [
-        '✓ Confirmed', '○ Pending',
-        'Date of execution', 'Time',
-        /^Safeword "/i, /^Toy · /i,
-        /signature \(debrief\)/i,
-        /Overall satisfaction|Aftercare effectiveness|Safeword used|Adjustments for next time|Debrief notes/i
-      ];
-      const isAffidavit = r => AFFIDAVIT_MARKERS.some(m => typeof m === 'string' ? r.label.startsWith(m) : m.test(r.label));
       const dayRows = rows.filter(r => !isAffidavit(r));
       const affRows = rows.filter(isAffidavit);
 
-      const renderGroup = list => list.forEach(r => {
-        plain += `  ${r.label}: ${r.value}\n`;
-        bodyHtml += rowHtml(r);
-      });
-
       if (dayRows.length) { bodyHtml += sectionH4('Day Section'); renderGroup(dayRows); }
       if (affRows.length) { bodyHtml += sectionH4(`Pre-Scene Execution Affidavit — ${esc(title)}`); renderGroup(affRows); }
+      bodyHtml += divider();
     });
     bodyHtml += footHtml;
 
