@@ -52,8 +52,9 @@
 
   const unlock = () => {
     overlay.classList.add('hidden');
-    restoreDays();     // re-attach AI-created day pages first…
-    loadSaved();
+    /* cloud state was already pulled at DOMContentLoaded — replay it after the gate opens */
+    restoreDays(window.CloudStore.days());   // re-attach AI-created day pages first…
+    loadSaved(window.CloudStore.fields());
     applySignatures();   // re-restore accepted signatures after the gate opens
     setTimeout(() => pwInput.blur(), 300);
   };
@@ -82,7 +83,6 @@
   });
 
   /* ---------- value accessors (stable per-page keys → no collisions) ---------- */
-  const STORE_KEY = 'dhContract.v2';
 
   /* unique key for any field: page id + element id, or a structural DOM path */
   const keyFor = el => {
@@ -105,23 +105,29 @@
     return data;
   };
 
-  const writeStore = () => {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(collectState())); }
-    catch { /* storage full — the explicit 💾 Save button surfaces the error instead */ }
+  /* ---------- cloud save (Supabase only — never local storage) ---------- */
+  let saveTimer;
+  const writeStore = () => {                       // debounced autosave → cloud
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      window.CloudStore.saveFields(collectState())
+        .then(ok => { if (!ok && !window.CloudStore.ready) softWarn(); });
+    }, 1200);
+  };
+  const softWarn = () => {
+    const t = $('#cloud-status');
+    if (t) { t.textContent = '☁️ Cloud offline — set js/supabase-config.js'; t.title = 'Not saved to cloud; entries live in this session only.'; }
   };
 
   const save = () => {
-    try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(collectState()));
-      toast('💾 Saved — our contract is kept safe on this device.');
-    } catch {
-      toast('⚠️ Browser storage is full — clear a finished AI day or export by email.', 3600);
-    }
+    window.CloudStore.saveFields(collectState()).then(ok => {
+      if (ok) toast('☁️ Saved to Supabase cloud — synced on every device.');
+      else if (!window.CloudStore.ready) { softWarn(); toast('⚠️ Cloud not configured — entries kept in this session only. Add your Supabase keys in js/supabase-config.js.', 4200); }
+      else toast('⚠️ Cloud save failed — check connection & retry.', 3600);
+    });
   };
 
-  const loadSaved = () => {
-    let data;
-    try { data = JSON.parse(localStorage.getItem(STORE_KEY)); } catch { return; }
+  const loadSaved = (data) => {
     if (!data) return;
     $$('#main-contract input, #main-contract textarea, #main-contract select').forEach(el => {
       const slot = el.closest('.initials-slot');
@@ -131,20 +137,18 @@
       if (!(k in data)) return;
       if (el.type === 'checkbox') el.checked = !!data[k];
       else el.value = data[k];
+      if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type === 'text' && el.maxLength === -1)) growInput(el);
     });
     autoGrowAll();
   };
 
   /* restore AI-created day pages (innerHTML kept verbatim → DOM paths stay stable),
-     then replay saved values on top of them */
-  const DAYS_KEY = 'dhContract.days.v1';
-  const restoreDays = () => {
-    let raw;
-    try { raw = JSON.parse(localStorage.getItem(DAYS_KEY)); } catch { return; }
-    if (!raw || !raw.list || !raw.list.length) return;
+     then replay saved values on top of them — all from the Supabase cloud */
+  const restoreDays = (list) => {
+    if (!list || !list.length) return;
     const summary = $('#summary');
     if (!summary) return;
-    raw.list.forEach(d => {
+    list.forEach(d => {
       if ($('#' + d.id)) return;                       // already present
       const tpl = document.createElement('template');
       tpl.innerHTML = d.html.trim();
@@ -153,14 +157,17 @@
       $('#main-contract').insertBefore(section, summary);
       if (typeof wireNewDay === 'function') wireNewDay(section);
     });
-    loadSaved();                                       // replay field values into restored days
+    loadSaved(window.CloudStore.fields());             // replay field values into restored days
     syncAllLocks();
   };
 
   $('#save-contract').addEventListener('click', save);
   $('#print-pdf').addEventListener('click', () => window.print());
-  setInterval(writeStore, 60000);          // gentle autosave
-  window.addEventListener('beforeunload', writeStore);
+  setInterval(writeStore, 60000);          // gentle cloud autosave
+  document.addEventListener('input', writeStore);   // live cloud sync as you type
+  window.addEventListener('beforeunload', () => {
+    if (window.CloudStore.ready) window.CloudStore.saveFields(collectState());
+  });
 
   /* ============================================================
      PHOTO SIGNATURES ON ACCEPT
@@ -173,13 +180,11 @@
     Deep:  'img/signature-deep.png',
     Honey: 'img/signature-honey.png',
   };
-  const SIG_KEY   = 'signAccepted';
-  const UNDO_MS   = 5 * 60 * 1000;         // undo window: 5 minutes
+  const UNDO_MS   = Infinity;              // v1.9 DH: undo is ALWAYS allowed — no sealing window
 
-  /* ---------- per-area signature state (legacy migration) ---------- */
+  /* ---------- per-area signature state (cloud-backed, in-memory mirror) ---------- */
   const BASE_AREAS = ['seal', 'signatories', 'debrief'];   // every area accepts independently
   let AREAS = [...BASE_AREAS];   // grows dynamically when the AI creates new day areas
-  const sigStore = { accepts: {} };   // in-memory mirror of SIG_KEY — safe for large localStorage values
   /* discover any data-area present in the DOM (e.g. signatories-day2 / debrief-day2) */
   const syncAreas = () => {
     $$('#main-contract [data-area]').forEach(el => {
@@ -188,26 +193,19 @@
     });
   };
   const readAccepts = () => {
-    let raw;
-    try { raw = JSON.parse(localStorage.getItem(SIG_KEY)) || {}; }
-    catch { raw = {}; }
+    const a = window.CloudStore.accepts() || {};
     // migrate legacy global format {Deep:{ts}} -> per-area {seal:{Deep:{ts}}, ...}
-    if (raw.Deep && typeof raw.Deep.ts === 'number') {
+    if (a.Deep && typeof a.Deep.ts === 'number') {
       const migrated = {};
-      BASE_AREAS.forEach(area => { migrated[area] = { Deep: raw.Deep, Honey: raw.Honey }; });
-      localStorage.setItem(SIG_KEY, JSON.stringify(migrated));
-      sigStore.accepts = migrated;
+      BASE_AREAS.forEach(area => { migrated[area] = { Deep: a.Deep, Honey: a.Honey }; });
+      window.CloudStore.saveAccepts(migrated);
       return migrated;
     }
-    // fall back to the in-memory mirror when storage is unavailable/quota-blocked
-    if (!Object.keys(raw).length && Object.keys(sigStore.accepts).length) return sigStore.accepts;
-    sigStore.accepts = raw;
-    return raw;
+    return a;
   };
   const writeAccepts = a => {
-    sigStore.accepts = a;                 // keep the live mirror first — survives storage failures
-    try { localStorage.setItem(SIG_KEY, JSON.stringify(a)); }
-    catch { toast('⚠️ Signature saved in this session only (browser storage full).', 3400); }
+    window.CloudStore.saveAccepts(a)
+      .then(ok => { if (!ok && !window.CloudStore.ready) toast('⚠️ Signature kept in this session only — cloud not configured.', 3400); });
   };
 
   /* overlay the signature image onto every slot of one party IN ONE AREA ONLY */
@@ -267,8 +265,8 @@
       /* compact labels — the full "tap to undo" hint lives in the tooltip */
       b.textContent = accepted ? 'Signed ✓ · Undo' : 'Accept';
       b.title = accepted
-        ? `Signed by ${party} — tap to undo within five minutes`
-        : `Accept & sign as ${party} (undoable for five minutes)`;
+        ? `Signed by ${party} — tap to undo any time`
+        : `Accept & sign as ${party} (undo available any time)`;
       /* Accept stays undoable inside a finished day: keep the Signed/Undo button live */
       b.classList.toggle('undoable', !!accepted);
     });
@@ -290,6 +288,7 @@
         else     { clearSlots(party, area); syncAreaUI(party, area, false); }
       });
     });
+    ensureSignAccepts(document);   // v1.9 DH: Accept option everywhere a sign is required
   };
 
   /* event delegation on document — each area is independent */
@@ -303,33 +302,43 @@
     const byParty = accepts[area] || (accepts[area] = {});
     const acc = byParty[party];
     if (acc) {
-      if (Date.now() - acc.ts > UNDO_MS) { toast('\ud83d\udd12 Sealed \u2014 the undo window has closed. Signed with love.', 3200); return; }
+      /* v1.9 DH: undo is allowed ANY time, for BOTH parties — no sealing window */
       delete byParty[party];
       writeAccepts(accepts);
       clearSlots(party, area);
       syncAreaUI(party, area, false);
-      /* day fields may be locked (finished day) — temporarily lift the lock so
-         the restored sign input is genuinely editable during the undo moment */
+      /* day fields may be locked (finished day) — re-open the day so the
+         restored sign input is genuinely editable after an undo */
       const slotEl = $(`.initials-slot[data-party="${party}"][data-area="${area}"]`);
       const lockedPage = slotEl && slotEl.closest('.page.day-locked');
-      if (lockedPage) lockedPage.classList.remove('day-locked');
+      if (lockedPage) {
+        lockedPage.classList.remove('day-locked');
+        const sel = $('.day-finished-select', lockedPage);   // keep the control in sync
+        if (sel) sel.value = 'no';
+      }
       const slotInput = slotEl && $('input', slotEl);
       if (slotInput && !slotInput.value.trim()) slotInput.focus();
-      if (lockedPage) setTimeout(() => syncLockUI(lockedPage), 5 * 60 * 1000);   // re-seal after the undo window
-      toast(`\u21a9 ${party}'s signature withdrawn here \u2014 other areas are untouched.`);
+      toast(`↩ ${party}'s signature withdrawn here — other areas are untouched.`);
     } else {
       byParty[party] = { ts: Date.now() };
       writeAccepts(accepts);
       fillSlots(party, area);
       syncAreaUI(party, area, true);
-      toast(`\u2764 ${party} accepted & signed here \u2014 sealed in five minutes.`);
+      toast(`❤ ${party} accepted & signed here — tap “Signed ✓ · Undo” any time to withdraw.`);
     }
     save();
   });
 
-  /* re-apply on initial page load too — AFTER restoring saved values so that
-     sealed slots/dates take ownership instead of being overwritten by old data */
-  document.addEventListener('DOMContentLoaded', () => { restoreDays(); loadSaved(); applySignatures(); });
+  /* boot flow: pull everything from Supabase → rebuild days → replay values →
+     overlay sealed signatures. Nothing is read from local storage. */
+  document.addEventListener('DOMContentLoaded', async () => {
+    const state = await window.CloudStore.load();
+    restoreDays(state ? state.days : []);
+    loadSaved(window.CloudStore.fields());
+    applySignatures();
+    const cs = $('#cloud-status');
+    if (cs && window.CloudStore.ready) cs.textContent = '☁️ Synced with Supabase';
+  });
 
   /* ---------- clear a day ---------- */
   const clearDay = btn => {
@@ -678,12 +687,11 @@
   /* ---------- append a freshly created day ---------- */
   const STATIC_IDS = new Set(['day1']);   // days shipped in index.html — never persisted
   const persistDays = () => {
-    try {
-      const list = $$('.page')
-        .filter(p => dayNumber(p.id) && !STATIC_IDS.has(p.id))
-        .map(p => ({ id: p.id, html: p.outerHTML }));
-      localStorage.setItem(DAYS_KEY, JSON.stringify({ v: 1, list }));
-    } catch { toast('⚠️ Could not store the new day (browser storage full).', 3200); }
+    const list = $$('.page')
+      .filter(p => dayNumber(p.id) && !STATIC_IDS.has(p.id))
+      .map(p => ({ id: p.id, html: p.outerHTML }));
+    window.CloudStore.saveDays(list)
+      .then(ok => { if (!ok && !window.CloudStore.ready) toast('⚠️ Cloud not configured — this day lives in the page only.', 3200); });
   };
   const addDayPage = p => {
     const tpl = document.createElement('template');
@@ -692,8 +700,31 @@
     const summary = $('#summary');
     $('#main-contract').insertBefore(section, summary);
     wireNewDay(section);
+    ensureSignAccepts(section);   // v1.9 DH: an Accept option beside every signature row
     syncLockUI(section);
     return section;
+  };
+
+  /* ---------- v1.9 DH: guarantee an Accept button wherever a sign is required ----------
+     Any .sign-row containing an initials-slot without its own accept button gets a
+     compact inline "Accept / Signed ✓ · Undo" control wired into the same area. */
+  const ensureSignAccepts = (root = document) => {
+    $$('.sign-row', root).forEach(row => {
+      $$('.initials-slot[data-party][data-area]', row).forEach(slot => {
+        const party = slot.dataset.party;
+        const area  = slot.dataset.area;
+        if ($(`.accept-btn[data-party="${party}"][data-area="${area}"]`, row)) return;
+        const label = slot.closest('.sign-field')?.querySelector('label')?.textContent || 'Signature';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'accept-btn accept-inline';
+        btn.dataset.party = party;
+        btn.dataset.area  = area;
+        btn.title = `Accept & sign as ${party} (${label.trim()}) — undo available any time`;
+        row.appendChild(btn);
+        syncAreaUI(party, area, !!(readAccepts()[area] || {})[party]);
+      });
+    });
   };
 
   /* wire behaviours that static markup relies on (auto-grow, date pills, clear, lock) */
@@ -756,10 +787,28 @@
     }
   });
 
-  /* ---------- textareas: grow with content ---------- */
+  /* ---------- textareas: auto-adjust height with content (compact by default) ---------- */
   const autoGrow = ta => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
   const autoGrowAll = () => $$('textarea').forEach(autoGrow);
   const wireTextareas = root => $$('textarea', root).forEach(ta => ta.addEventListener('input', () => autoGrow(ta)));
+
+  /* ---------- inline text inputs: grow to fit their text, stay compact ---------- */
+  const GROW_FONT = '15px "Cormorant Garamond", Georgia, serif';
+  const measureCanvas = document.createElement('canvas');
+  const mctx = measureCanvas.getContext('2d');
+  const growInput = inp => {
+    if (inp.dataset.pill === '1') return;                 // DD/MM/YYYY pills keep fixed size
+    const min = parseFloat(getComputedStyle(inp).minWidth) || 70;
+    const max = parseFloat(inp.dataset.growMax || '340');
+    mctx.font = getComputedStyle(inp).font || GROW_FONT;
+    const w = Math.ceil(mctx.measureText(inp.value || inp.placeholder || '').width) + 26;
+    inp.style.width = Math.min(Math.max(w, min), max) + 'px';
+  };
+  const growInputsIn = root => $$('input[type="text"]', root).forEach(growInput);
+  document.addEventListener('input', e => {
+    const inp = e.target;
+    if (inp.matches && inp.matches('#main-contract input[type="text"]:not([maxlength])')) growInput(inp);
+  }, true);
 
   /* ---------- date/time pills: auto-advance + digits only ---------- */
   const wirePills = root => $$('.datetime-group', root).forEach(group => {
