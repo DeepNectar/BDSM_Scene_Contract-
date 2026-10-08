@@ -264,7 +264,13 @@
 
   const syncAreaUI = (party, area, accepted) => {
     $$(`.accept-btn[data-party="${party}"][data-area="${area}"]`).forEach(b => {
-      b.textContent = accepted ? 'Signed \u2014 tap to undo' : 'Accept as ' + party;
+      /* compact labels — the full "tap to undo" hint lives in the tooltip */
+      b.textContent = accepted ? 'Signed ✓ · Undo' : 'Accept';
+      b.title = accepted
+        ? `Signed by ${party} — tap to undo within five minutes`
+        : `Accept & sign as ${party} (undoable for five minutes)`;
+      /* Accept stays undoable inside a finished day: keep the Signed/Undo button live */
+      b.classList.toggle('undoable', !!accepted);
     });
     $$(`.sig-card[data-party="${party}"][data-area="${area}"]`).forEach(card => {
       card.classList.toggle('signed', !!accepted);
@@ -302,6 +308,14 @@
       writeAccepts(accepts);
       clearSlots(party, area);
       syncAreaUI(party, area, false);
+      /* day fields may be locked (finished day) — temporarily lift the lock so
+         the restored sign input is genuinely editable during the undo moment */
+      const slotEl = $(`.initials-slot[data-party="${party}"][data-area="${area}"]`);
+      const lockedPage = slotEl && slotEl.closest('.page.day-locked');
+      if (lockedPage) lockedPage.classList.remove('day-locked');
+      const slotInput = slotEl && $('input', slotEl);
+      if (slotInput && !slotInput.value.trim()) slotInput.focus();
+      if (lockedPage) setTimeout(() => syncLockUI(lockedPage), 5 * 60 * 1000);   // re-seal after the undo window
       toast(`\u21a9 ${party}'s signature withdrawn here \u2014 other areas are untouched.`);
     } else {
       byParty[party] = { ts: Date.now() };
@@ -338,8 +352,11 @@
 
   /* ============================================================
      DAY LOCK — a day is editable (its fields AND its signature
-     accept/undo buttons) until it is marked as finished.
-     Once "Day finished = ✅ Yes": everything in the day seals.
+     accept buttons) until it is marked as finished.
+     Once "Day finished = ✅ Yes": fields & fresh accepts seal.
+     EXCEPTION: an already-accepted sign stays UNDOABLE in the
+     day section (tap "Signed ✓ · Undo") for the five-minute window,
+     even after the day is marked finished.
      Switching back to ❌ No re-opens every sign for editing.
      ============================================================ */
   const dayLocked = page => {
@@ -360,10 +377,13 @@
         : `🔓 ${sel.dataset.day.toUpperCase()} is open again — every sign and field is editable.`);
     });
   });
-  /* guard: clicks on accept-buttons / filled signature slots inside a locked day */
+  /* guard: clicks on accept-buttons / filled signature slots inside a locked day.
+     Signed/Undo buttons (.undoable) stay live — Accept is undoable in the day
+     section even after the day is marked finished. */
   document.addEventListener('click', e => {
     const target = e.target.closest('.accept-btn, .initials-slot');
     if (!target) return;
+    if (target.classList.contains('undoable')) return;   // undo remains available
     const page = target.closest('.page');
     if (page && dayLocked(page)) {
       e.stopPropagation();
@@ -607,13 +627,13 @@
           <img class="sig-photo" src="img/signature-honey.png" alt="Honey's signature" loading="lazy">
           <span class="sig-name">Honey · Submissive</span>
           <span class="sig-status">Awaiting acceptance…</span>
-          <button class="accept-btn" data-area="signatories-day${N}" data-party="Honey" type="button">Accept as Honey</button>
+          <button class="accept-btn" data-area="signatories-day${N}" data-party="Honey" type="button">Accept</button>
         </div>
         <div class="sig-card" data-area="signatories-day${N}" data-party="Deep">
           <img class="sig-photo" src="img/signature-deep.png" alt="Deep's signature" loading="lazy">
           <span class="sig-name">Deep · Dominant</span>
           <span class="sig-status">Awaiting acceptance…</span>
-          <button class="accept-btn" data-area="signatories-day${N}" data-party="Deep" type="button">Accept as Deep</button>
+          <button class="accept-btn" data-area="signatories-day${N}" data-party="Deep" type="button">Accept</button>
         </div>
       </div>
       <div class="sign-row">

@@ -168,23 +168,25 @@ select{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background
 }
 .clear-day-btn:hover{background:rgba(140,59,59,.08)}
 
-/* ---------- signature blocks ---------- */
-.sign-row{display:flex;gap:16px;flex-wrap:wrap;margin:12px 0}
-.sign-field{flex:1 1 240px;min-width:200px}
-.sign-field label{display:block;font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:2px}
-.sign-field input{width:100%;border-bottom:1.5px solid var(--accent);font-family:var(--serif);font-size:17px;font-style:italic}
-.sign-field .datetime-group{margin-top:2px;width:100%;justify-content:center}
+/* ---------- signature blocks (compact) ---------- */
+.sign-row{display:flex;gap:10px;flex-wrap:wrap;margin:8px 0;align-items:flex-end}
+.sign-field{flex:1 1 170px;min-width:140px}
+.sign-field label{display:block;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:1px}
+.sign-field input{width:100%;border-bottom:1.5px solid var(--accent);font-family:var(--serif);font-size:15px;font-style:italic;padding:2px 4px}
+.sign-field .datetime-group{margin-top:2px;width:100%;justify-content:center;padding:1px 4px}
 .sign-field .initials-slot{display:block;width:100%}
-.sign-cards{margin:6px 0 16px}
-.sig-card .accept-btn{margin-top:8px;width:100%}
-.sig-card .sig-status{margin-bottom:2px}
+.sign-cards{margin:4px 0 10px}
+.sig-card .accept-btn{margin-top:5px;width:100%}
+.sig-card .sig-status{margin-bottom:1px}
 
 /* locked day (marked finished) — inputs stay visible, only interaction is blocked */
 .page.day-locked input:not([type="checkbox"]),
 .page.day-locked textarea,
 .page.day-locked select,
-.page.day-locked .accept-btn,
+.page.day-locked .accept-btn:not(.undoable),
 .page.day-locked .clear-day-btn{pointer-events:none;user-select:none}
+/* Signed/Undo buttons stay clickable in a finished day — Accept is undoable */
+.page.day-locked .accept-btn.undoable{pointer-events:auto;opacity:1}
 .page.day-locked input[type="checkbox"]{cursor:not-allowed}
 .page.day-locked input,.page.day-locked textarea,.page.day-locked select{opacity:.6;background:rgba(220,205,189,.12)}
 /* the status control itself must remain usable so the day can be unlocked again */
@@ -196,38 +198,38 @@ select{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background
 }
 .page.day-locked .lock-note{display:flex}
 
-/* ---------- photo signatures on accept ---------- */
-.initials-slot{position:relative;display:inline-block;min-height:34px}
+/* ---------- photo signatures on accept (compact) ---------- */
+.initials-slot{position:relative;display:inline-block;min-height:28px}
 .slot-sig{
   position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;
   opacity:0;transform:rotate(-4deg) scale(.96);
   transition:opacity .45s ease,transform .45s ease;
 }
-.slot-filled{height:48px}
+.slot-filled{height:36px}
 .slot-filled .slot-sig{opacity:1;transform:rotate(-4deg) scale(1)}
 .slot-filled input.editable-field{visibility:hidden}   /* hide, don't remove — keeps data intact */
 
 .seal{text-align:center;margin-top:18px;padding-top:14px;border-top:1px dashed var(--line)}
 .seal-title{font-family:var(--serif);font-style:italic;font-size:17px;color:var(--wine);letter-spacing:.04em}
 .accept-btn{
-  font:inherit;font-weight:500;font-size:14px;letter-spacing:.05em;cursor:pointer;
-  padding:8px 22px;border-radius:999px;border:1px solid var(--wine);color:var(--wine);background:transparent;
+  font:inherit;font-weight:500;font-size:12.5px;line-height:1.2;letter-spacing:.04em;cursor:pointer;
+  padding:4px 14px;border-radius:999px;border:1px solid var(--wine);color:var(--wine);background:transparent;
   transition:background .2s,color .2s,box-shadow .2s,transform .15s;
 }
 .accept-btn:hover{background:rgba(124,45,58,.08);transform:translateY(-1px)}
-.sig-cards{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+.sig-cards{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
 .sig-card{
-  position:relative;width:230px;border:1px solid var(--line);border-radius:14px;background:#fffdf9;
-  padding:14px 14px 10px;box-shadow:0 8px 20px -12px rgba(42,28,22,.35);transition:border-color .3s,box-shadow .3s;
+  position:relative;width:170px;border:1px solid var(--line);border-radius:12px;background:#fffdf9;
+  padding:8px 9px 7px;box-shadow:0 6px 16px -10px rgba(42,28,22,.35);transition:border-color .3s,box-shadow .3s;
 }
-.sig-card.signed{border-color:var(--accent-2);box-shadow:0 10px 26px -10px rgba(124,45,58,.45)}
+.sig-card.signed{border-color:var(--accent-2);box-shadow:0 8px 20px -8px rgba(124,45,58,.45)}
 .sig-card .sig-photo{
-  display:block;width:100%;height:64px;object-fit:contain;opacity:0;transform:rotate(-3deg);
+  display:block;width:100%;height:42px;object-fit:contain;opacity:0;transform:rotate(-3deg);
   transition:opacity .5s ease,transform .5s ease;
 }
 .sig-card.signed .sig-photo{opacity:1;transform:rotate(-3deg) translateY(-2px)}
-.sig-name{display:block;font-family:var(--serif);font-size:16px;font-weight:600;color:var(--ink);margin-top:4px}
-.sig-status{display:block;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-soft);margin-top:2px}
+.sig-name{display:block;font-family:var(--serif);font-size:13.5px;font-weight:600;color:var(--ink);margin-top:2px}
+.sig-status{display:block;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin-top:1px}
 .sig-card.signed .sig-status{color:var(--ok)}
 
 /* ---------- debrief grid ---------- */
@@ -373,13 +375,13 @@ textarea.ai-field{resize:vertical;min-height:64px}
   .inline-input{width:110px}
   .inline-input.adj{width:140px}
   .debrief-grid{grid-template-columns:1fr}
-  .sign-row{flex-direction:column}
+  .sign-row{flex-direction:column;gap:8px}
   .clear-day-btn{margin-left:0}
   th,td{padding:6px 8px;font-size:13px}
   .modal-footer .btn{flex:1}
-  .accept-btn{width:100%}
-  .sig-card{width:100%;max-width:320px}
-  .sig-card .sig-photo,.slot-sig{height:44px}
+  .accept-btn{width:100%;padding:5px 12px}
+  .sig-card{width:100%;max-width:240px;padding:7px 8px 6px}
+  .sig-card .sig-photo,.slot-sig{height:36px}
 }
 
 /* ---------- reduced motion ---------- */
