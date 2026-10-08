@@ -19,6 +19,6 @@
    the policy or add an auth anon key of your own.
    ============================================================ */
 window.SUPABASE_CONFIG = {
-  url: 'https://YOUR-PROJECT-REF.supabase.co',   // ← replace
-  anonKey: 'YOUR-ANON-PUBLIC-KEY',               // ← replace
+  url: 'https://qbnxcfwwsuqfmearyris.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFibnhjZnd3c3VxZm1lYXJ5cmlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MzI0NDEsImV4cCI6MjEwNzAwODQ0MX0.dP_Ip49NkOMxqn-lE15cOlR6EwJw4yB5dFLJYxBumPE',
 };
