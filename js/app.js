@@ -52,6 +52,7 @@
 
   const unlock = () => {
     overlay.classList.add('hidden');
+    restoreDays();     // re-attach AI-created day pages first…
     loadSaved();
     applySignatures();   // re-restore accepted signatures after the gate opens
     setTimeout(() => pwInput.blur(), 300);
@@ -104,9 +105,19 @@
     return data;
   };
 
-  const writeStore = () => localStorage.setItem(STORE_KEY, JSON.stringify(collectState()));
+  const writeStore = () => {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(collectState())); }
+    catch { /* storage full — the explicit 💾 Save button surfaces the error instead */ }
+  };
 
-  const save = () => { writeStore(); toast('💾 Saved — our contract is kept safe on this device.'); };
+  const save = () => {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(collectState()));
+      toast('💾 Saved — our contract is kept safe on this device.');
+    } catch {
+      toast('⚠️ Browser storage is full — clear a finished AI day or export by email.', 3600);
+    }
+  };
 
   const loadSaved = () => {
     let data;
@@ -122,6 +133,28 @@
       else el.value = data[k];
     });
     autoGrowAll();
+  };
+
+  /* restore AI-created day pages (innerHTML kept verbatim → DOM paths stay stable),
+     then replay saved values on top of them */
+  const DAYS_KEY = 'dhContract.days.v1';
+  const restoreDays = () => {
+    let raw;
+    try { raw = JSON.parse(localStorage.getItem(DAYS_KEY)); } catch { return; }
+    if (!raw || !raw.list || !raw.list.length) return;
+    const summary = $('#summary');
+    if (!summary) return;
+    raw.list.forEach(d => {
+      if ($('#' + d.id)) return;                       // already present
+      const tpl = document.createElement('template');
+      tpl.innerHTML = d.html.trim();
+      const section = tpl.content.firstElementChild;
+      if (!section || section.tagName !== 'SECTION') return;
+      $('#main-contract').insertBefore(section, summary);
+      if (typeof wireNewDay === 'function') wireNewDay(section);
+    });
+    loadSaved();                                       // replay field values into restored days
+    syncAllLocks();
   };
 
   $('#save-contract').addEventListener('click', save);
@@ -144,7 +177,16 @@
   const UNDO_MS   = 5 * 60 * 1000;         // undo window: 5 minutes
 
   /* ---------- per-area signature state (legacy migration) ---------- */
-  const AREAS = ['seal', 'signatories', 'debrief'];   // every area accepts independently
+  const BASE_AREAS = ['seal', 'signatories', 'debrief'];   // every area accepts independently
+  let AREAS = [...BASE_AREAS];   // grows dynamically when the AI creates new day areas
+  const sigStore = { accepts: {} };   // in-memory mirror of SIG_KEY — safe for large localStorage values
+  /* discover any data-area present in the DOM (e.g. signatories-day2 / debrief-day2) */
+  const syncAreas = () => {
+    $$('#main-contract [data-area]').forEach(el => {
+      const a = el.dataset.area;
+      if (a && !AREAS.includes(a)) AREAS.push(a);
+    });
+  };
   const readAccepts = () => {
     let raw;
     try { raw = JSON.parse(localStorage.getItem(SIG_KEY)) || {}; }
@@ -152,13 +194,21 @@
     // migrate legacy global format {Deep:{ts}} -> per-area {seal:{Deep:{ts}}, ...}
     if (raw.Deep && typeof raw.Deep.ts === 'number') {
       const migrated = {};
-      AREAS.forEach(area => { migrated[area] = { Deep: raw.Deep, Honey: raw.Honey }; });
+      BASE_AREAS.forEach(area => { migrated[area] = { Deep: raw.Deep, Honey: raw.Honey }; });
       localStorage.setItem(SIG_KEY, JSON.stringify(migrated));
+      sigStore.accepts = migrated;
       return migrated;
     }
+    // fall back to the in-memory mirror when storage is unavailable/quota-blocked
+    if (!Object.keys(raw).length && Object.keys(sigStore.accepts).length) return sigStore.accepts;
+    sigStore.accepts = raw;
     return raw;
   };
-  const writeAccepts = a => localStorage.setItem(SIG_KEY, JSON.stringify(a));
+  const writeAccepts = a => {
+    sigStore.accepts = a;                 // keep the live mirror first — survives storage failures
+    try { localStorage.setItem(SIG_KEY, JSON.stringify(a)); }
+    catch { toast('⚠️ Signature saved in this session only (browser storage full).', 3400); }
+  };
 
   /* overlay the signature image onto every slot of one party IN ONE AREA ONLY */
   const fillSlots = (party, area) => {
@@ -224,6 +274,7 @@
   };
 
   const applySignatures = () => {
+    syncAreas();   // include any AI-created day areas (signatories-day2, debrief-day2, …)
     const accepts = readAccepts();
     AREAS.forEach(area => {
       const byParty = accepts[area] || {};
@@ -264,35 +315,434 @@
 
   /* re-apply on initial page load too — AFTER restoring saved values so that
      sealed slots/dates take ownership instead of being overwritten by old data */
-  document.addEventListener('DOMContentLoaded', () => { loadSaved(); applySignatures(); });
+  document.addEventListener('DOMContentLoaded', () => { restoreDays(); loadSaved(); applySignatures(); });
 
   /* ---------- clear a day ---------- */
-  $$('.clear-day-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const dayId = btn.dataset.day;
-      const page  = $('#' + dayId);
-      if (!page) return;
-      if (!confirm(`Clear ALL entries for ${dayId.toUpperCase()}? This cannot be undone.`)) return;
-      $$('input:not([type="password"]), textarea, select', page).forEach(el => {
-        const slot = el.closest('.initials-slot');
-        if (slot?.classList.contains('slot-filled')) return;   // keep sealed signatures intact
-        if (el.type === 'checkbox') el.checked = false;
-        else if (el.tagName === 'SELECT') el.selectedIndex = 0;
-        else el.value = '';
-      });
-      $$('textarea', page).forEach(ta => { ta.style.height = ''; });
-      save();
-      toast(`🗑 ${dayId.toUpperCase()} cleared.`);
+  const clearDay = btn => {
+    const dayId = btn.dataset.day;
+    const page  = $('#' + dayId);
+    if (!page) return;
+    if (!confirm(`Clear ALL entries for ${dayId.toUpperCase()}? This cannot be undone.`)) return;
+    $$('input:not([type="password"]), textarea, select', page).forEach(el => {
+      const slot = el.closest('.initials-slot');
+      if (slot?.classList.contains('slot-filled')) return;   // keep sealed signatures intact
+      if (el.type === 'checkbox') el.checked = false;
+      else if (el.tagName === 'SELECT') el.selectedIndex = 0;
+      else el.value = '';
     });
+    $$('textarea', page).forEach(ta => { ta.style.height = ''; });
+    save();
+    toast(`🗑 ${dayId.toUpperCase()} cleared.`);
+  };
+  $$('.clear-day-btn').forEach(btn => btn.addEventListener('click', () => clearDay(btn)));
+
+  /* ============================================================
+     DAY LOCK — a day is editable (its fields AND its signature
+     accept/undo buttons) until it is marked as finished.
+     Once "Day finished = ✅ Yes": everything in the day seals.
+     Switching back to ❌ No re-opens every sign for editing.
+     ============================================================ */
+  const dayLocked = page => {
+    const sel = $('.day-finished-select', page);
+    return !!sel && sel.value === 'yes';
+  };
+  const syncLockUI = page => {
+    page.classList.toggle('day-locked', dayLocked(page));
+  };
+  const syncAllLocks = () => $$('.page').forEach(syncLockUI);
+  $$('.day-finished-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const page = sel.closest('.page');
+      syncLockUI(page);
+      writeStore();
+      toast(dayLocked(page)
+        ? `🔒 ${sel.dataset.day.toUpperCase()} marked finished — signatures & fields are sealed.`
+        : `🔓 ${sel.dataset.day.toUpperCase()} is open again — every sign and field is editable.`);
+    });
+  });
+  /* guard: clicks on accept-buttons / filled signature slots inside a locked day */
+  document.addEventListener('click', e => {
+    const target = e.target.closest('.accept-btn, .initials-slot');
+    if (!target) return;
+    const page = target.closest('.page');
+    if (page && dayLocked(page)) {
+      e.stopPropagation();
+      toast('🔒 This day is marked finished — set “Day finished” to ❌ No to edit its signs.', 3200);
+    }
+  }, true);
+
+  /* ============================================================
+     ✨ AI ASSISTANT — create a new BDSM-sequence day OR write
+     generated content into an existing (not-yet-finished) day.
+     Runs fully offline with a consent-first scene template engine.
+     ============================================================ */
+  const aiModal    = $('#ai-modal');
+  const aiDaySel   = $('#ai-day-select');
+  const aiChipsM   = $$('#ai-mode-chips .ai-chip');
+  const aiChipsS   = $$('#ai-seq-chips .ai-chip');
+  const aiPreview  = $('#ai-preview');
+  const aiApplyBtn = $('#ai-apply-btn');
+  const openAi  = () => { refreshAiDayOptions(); aiModal.classList.add('active'); };
+  const closeAi = () => aiModal.classList.remove('active');
+  $('#ai-assistant').addEventListener('click', openAi);
+  $('#ai-close-btn').addEventListener('click', closeAi);
+  $('#ai-close-footer-btn').addEventListener('click', closeAi);
+  aiModal.addEventListener('click', e => { if (e.target === aiModal) closeAi(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAi(); });
+
+  let aiMode = 'create';           // 'create' | 'write'
+  let aiDraft = null;              // last generated plan, applied on demand
+
+  aiChipsM.forEach(b => b.addEventListener('click', () => {
+    aiChipsM.forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    aiMode = b.dataset.mode;
+    aiApplyBtn.textContent = aiMode === 'create' ? '✨ Create day' : '✍️ Write into day';
+    aiApplyBtn.disabled = true;
+    aiDraft = null;
+    refreshAiDayOptions();
+  }));
+  aiChipsS.forEach(b => b.addEventListener('click', () => b.classList.toggle('active')));
+
+  const dayNumber = id => { const m = /^day(\d+)$/.exec(id); return m ? +m[1] : null; };
+  const existingDayIds = () => $$('.page').map(p => p.id).filter(id => dayNumber(id));
+
+  const refreshAiDayOptions = () => {
+    const ids = existingDayIds();
+    aiDaySel.innerHTML = '';
+    if (aiMode === 'create') {
+      const opt = document.createElement('option');
+      const nextN = ids.reduce((mx, id) => Math.max(mx, dayNumber(id)), 0) + 1;
+      opt.value = `new:day${nextN}`;
+      opt.textContent = `New Day ${nextN} (appended at the end)`;
+      aiDaySel.appendChild(opt);
+    } else {
+      const editable = ids.filter(id => !dayLocked($('#' + id)));
+      if (!editable.length) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = '(no open days — mark a day ❌ Not finished first)';
+        aiDaySel.appendChild(opt);
+      } else {
+        editable.forEach(id => {
+          const opt = document.createElement('option');
+          opt.value = id;
+          opt.textContent = $(`#${id} h2`)?.textContent.trim() || id.toUpperCase();
+          aiDaySel.appendChild(opt);
+        });
+      }
+    }
+  };
+
+  /* ---- sequence knowledge base (everything stays SSC/RACK-safe) ---- */
+  const SEQ_LIB = {
+    sensory: {
+      name: 'Sensory deprivation', toy: 'Silk blindfold / noise-reducing headphones',
+      hard: 'Blindfold removed instantly on RED or any non-verbal signal; never combined with positional restraint that hides distress.',
+      step: ['blindfold on, narrate every touch before it lands', 'build anticipation through sound & silence']
+    },
+    restraint: {
+      name: 'Restraint (upper body)', toy: 'Silk ties / scarves and/or metal handcuffs — never simultaneously on the same limb',
+      hard: 'Circulation & comfort check every 10 minutes; key visible and within reach at all times.',
+      step: ['wrists bound softly, padding under every knot', 'reassurance check-in before leaving her still']
+    },
+    bondage: {
+      name: 'Bondage / rope', toy: 'Soft cotton rope — single-column wraps, quick-release safety knots',
+      hard: 'Every tie carries a quick-release; safety shears beside the mat; no rope on the neck.',
+      step: ['rope dressing at a slow, deliberate pace', 'single-column tie with constant verbal check-ins']
+    },
+    impact: {
+      name: 'Impact play', toy: 'Soft flogger / leather paddle',
+      hard: 'Strikes only over muscle or flesh-safe zones — never kidneys, spine, or joints; warm-up strokes first.',
+      step: ['warm-up taps, rising rhythm', 'steady strokes with afterglow rub between sets']
+    },
+    sensation: {
+      name: 'Temperature / sensation', toy: 'Ice cubes + warm breath contrast, feathers, clothespins/clamps',
+      hard: 'Ice never contacts neck, face, or mucosa and never rests longer than 5 seconds; clamps max 10 consecutive minutes with a timer.',
+      step: ['ice trails across shoulders and spine', 'clamps applied + 10-minute timer set', 'alternating warm breath after each trail']
+    },
+    powerexchange: {
+      name: 'Power exchange / orders', toy: 'Voice, posture, ritual of address ("Sir" / "Ma’am")',
+      hard: 'Orders stop instantly on YELLOW; negotiation of scenes-of-authority happens pre-scene, never mid-play.',
+      step: ['kneeling check-in, three simple escalating orders', 'praise woven between commands']
+    },
+    service: {
+      name: 'Service submission', toy: 'Small rituals — pouring tea, offering slippers, attentive tasks',
+      hard: 'Service tasks are framed as gifts, never tests; correction stays gentle and in-negotiation.',
+      step: ['tea ceremony performed slowly, eyes lowered', 'task list read aloud, one graceful act at a time']
+    },
+    edging: {
+      name: 'Teasing & edging', toy: 'Hands, lips, vibrator on lowest setting',
+      hard: 'Edge count agreed beforehand; GREEN/YELLOW governs pace; orgasm denial ends on request.',
+      step: ['slow tease, drawn-out anticipation', 'first edge held, then released with praise']
+    },
+    aftercare: {
+      name: 'Aftercare', toy: 'Warm blanket, herbal tea, moisturiser, massage, unhurried cuddles',
+      hard: 'Aftercare is mandatory and never shortened; debrief begins only once both are warm, hydrated and settled.',
+      step: ['blanket wrap + hydration immediately at scene end', 'massage, debrief and ≥20 minutes of undistracted cuddling']
+    }
+  };
+  const SEQ_ORDER = Object.keys(SEQ_LIB);
+
+  const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+  const buildPlan = () => {
+    const picked = SEQ_ORDER.filter(k => $(`#ai-seq-chips [data-seq="${k}"]`).classList.contains('active'));
+    const seqs = picked.length ? picked : ['sensory', 'restraint', 'sensation', 'edging', 'aftercare'];
+    const duration = $('#ai-duration').value.trim() || 'Seventy-five (75) minutes of active scene play, plus generous aftercare';
+    const notes    = $('#ai-notes').value.trim();
+    const target   = aiDaySel.value;
+    const n        = dayNumber(target.startsWith('new:') ? target.slice(4) : target) || 99;
+    const dateStr  = n === 1 ? '30 July 2026' : 'to be filled in ✍️';
+    const protocol = seqs.map(k => SEQ_LIB[k].name).join(' → ');
+    return { n, seqs, duration, notes, target, dateStr, protocol };
+  };
+
+  const renderPreview = p => {
+    const acts = p.seqs.map(k => `<li><strong>${escH(SEQ_LIB[k].name)}</strong> — ${escH(SEQ_LIB[k].toy)}</li>`).join('');
+    const lims = p.seqs.map(k => `<li>${escH(SEQ_LIB[k].hard)}</li>`).join('');
+    const steps = p.seqs.map((k, i) => `<li>T+${i * 10} · <strong>${escH(SEQ_LIB[k].name)}</strong>: ${escH(SEQ_LIB[k].step.join('; '))}</li>`).join('');
+    aiPreview.innerHTML =
+      `<p><strong>Day ${p.n} · ${escH(p.dateStr)} — Private Bedroom / Play Space</strong></p>` +
+      `<p><em>Duration:</em> ${escH(p.duration)}</p>` +
+      `<p><em>Protocol:</em> ${escH(p.protocol)}</p>` +
+      (p.notes ? `<p><em>Your notes:</em> ${escH(p.notes)}</p>` : '') +
+      `<p><em>Play bill:</em></p><ul>${acts}</ul>` +
+      `<p><em>Hard limits generated:</em></p><ul>${lims}</ul>` +
+      `<p><em>Chronological guide:</em></p><ol>${steps}</ol>` +
+      `<p class="muted">Everything above is drafted with consent-first safeguards — review, tweak, then apply.</p>`;
+  };
+
+  $('#ai-generate-btn').addEventListener('click', () => {
+    if (aiMode === 'write' && !aiDaySel.value) { toast('⚠️ No open day to write into — mark a day ❌ Not finished first.', 3400); return; }
+    aiDraft = buildPlan();
+    renderPreview(aiDraft);
+    aiApplyBtn.disabled = false;
+    toast('🪄 Draft ready — press ' + (aiMode === 'create' ? '“Create day”' : '“Write into day”') + ' to apply it.');
+  });
+
+  /* ---------- HTML builders for a brand-new day page ---------- */
+  const dmyPill = () =>
+    `<span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span>`;
+  const ynPair  = (a, b) => `<label class="yn"><input type="checkbox"> ${a}</label><label class="yn"><input type="checkbox"> ${b}</label>`;
+
+  const dayPageHTML = p => {
+    const N = p.n, low = 'd' + N;
+    const acts = p.seqs.map(k => `<tr><td>${escH(SEQ_LIB[k].name)}</td><td>${escH(SEQ_LIB[k].toy)}</td></tr>`).join('');
+    const lims = p.seqs.map((k, i) => `<tr><td>5.${i + 1}</td><td>${escH(SEQ_LIB[k].hard)}</td></tr>`).join('');
+    const steps = p.seqs.map((k, i) =>
+      `<tr><td>T+${i * 10}</td><td>${escH(SEQ_LIB[k].step.join(' — '))}</td><td>${i % 2 ? 'Both' : 'Deep'}</td><td>Consent checks throughout</td></tr>`).join('');
+    return `
+    <section class="page" id="day${N}">
+      <div class="page-head">
+        <h2>Day ${N} · ${escH(p.dateStr)} — Private Bedroom / Play Space</h2>
+        <span class="day-badge">✨ AI-drafted · ♥ Consent first</span>
+      </div>
+      <div class="day-finished">
+        <label for="df-day${N}">📌 Day finished:</label>
+        <select class="day-finished-select" id="df-day${N}" data-day="day${N}">
+          <option value="no">❌ No</option>
+          <option value="yes">✅ Yes</option>
+        </select>
+        <button class="clear-day-btn" type="button" data-day="day${N}">🗑 Clear this day</button>
+      </div>
+      <p class="lock-note">🔒 This day is marked as finished — everything (signatures included) is sealed. Set “Day finished” to ❌ No to edit again.</p>
+
+      <p><strong>Between:</strong> Deep (the Dominant) &amp; Honey (the Submissive)</p>
+
+      <h3 class="section-title">Article 1 · Preamble &amp; Scope</h3>
+      <p>Wherefore both parties enter this agreement freely, willingly, and with full capacity to consent; this scene-specific accord is effective only on the dates stated herein, operating alongside — and superseding only where explicitly stated — the standing D/s agreement. Lovingly, cautiously, and without exception.</p>
+
+      <h3 class="section-title">Article 2 · Session Parameters</h3>
+      <table>
+        <tr><th>Clause</th><th>Specification</th></tr>
+        <tr><td>2.1 Date of scene</td><td>${dmyPill()}</td></tr>
+        <tr><td>2.2 Planned duration</td><td><input class="inline-input editable-field" style="width:100%" value="${escH(p.duration)}"></td></tr>
+        <tr><td>2.3 Venue</td><td>Private bedroom / play space. No third parties present.</td></tr>
+      </table>
+
+      <h3 class="section-title">Article 3 · Scheduled Activities (The Play Bill)</h3>
+      <table>
+        <tr><th>Category</th><th>Specific implement / toy</th></tr>
+        ${acts}
+      </table>
+      <p><strong>3.2 Protocol:</strong> ${escH(p.protocol)}.</p>
+
+      <h3 class="section-title">Article 4 · New Activities Clause</h3>
+      <div class="checklist-item"><input type="checkbox" id="${low}-new"><label for="${low}-new">4.1 Are any NEW activities being introduced today?</label></div>
+      <p>4.2 No unvetted activity shall be introduced during this session without a fresh, sober, out-of-scene negotiation.</p>
+
+      <h3 class="section-title">Article 5 · Hard Limits — Session Specific</h3>
+      <table>
+        <tr><th>Clause</th><th>Prohibition</th></tr>
+        ${lims}
+      </table>
+
+      <h3 class="section-title">Article 6 · Aftercare Provision</h3>
+      <table>
+        <tr><th>Aftercare deliverable</th><th>Duration</th></tr>
+        <tr><td>Warm blanket wrap (thermal regulation)</td><td>Immediate</td></tr>
+        <tr><td>Hydration — warm herbal tea or still water</td><td>Upon request</td></tr>
+        <tr><td>Gentle massage of bound / played areas</td><td>5 minutes per limb</td></tr>
+        <tr><td>Undistracted cuddling, verbal debrief, emotional reconnection</td><td>Minimum 20 minutes</td></tr>
+        <tr><td>Light snack — chocolate or fruit</td><td>Upon request</td></tr>
+      </table>
+
+      <h3 class="section-title">Article 7 · Special Requests &amp; Desires</h3>
+      <p class="quote"><strong>Submissive:</strong> <input class="inline-input editable-field" style="width:80%" placeholder="Type Honey's request…"></p>
+      <p class="quote"><strong>Dominant:</strong> <input class="inline-input editable-field" style="width:80%" placeholder="Type Deep's wish…"></p>
+      ${p.notes ? `<p class="quote"><strong>AI note carried over:</strong> “${escH(p.notes)}”</p>` : ''}
+
+      <h3 class="section-title">Article 8 · Safewords &amp; Withdrawal of Consent</h3>
+      <table>
+        <tr><th>Safeword</th><th>Meaning</th><th>Action required</th></tr>
+        <tr><td><em>“RED”</em></td><td>Full stop — withdrawal of consent.</td><td>Scene ends immediately; all restraints removed; aftercare begins.</td></tr>
+        <tr><td><em>“YELLOW”</em></td><td>Pause — check-in required.</td><td>Dominant pauses, checks in verbally, adjusts as needed.</td></tr>
+        <tr><td><em>“GREEN”</em></td><td>All good — continue.</td><td>Dominant proceeds.</td></tr>
+      </table>
+
+      <h3 class="section-title">Signatories</h3>
+      <div class="sig-cards sign-cards">
+        <div class="sig-card" data-area="signatories-day${N}" data-party="Honey">
+          <img class="sig-photo" src="img/signature-honey.png" alt="Honey's signature" loading="lazy">
+          <span class="sig-name">Honey · Submissive</span>
+          <span class="sig-status">Awaiting acceptance…</span>
+          <button class="accept-btn" data-area="signatories-day${N}" data-party="Honey" type="button">Accept as Honey</button>
+        </div>
+        <div class="sig-card" data-area="signatories-day${N}" data-party="Deep">
+          <img class="sig-photo" src="img/signature-deep.png" alt="Deep's signature" loading="lazy">
+          <span class="sig-name">Deep · Dominant</span>
+          <span class="sig-status">Awaiting acceptance…</span>
+          <button class="accept-btn" data-area="signatories-day${N}" data-party="Deep" type="button">Accept as Deep</button>
+        </div>
+      </div>
+      <div class="sign-row">
+        <div class="sign-field"><label>Submissive / Bottom — signature</label><span class="initials-slot" data-area="signatories-day${N}" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+        <div class="sign-field"><label>Printed name</label><input class="editable-field" placeholder="Type printed name"></div>
+        <div class="sign-field"><label>Date</label>${dmyPill()}</div>
+      </div>
+      <div class="sign-row">
+        <div class="sign-field"><label>Dominant / Top — signature</label><span class="initials-slot" data-area="signatories-day${N}" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+        <div class="sign-field"><label>Printed name</label><input class="editable-field" placeholder="Type printed name"></div>
+        <div class="sign-field"><label>Date</label>${dmyPill()}</div>
+      </div>
+
+      <h3 class="section-title">Pre-Scene Execution Affidavit — Day ${N}</h3>
+      <p class="exec-line"><strong>Date of execution:</strong> ${dmyPill()} <strong>Time:</strong> <span class="datetime-group time-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="HH"><i>:</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minutes"></span></p>
+      <div class="checklist-item"><input type="checkbox" id="${low}-a1"><label for="${low}-a1">We have BOTH read and understood this Scene Contract.</label></div>
+      <div class="checklist-item"><input type="checkbox" id="${low}-a2"><label for="${low}-a2">We have BOTH used the bathroom and are physically comfortable.</label></div>
+      <div class="checklist-item"><input type="checkbox" id="${low}-a3"><label for="${low}-a3">We have BOTH had water within the last 30 minutes.</label></div>
+      <div class="checklist-item"><input type="checkbox" id="${low}-a4"><label for="${low}-a4">All toys and props are clean, safe, and positioned within arm's reach.</label></div>
+      <div class="checklist-item"><input type="checkbox" id="${low}-a5"><label for="${low}-a5">We have agreed on the specific activities for today (Article 3).</label></div>
+      <div class="checklist-item"><input type="checkbox" id="${low}-a6"><label for="${low}-a6">We have BOTH said our safewords out loud to confirm we remember them.</label></div>
+
+      <h4>Scene Debrief — Day ${N} (after scene)</h4>
+      <div class="debrief-grid">
+        <div><label>Overall satisfaction</label> <input class="inline-input score" inputmode="numeric" maxlength="2" placeholder="x/10"></div>
+        <div><label>Aftercare effectiveness</label> <input class="inline-input score" inputmode="numeric" maxlength="2" placeholder="x/10"></div>
+        <div><label>Safeword used?</label> ${ynPair('Yes', 'No')} If yes, which? <input class="inline-input sw" placeholder="RED / YELLOW"></div>
+        <div><label>Adjustments for next time?</label> <input class="inline-input adj editable-field" placeholder="Type adjustments…"></div>
+        <div class="full"><label>Debrief notes</label> <textarea class="note-box" placeholder="Write any observations, incidents, or adjustments…"></textarea></div>
+      </div>
+      <div class="sign-row">
+        <div class="sign-field"><label>Deep's signature (debrief)</label><span class="initials-slot" data-area="debrief-day${N}" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+        <div class="sign-field"><label>Date</label>${dmyPill()}</div>
+      </div>
+      <div class="sign-row">
+        <div class="sign-field"><label>Honey's signature (debrief)</label><span class="initials-slot" data-area="debrief-day${N}" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+        <div class="sign-field"><label>Date</label>${dmyPill()}</div>
+      </div>
+    </section>`;
+  };
+
+  /* ---------- append a freshly created day ---------- */
+  const STATIC_IDS = new Set(['day1']);   // days shipped in index.html — never persisted
+  const persistDays = () => {
+    try {
+      const list = $$('.page')
+        .filter(p => dayNumber(p.id) && !STATIC_IDS.has(p.id))
+        .map(p => ({ id: p.id, html: p.outerHTML }));
+      localStorage.setItem(DAYS_KEY, JSON.stringify({ v: 1, list }));
+    } catch { toast('⚠️ Could not store the new day (browser storage full).', 3200); }
+  };
+  const addDayPage = p => {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = dayPageHTML(p).trim();
+    const section = tpl.content.firstElementChild;
+    const summary = $('#summary');
+    $('#main-contract').insertBefore(section, summary);
+    wireNewDay(section);
+    syncLockUI(section);
+    return section;
+  };
+
+  /* wire behaviours that static markup relies on (auto-grow, date pills, clear, lock) */
+  const wireNewDay = page => {
+    wireTextareas(page);
+    wirePills(page);
+    const clearBtn = $('.clear-day-btn', page);
+    if (clearBtn) clearBtn.addEventListener('click', () => clearDay(clearBtn));
+    const dfSel = $('.day-finished-select', page);
+    if (dfSel) dfSel.addEventListener('change', () => {
+      syncLockUI(page);
+      writeStore();
+      toast(dayLocked(page)
+        ? `🔒 ${page.id.toUpperCase()} marked finished — signatures & fields are sealed.`
+        : `🔓 ${page.id.toUpperCase()} is open again — every sign and field is editable.`);
+    });
+  };
+
+  /* ---------- "write into day": fill Article 3 table of an open day ---------- */
+  const writeIntoDay = p => {
+    const page = $('#' + p.target);
+    if (!page || dayLocked(page)) { toast('🔒 That day is marked finished — unlock it first.', 3200); return false; }
+    const bill = $$('table', page)[1];               // Article 3 · Play Bill
+    if (!bill) return false;
+    p.seqs.forEach(k => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escH(SEQ_LIB[k].name)}</td><td>${escH(SEQ_LIB[k].toy)}</td>`;
+      bill.appendChild(tr);
+    });
+    if (p.notes) {
+      const quotes = $$('.quote', page);
+      if (quotes.length) quotes[quotes.length - 1].insertAdjacentHTML('afterend',
+        `<p class="quote"><strong>AI note:</strong> “${escH(p.notes)}”</p>`);
+    }
+    return true;
+  };
+
+  aiApplyBtn.addEventListener('click', () => {
+    if (!aiDraft) return;
+    if (aiMode === 'create') {
+      const created = `✨ Day ${aiDraft.n} created by the AI — review it together before signing ♥`;
+      const section = addDayPage(aiDraft);
+      persistDays();
+      aiDraft = null;
+      aiApplyBtn.disabled = true;
+      closeAi();
+      save();
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      toast(created, 3400);
+    } else {
+      const targetName = String(aiDraft.target).toUpperCase();
+      if (writeIntoDay(aiDraft)) {
+        persistDays();                       // keep the written rows across reloads
+        toast(`✍️ AI wrote the chosen sequence into ${targetName}.`, 3200);
+        aiDraft = null;
+        aiApplyBtn.disabled = true;
+        closeAi();
+        save();
+      }
+    }
   });
 
   /* ---------- textareas: grow with content ---------- */
   const autoGrow = ta => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
-  $$('textarea').forEach(ta => ta.addEventListener('input', () => autoGrow(ta)));
   const autoGrowAll = () => $$('textarea').forEach(autoGrow);
+  const wireTextareas = root => $$('textarea', root).forEach(ta => ta.addEventListener('input', () => autoGrow(ta)));
 
   /* ---------- date/time pills: auto-advance + digits only ---------- */
-  $$('.datetime-group').forEach(group => {
+  const wirePills = root => $$('.datetime-group', root).forEach(group => {
     const inputs = $$('input', group);
     inputs.forEach((inp, i) => {
       inp.addEventListener('input', () => {
@@ -304,6 +754,9 @@
       });
     });
   });
+  wireTextareas(document);
+  wirePills(document);
+  $$('.datetime-group').forEach(() => {});   // keep grouping explicit for readability
 
   /* ============================================================
      EMAIL EXPORT

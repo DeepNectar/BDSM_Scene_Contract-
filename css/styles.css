@@ -137,14 +137,16 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 input[type=checkbox]{width:16px;height:16px;accent-color:var(--wine);cursor:pointer;vertical-align:-2px}
 select{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background:#fffdf9}
 
-/* date/time pills — roomy enough for full values, never clipped */
+/* date/time pills — ONE consistent size everywhere (DD / MM / YYYY) … */
 .datetime-group{
   display:inline-flex;align-items:center;gap:3px;white-space:nowrap;
   background:rgba(255,250,242,.8);border:1px solid var(--line);border-radius:999px;padding:3px 12px;
 }
-.datetime-group input{width:3.2ch;text-align:center;border-bottom:1px dashed var(--line);padding:3px 1px;font-size:14px}
-.datetime-group input[maxlength="4"]{width:5.4ch}
+.datetime-group input{width:3.4ch;text-align:center;border-bottom:1px dashed var(--line);padding:3px 1px;font-size:14px}
+.datetime-group input[maxlength="4"]{width:5.6ch}
 .datetime-group i{font-style:normal;color:var(--accent);padding:0 2px}
+/* … and a slightly tighter variant for HH:MM time pills only */
+.time-group input{width:3ch}
 .exec-line,.witness-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
 .witness-line .initials-slot{min-width:200px}
 .witness-line .editable-field{width:100%}
@@ -176,6 +178,23 @@ select{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background
 .sign-cards{margin:6px 0 16px}
 .sig-card .accept-btn{margin-top:8px;width:100%}
 .sig-card .sig-status{margin-bottom:2px}
+
+/* locked day (marked finished) — inputs stay visible, only interaction is blocked */
+.page.day-locked input:not([type="checkbox"]),
+.page.day-locked textarea,
+.page.day-locked select,
+.page.day-locked .accept-btn,
+.page.day-locked .clear-day-btn{pointer-events:none;user-select:none}
+.page.day-locked input[type="checkbox"]{cursor:not-allowed}
+.page.day-locked input,.page.day-locked textarea,.page.day-locked select{opacity:.6;background:rgba(220,205,189,.12)}
+/* the status control itself must remain usable so the day can be unlocked again */
+.day-finished .day-finished-select{pointer-events:auto!important;user-select:auto;opacity:1!important;background:#fffdf9}
+.lock-note{
+  display:none;align-items:center;gap:6px;margin:0 0 12px;padding:6px 12px;
+  font-size:13px;color:var(--no);background:rgba(140,59,59,.07);
+  border:1px dashed rgba(140,59,59,.45);border-radius:8px;
+}
+.page.day-locked .lock-note{display:flex}
 
 /* ---------- photo signatures on accept ---------- */
 .initials-slot{position:relative;display:inline-block;min-height:34px}
@@ -310,10 +329,47 @@ select{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background
 }
 .toast.show{opacity:1;transform:translate(-50%,0)}
 
+/* ---------- AI assistant modal ---------- */
+.ai-overlay{
+  position:fixed;inset:0;z-index:61;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(14,8,8,.75);backdrop-filter:blur(6px);
+}
+.ai-overlay.active{display:flex}
+.ai-card{
+  width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column;
+  background:var(--paper);border:1px solid #cbb69f;border-radius:18px;box-shadow:var(--shadow);overflow:hidden;
+}
+.ai-header{display:flex;align-items:center;justify-content:space-between;padding:16px 22px;border-bottom:1px solid var(--line)}
+.ai-header h3{font-family:var(--serif);font-weight:600;font-size:20px}
+.ai-close{background:none;border:none;font-size:26px;line-height:1;color:var(--ink-soft);cursor:pointer}
+.ai-close:hover{color:var(--wine)}
+.ai-body{flex:1;overflow:auto;padding:16px 22px 6px;display:flex;flex-direction:column;gap:14px}
+.ai-block label{display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px}
+.ai-field{width:100%;font:inherit;font-size:14px;background:#fffdf9;border:1px solid var(--line);border-radius:10px;padding:8px 10px;color:var(--ink)}
+.ai-field:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(163,112,92,.15)}
+textarea.ai-field{resize:vertical;min-height:64px}
+.ai-chips{display:flex;flex-wrap:wrap;gap:8px}
+.ai-chip{
+  font:inherit;font-size:13px;padding:6px 14px;border-radius:999px;cursor:pointer;
+  border:1px solid var(--line);background:#fffdf9;color:var(--ink-soft);transition:.2s;
+}
+.ai-chip:hover{border-color:var(--accent);color:var(--ink)}
+.ai-chip.active{background:linear-gradient(120deg,var(--wine),var(--accent));color:#fff;border-color:transparent}
+.ai-preview{
+  background:#fffdf9;border:1px dashed var(--line);border-radius:10px;padding:12px 14px;
+  font-size:13.5px;max-height:260px;overflow:auto;white-space:normal
+}
+.ai-preview ul,.ai-preview ol{margin-left:20px}
+.ai-preview li{margin:3px 0}
+.ai-preview .muted{color:var(--ink-soft);font-style:italic}
+.ai-footer{display:flex;gap:10px;justify-content:flex-end;padding:14px 22px;border-top:1px solid var(--line);flex-wrap:wrap}
+.ai-footer .btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+
 /* ---------- responsive ---------- */
 @media (max-width:640px){
   .datetime-group{padding:2px 6px}
-  .datetime-group input{width:1.9ch;font-size:12px}
+  .datetime-group input{width:2.4ch;font-size:12px}
+  .datetime-group input[maxlength="4"]{width:4.4ch}
   .inline-input{width:110px}
   .inline-input.adj{width:140px}
   .debrief-grid{grid-template-columns:1fr}
@@ -334,7 +390,7 @@ select{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background
 /* ---------- print ---------- */
 @media print{
   body{background:#fff;padding:0}
-  .particle,.login-overlay,.modal-overlay,.btn-group,.toast,.clear-day-btn,.day-finished,.accept-btn{display:none!important}
+  .particle,.login-overlay,.modal-overlay,.ai-overlay,.btn-group,.toast,.clear-day-btn,.day-finished,.accept-btn,.lock-note{display:none!important}
   .contract-container{max-width:none;box-shadow:none;border:none;border-radius:0;padding:0}
   .contract-container::after{display:none}
   .page{border:1px solid #bbb;break-inside:avoid-page;box-shadow:none;background:#fff;margin-bottom:14px}
