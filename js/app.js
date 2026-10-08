@@ -43,8 +43,58 @@
      APP_VERSION is the single source of truth: it drives the badge shown on
      the home screen (header) so the version always stays in sync. When you
      bump a release here, also prepend one WHATS_NEW line describing it. */
-  const APP_VERSION = 'v3.3 DH';
+  /* ---------- storage keys (single source of truth) ----------
+     v3.4 DH: STORE_KEY was referenced but never declared, which threw a
+     ReferenceError on every save/load and made the whole app look dead. */
+  var STORE_KEY = 'dhContract.fields.v1';   // var → readable everywhere in this IIFE & the SW
+  var PW_KEY    = 'dhContract.pw.v1';        // install-prompt bookkeeping (device-local only)
+
+  /* ---------- device helpers with safe fallbacks ----------
+     js/device.js defines window.isPhone / downloadBlob / DHDevice, but it is not
+     loaded by index.html (and test harnesses skip it). These shims keep every
+     feature working instead of crashing with "isPhone is not defined". */
+  const _detectPhone = () => {
+    try {
+      const ua = navigator.userAgent || '';
+      const mobileUA = /Android|iP(hone|ad|od)|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(ua);
+      const touchy = (navigator.maxTouchPoints || 0) > 0;
+      const w = Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0);
+      return mobileUA || (w <= 600 && touchy);
+    } catch { return false; }
+  };
+  const isPhone = () => {
+    if (typeof window.isPhone === 'function') { try { return !!window.isPhone(); } catch { /* fall through */ } }
+    return _detectPhone();
+  };
+  const downloadBlob = (blob, filename) => {
+    if (typeof window.downloadBlob === 'function') return window.downloadBlob(blob, filename);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.rel = 'noopener'; a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { a.remove(); try { URL.revokeObjectURL(url); } catch { /* ignore */ } }, 800);
+  };
+
+  /* ---------- collapse state (▾/▸ per day) ---------- */
+  const collapsedOverride = new Map();               // manual ▾/▸ choice per page id
+  const isCollapsed = page => {
+    const o = collapsedOverride.get(page.id);
+    if (o !== undefined) return o;
+    return dayLocked(page);                          // finished days collapse by default
+  };
+  const applyCollapse = page => {
+    page.classList.toggle('collapsed', isCollapsed(page));
+    const btn = $('.collapse-toggle', page);
+    if (btn) {
+      btn.textContent = isCollapsed(page) ? '▸ Expand' : '▾ Collapse';
+      btn.title = isCollapsed(page) ? 'Show this day’s contents' : 'Hide this day’s contents';
+    }
+  };
+
+  const APP_VERSION = 'v3.4 DH';
   const WHATS_NEW = [
+    '🩹 v3.4: Fixed the startup crash (“Cannot access ‘ensureSignAccepts’ before initialization”) — the site now opens clean on every device, signatures restore instantly, and Save / Print-PDF / delete-day / collapse toggles all work again. Cloud sync (Supabase) is now the single source of truth on every reload.',
     '🆕 v3.3: ALL existing days wiped clean as you asked — the contract starts empty. Add days back anytime with “➕ Add blank day”, or let “✨ AI write a day” draft one for you. Every single day page carries a red “✖ Delete day” button that permanently removes it from the contract AND the cloud.',
     '💘 The AI writer now truly drafts the WHOLE day from your selections: pick COUPLE TYPE (romantic lovers / spicy & naughty / vanilla-sweet / brat tamer / service-devotion / new D/s / long-distance / experienced kinksters), MOOD, INTENSITY, LEAD, VENUE and any BDSM category+subcategory chips — every chip changes the preamble tone, the play bill, protocols, hard limits, aftercare and the romantic narrative woven through the day.',
     '🔧 v3.2: Delete-day button now visible on EVERY day (Day 1 included) and fully working; “✉ Email data” & “✨ AI write a day” hardened with an error-toast watchdog + no-JS fallback so buttons can never appear dead.',
@@ -155,21 +205,24 @@
     if (t) { t.textContent = '☁️ Cloud offline — set js/supabase-config.js'; t.title = 'Not saved to cloud; entries live in this session only.'; }
   };
 
+  /* ---------- save: cloud first (source of truth), local copy as a
+     per-device safety net so nothing is ever lost offline ---------- */
   const save = (quiet) => {
+    let ok = true;
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(collectState()));
-      if (!quiet) toast('💾 Saved — our contract is kept safe on this device.');
-    } catch {
-      if (!quiet) toast('⚠️ Browser storage is full — clear a finished AI day or export by email.', 3600);
+    } catch { ok = false; }
+    writeStore();                                  // push the newest entries to Supabase too
+    if (!quiet) {
+      if (ok) toast('💾 Saved — in the cloud and safe on this device.');
+      else toast('⚠️ Browser storage is full — saved to the cloud only. Export by email to free space.', 3600);
     }
   };
 
   /* ---------- visibility helpers (used by autosave AND the app lifecycle) ---------- */
   const pageVisible = () => document.visibilityState === 'visible';
 
-  const loadSaved = () => {
-    let data;
-    try { data = JSON.parse(localStorage.getItem(STORE_KEY)); } catch { return; }
+  const applyFieldData = data => {
     if (!data) return;
     $$('#main-contract input, #main-contract textarea, #main-contract select').forEach(el => {
       const slot = el.closest('.initials-slot');
@@ -184,25 +237,43 @@
     autoGrowAll();
   };
 
+  /* load values: cloud mirror wins, local copy fills any gaps */
+  const loadSaved = (data) => {
+    let merged = {};
+    try { Object.assign(merged, JSON.parse(localStorage.getItem(STORE_KEY)) || {}); } catch { /* ignore */ }
+    if (window.CloudStore && typeof window.CloudStore.fields === 'function') {
+      try { Object.assign(merged, window.CloudStore.fields() || {}); } catch { /* ignore */ }
+    }
+    if (data && typeof data === 'object') Object.assign(merged, data);
+    applyFieldData(merged);
+  };
+
   /* restore AI-created day pages (innerHTML kept verbatim → DOM paths stay stable),
-     then replay saved values on top of them */
+     then replay saved values on top of them.
+     Source order: explicit arg (cloud list) → in-memory cloud mirror → local copy. */
   var DAYS_KEY = 'dhContract.days.v1';   // var (not const) → also readable from the service worker
-  const restoreDays = () => {
-    let raw;
-    try { raw = JSON.parse(localStorage.getItem(DAYS_KEY)); } catch { return; }
-    if (!raw || !raw.list || !raw.list.length) return;
+  const restoreDays = (listArg) => {
+    let list = Array.isArray(listArg) ? listArg : null;
+    if (!list && window.CloudStore && typeof window.CloudStore.days === 'function') {
+      try { const d = window.CloudStore.days(); if (Array.isArray(d) && d.length) list = d; } catch { /* ignore */ }
+    }
+    if (!list) {
+      try { const raw = JSON.parse(localStorage.getItem(DAYS_KEY)); if (raw && Array.isArray(raw.list)) list = raw.list; } catch { /* ignore */ }
+    }
+    if (!list || !list.length) return;
     const summary = $('#summary');
     if (!summary) return;
     list.forEach(d => {
+      if (!d || !d.id || !d.html) return;
       if ($('#' + d.id)) return;                       // already present
       const tpl = document.createElement('template');
-      tpl.innerHTML = d.html.trim();
+      tpl.innerHTML = String(d.html).trim();
       const section = tpl.content.firstElementChild;
       if (!section || section.tagName !== 'SECTION') return;
       $('#main-contract').insertBefore(section, summary);
       if (typeof wireNewDay === 'function') wireNewDay(section);
     });
-    loadSaved(window.CloudStore.fields());             // replay field values into restored days
+    loadSaved();                                       // replay field values into restored days
     syncAllLocks();
   };
 
@@ -541,6 +612,51 @@
      (app.js is loaded with `defer`, so this also runs after js/device.js and
      js/pdf.js have defined their globals.) */
   const bootContract = () => { restoreDays(); loadSaved(); applySignatures(); };
+
+  /* ---------- v3.4 DH: hoisted helpers (declared here, used above) ----------
+     These two were previously declared further down the file as `const`s while
+     applySignatures()/addDayPage() referenced them during boot — a classic TDZ
+     crash ("Cannot access 'ensureSignAccepts' before initialization"). They are
+     now defined BEFORE any call site can run. */
+
+  /* guarantee an Accept button wherever a sign is required: any .sign-row
+     containing an initials-slot without its own accept button gets a compact
+     inline "Accept / Signed ✓ · Undo" control wired into the same area. */
+  function ensureSignAccepts(root = document) {
+    normaliseAreas(root);   // v1.9 DH: every slot/button gets a valid data-area first
+    /* accept buttons that live OUTSIDE any .sign-row (e.g. the witness line) */
+    $$('.accept-btn[data-party]:not([data-area])', root).forEach(b => { b.dataset.area = 'seal'; });
+    $$('.sign-row', root).forEach(row => {
+      $$('.initials-slot[data-party][data-area]', row).forEach(slot => {
+        const party = slot.dataset.party;
+        const area  = slot.dataset.area;
+        if ($(`.accept-btn[data-party="${party}"][data-area="${area}"]`, row)) return;
+        const label = slot.closest('.sign-field')?.querySelector('label')?.textContent || 'Signature';
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'accept-btn accept-inline';
+        btn.dataset.party = party;
+        btn.dataset.area  = area;
+        btn.title = `Accept & sign as ${party} (${label.trim()}) — undo available any time`;
+        row.appendChild(btn);
+        syncAreaUI(party, area, !!(readAccepts()[area] || {})[party]);
+      });
+    });
+  }
+
+  /* append a freshly created day page to the contract */
+  function addDayPage(p) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = dayPageHTML(p).trim();
+    const section = tpl.content.firstElementChild;
+    const summary = $('#summary');
+    $('#main-contract').insertBefore(section, summary);
+    wireNewDay(section);
+    ensureSignAccepts(section);   // v1.9 DH: an Accept option beside every signature row
+    syncLockUI(section);
+    return section;
+  }
+
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootContract);
   else bootContract();
 
@@ -1375,42 +1491,10 @@
     window.CloudStore.saveDays(list)
       .then(ok => { if (!ok && !window.CloudStore.ready) toast('⚠️ Cloud not configured — this day lives in the page only.', 3200); });
   };
-  const addDayPage = p => {
-    const tpl = document.createElement('template');
-    tpl.innerHTML = dayPageHTML(p).trim();
-    const section = tpl.content.firstElementChild;
-    const summary = $('#summary');
-    $('#main-contract').insertBefore(section, summary);
-    wireNewDay(section);
-    ensureSignAccepts(section);   // v1.9 DH: an Accept option beside every signature row
-    syncLockUI(section);
-    return section;
-  };
-
-  /* ---------- v1.9 DH: guarantee an Accept button wherever a sign is required ----------
-     Any .sign-row containing an initials-slot without its own accept button gets a
-     compact inline "Accept / Signed ✓ · Undo" control wired into the same area. */
-  const ensureSignAccepts = (root = document) => {
-    normaliseAreas(root);   // v1.9 DH: every slot/button gets a valid data-area first
-    /* accept buttons that live OUTSIDE any .sign-row (e.g. the witness line) */
-    $$('.accept-btn[data-party]:not([data-area])', root).forEach(b => { b.dataset.area = 'seal'; });
-    $$('.sign-row', root).forEach(row => {
-      $$('.initials-slot[data-party][data-area]', row).forEach(slot => {
-        const party = slot.dataset.party;
-        const area  = slot.dataset.area;
-        if ($(`.accept-btn[data-party="${party}"][data-area="${area}"]`, row)) return;
-        const label = slot.closest('.sign-field')?.querySelector('label')?.textContent || 'Signature';
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'accept-btn accept-inline';
-        btn.dataset.party = party;
-        btn.dataset.area  = area;
-        btn.title = `Accept & sign as ${party} (${label.trim()}) — undo available any time`;
-        row.appendChild(btn);
-        syncAreaUI(party, area, !!(readAccepts()[area] || {})[party]);
-      });
-    });
-  };
+  /* NOTE: addDayPage() and ensureSignAccepts() were MOVED UP with bootContract()
+     (see the hoisted-helpers block near the signature code) so they are fully
+     initialised before applySignatures()/boot run — this fixes the TDZ crash
+     "Cannot access 'ensureSignAccepts' before initialization". */
 
   /* wire behaviours that static markup relies on (auto-grow, date pills, clear, lock) */
   const wireNewDay = page => {
@@ -2048,7 +2132,6 @@ ${bodyHtml}
      service workers (file:// preview, old WebView) the contract
      still works exactly as before.
      ============================================================ */
-  const PW_KEY = 'dhContract.pw.v1';
   const pwState = (() => {
     try { return JSON.parse(localStorage.getItem(PW_KEY)) || {}; } catch { return {}; }
   })();
