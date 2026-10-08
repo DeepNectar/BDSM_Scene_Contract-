@@ -26,6 +26,25 @@
     toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
   };
 
+  /* ---------- v2.4 DH — app version + "What's new in this version" ----------
+     APP_VERSION is the single source of truth: it drives the badge shown on
+     the home screen (header) so the version always stays in sync. When you
+     bump a release here, also prepend one WHATS_NEW line describing it. */
+  const APP_VERSION = 'v2.5 DH';
+  const WHATS_NEW = [
+    '♥ HTML email images are now COMPRESSED real copies embedded as small base64 data URIs — sign, stamp & logo preview reliably in every viewer (large/uncompressed embeds were being dropped).',
+    'Email keeps only the main, important things: header banner, Contract Overview (key fields only), Signatures and each finished day’s entries — long rule lists and other bulk removed.',
+    'Every image stays clickable: opens the original full-resolution file on Google Drive.',
+    'Previous releases: finished days auto-collapse (▾/▸ toggle), bigger header logo, version badge + What’s new toast.'
+  ];
+  const versionBadge = $('#version-badge');
+  if (versionBadge) {
+    versionBadge.textContent = APP_VERSION + ' ♥';   // keep header text in sync automatically
+    versionBadge.addEventListener('click', () => {
+      toast('✨ What\'s new in ' + APP_VERSION + ':\n• ' + WHATS_NEW.join('\n• '), 12000);
+    });
+  }
+
   /* ---------- floating hearts (transform/opacity only → cheap) ---------- */
   const particleHost = document.createDocumentFragment();
   const SYMS = ['♥', '♡', '✦', '❥'];
@@ -202,25 +221,46 @@
   const viewUrl = k => `https://drive.google.com/file/d/${IMG_IDS[k]}/view?usp=sharing`;
 
   const IMG_FILES = { Deep: 'img/signature-deep.png', Honey: 'img/signature-honey.png', stamp: 'img/love-stamp.png', logo: 'img/soulmate-logo.png' };
-  let DATA_URIS = {};                       // key -> base64 data URI (filled async before export)
-  const toDataUri = b64 => `data:image/png;base64,${b64}`;
+  let DATA_URIS = {};                       // key -> compressed base64 data URI (filled async before export)
+  /* v2.5 DH — ROOT CAUSE of "images not previewing": the raw PNGs are 115–575 KB,
+     so every exported <img src> carried a huge base64 string (multi-MB HTML).
+     Many HTML previewers/email clients silently DROP oversized data URIs → blank.
+     Fix: downscale each image on a canvas and re-encode as compact JPEG (~10–30 KB),
+     which every viewer renders. If compression fails we still fall back to the
+     plain lh3 Drive link + clickable /view anchor + SVG onerror mark. */
+  const EMBED_SIZES = { Deep: [360, 120], Honey: [360, 120], stamp: [280, 280], logo: [280, 240] };
+  const compressImg = (key, path) => new Promise(resolve => {
+    fetch(path).then(r => (r && r.ok) ? r.blob() : null).then(blob => {
+      if (!blob) return resolve('');
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const [w, h] = EMBED_SIZES[key] || [320, 200];
+          const cv = document.createElement('canvas');
+          cv.width = w; cv.height = h;
+          const ctx = cv.getContext('2d');
+          ctx.fillStyle = '#ffffff';               // white matte so transparent PNGs stay crisp
+          ctx.fillRect(0, 0, w, h);
+          const ar = Math.min(w / img.width, h / img.height);
+          const dw = Math.round(img.width * ar), dh = Math.round(img.height * ar);
+          ctx.drawImage(img, Math.round((w - dw) / 2), Math.round((h - dh) / 2), dw, dh);
+          resolve(cv.toDataURL('image/jpeg', 0.85));   // small, universally rendered
+        } catch (_) { resolve(''); }
+        finally { URL.revokeObjectURL(url); }
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(''); };
+      img.src = url;
+    }).catch(() => resolve(''));
+  });
   const loadImageUris = () => Promise.all(Object.entries(IMG_FILES).map(([k, p]) =>
-    fetch(p).then(r => r.ok ? r.blob() : null).then(b => b && new Promise(res => {
-      const fr = new FileReader();
-      fr.onload = () => { DATA_URIS[k] = String(fr.result); res(); }
-      try { fr.readAsDataURL(b); } catch (_) { res(); }
-    })).catch(() => {})));
-  /* srcset keeps the Drive https link as an alternative source; the primary src
-     is always the embedded base64 copy (see imgTag) so previews never go blank. */
-  const imgSrcs = k => DATA_URIS[k]
-    ? { src: DATA_URIS[k], srcset: `${ghUrl(k, 480, 160)} 1x` }
-    : { src: ghUrl(k, 480, 160), srcset: '' };
+    compressImg(k, p).then(uri => { if (uri) DATA_URIS[k] = uri; })));
 
   /* v2.3 DH — inline SVG fallbacks drawn directly into the HTML so the sign and
      brand marks are ALWAYS visible in any previewer, even ones that block all
      remote images. The <img> still tries the Drive https link first; if it
      fails to load, onerror swaps in the matching SVG placeholder. */
-  const escA = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const escA = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/'/g,'&#39;');
   const wrapSvg = inner => 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="160" viewBox="0 0 480 160">` +
     `<rect width="480" height="160" rx="14" fill="#fdf6f0" stroke="#c98a97" stroke-width="3"/>${inner}</svg>`);
@@ -1134,15 +1174,12 @@
       if (word) words.push(word);
     });
     if (words.length) add('Safeword' + (words.length > 1 ? 's' : ''), words.join(' / '));
-    /* consent declaration */
+    /* v2.5 DH — MAIN THINGS ONLY: consent declaration kept (core), but the long
+       Always-do / Never-do rule lists are intentionally EXCLUDED from the email —
+       they live in the contract itself; the export stays short and readable. */
     const consent = [...$$('.quote', doc)].map(q => q.textContent.trim())
       .find(t => /consent to this scene/i.test(t));
     if (consent) add('Consent declaration', consent.replace(/[“”]/g, ''));
-    /* summary do / don't lists */
-    const dos   = $$('.do-card li').map(li => li.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
-    const donts = $$('.dont-card li').map(li => li.textContent.replace(/\s+/g, ' ').trim()).filter(Boolean);
-    if (dos.length)   add('Always do', dos.join(' | '));
-    if (donts.length) add('Never do', donts.join(' | '));
     return rows;
   };
   const uriCache = {};
@@ -1189,36 +1226,27 @@
        PNG (previews in EVERY viewer, even offline); lh3 Drive link kept as a
        srcset alternative; onerror falls back to the inline SVG mark. */
     const imgTag = (k, w, h, alt, style) => {
-      const s = imgSrcs(k);
-      const main = DATA_URIS[k] || s.src;              // prefer the guaranteed data URI
-      const alt2 = s.srcset ? ` srcset="${escA(s.srcset)}"` : '';
-      return `<img src="${escA(main)}"${alt2} alt="${esc(alt)}" width="${w}" onerror="this.onerror=null;this.src='${SIG_SVG[k]}'" style="${style}">`;
+      /* v2.5 DH — src = COMPRESSED embedded copy (small → never dropped by previewers);
+         if even that fails to decode, onerror swaps to the public Drive https link,
+         and a second failure draws the inline SVG mark. No srcset → keeps the HTML lean. */
+      const main = DATA_URIS[k] || ghUrl(k, w, h);     // compressed embed, else plain Drive link
+      return `<img src="${escA(main)}" alt="${esc(alt)}" width="${w}" onerror="this.onerror=null;this.src='${ghUrl(k, w, h)}';this.onerror=function(){this.onerror=null;this.src='${SIG_SVG[k]}'}" style="${style}">`;
     };
-    AREAS.forEach(area => {
-      const byParty = accepts[area] || {};
-      Object.keys(SIG_CONFIG).forEach(party => {
-        const acc = byParty[party];
-        const tag = `${nameOf(area)} — ${party}`;
-        if (acc) {
-          sigPlain += `  ${tag}: signed (${new Date(acc.ts).toLocaleString()})\n`;
-          sigHtml += `<tr><td style="padding:10px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong>${esc(tag)}:</strong>&nbsp;accepted &amp; signed<br>` +
-                     `<a href="${partyView(party)}" target="_blank" style="text-decoration:none">` +
-                     imgTag(party, 200, 56, `${party} signature`, 'height:56px;width:auto;max-width:220px;display:inline-block;vertical-align:middle;border:0') +
-                     `<br><span style="font-family:Georgia,serif;font-style:italic;font-size:20px;color:#7b2d3b">&#10022; ${esc(party)} &#9829;</span>` +
-                     `</a><br><a href="${partyView(party)}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">View ${esc(party)}&apos;s signature on Google Drive</a></td></tr>`;
-        } else {
-          /* v2.4 DH — even when the in-app Accept hasn't been recorded for this
-             area, ALWAYS show the real sign image (embedded base64 + Drive link)
-             so nothing looks blank in the HTML email preview. */
-          sigPlain += `  ${tag}: (awaiting in-app accept — sign image linked below)\n`;
-          sigHtml += `<tr><td style="padding:10px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong>${esc(tag)}:</strong>&nbsp;` +
-                     `<a href="${partyView(party)}" target="_blank" style="text-decoration:none">` +
-                     imgTag(party, 200, 56, `${party} signature`, 'height:56px;width:auto;max-width:220px;display:inline-block;vertical-align:middle;border:0') +
-                     `<br><span style="font-family:Georgia,serif;font-style:italic;font-size:20px;color:#7b2d3b">&#10022; ${esc(party)} &#9829;</span>` +
-                     `</a>&nbsp;<em>(accept pending)</em>&nbsp;&mdash;&nbsp;` +
-                     `<a href="${partyView(party)}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">sign image on Google Drive</a></td></tr>`;
-        }
-      });
+    /* v2.5 DH — MAIN THINGS ONLY: one clean row per person (not per area), with the
+       real sign image, an accepted/pending note and a single clickable Drive link. */
+    Object.keys(SIG_CONFIG).forEach(party => {
+      const acceptedAreas = AREAS.filter(a => (accepts[a] || {})[party]);
+      const status = acceptedAreas.length === AREAS.length ? 'Accepted &amp; signed'
+                   : acceptedAreas.length ? `Accepted: ${acceptedAreas.map(nameOf).join(', ')}`
+                   : 'Awaiting in-app accept';
+      sigPlain += `  ${party}: ${status.replace(/&amp;/g, '&')} — ${partyView(party)}\n`;
+      sigHtml += `<tr>` +
+        `<td style="padding:12px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c;width:46%"><strong style="color:#7b2d3b">${esc(party)}</strong><br><span style="font-size:12px;color:#5b4437">${status}</span><br>` +
+        `<a href="${partyView(party)}" target="_blank" style="color:#a04b5c;font-size:12px;text-decoration:underline">View full signature on Google Drive</a></td>` +
+        `<td align="right" style="padding:12px 0;border-bottom:1px solid #f3e6da">` +
+        `<a href="${partyView(party)}" target="_blank" style="text-decoration:none">` +
+        imgTag(party, 200, 56, `${party} signature`, 'height:56px;width:auto;max-width:220px;display:inline-block;vertical-align:middle;border:0') +
+        `</a></td></tr>`;
     });
     sigHtml = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse">${sigHtml}</table>`;
 

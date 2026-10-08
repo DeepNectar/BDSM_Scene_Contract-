@@ -1,2 +1,5 @@
-# Compressed files
-*.zip
+# Dependencies
+node_modules/
+
+# Temp files
+*.tmp
