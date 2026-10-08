@@ -26,6 +26,25 @@
     toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
   };
 
+  /* ---------- v2.4 DH — app version + "What's new in this version" ----------
+     APP_VERSION is the single source of truth: it drives the badge shown on
+     the home screen (header) so the version always stays in sync. When you
+     bump a release here, also prepend one WHATS_NEW line describing it. */
+  const APP_VERSION = 'v2.4 DH';
+  const WHATS_NEW = [
+    '♥ HTML email now embeds the REAL sign, stamp & logo as base64 copies — they preview everywhere, even offline or when Drive links are blocked.',
+    'Signatures show in the email even before in-app Accept ("accept pending"), plus clickable Google Drive links for every image.',
+    'Finished days auto-collapse (▾ Collapse / ▸ Expand toggle on every day); collapsed days still print/export in full.',
+    'Bigger Soulmate Code logo & wordmark in the header; professional & romantic HTML email with a Contract Overview of all important data.'
+  ];
+  const versionBadge = $('#version-badge');
+  if (versionBadge) {
+    versionBadge.textContent = APP_VERSION + ' ♥';   // keep header text in sync automatically
+    versionBadge.addEventListener('click', () => {
+      toast('✨ What\'s new in ' + APP_VERSION + ':\n• ' + WHATS_NEW.join('\n• '), 12000);
+    });
+  }
+
   /* ---------- floating hearts (transform/opacity only → cheap) ---------- */
   const particleHost = document.createDocumentFragment();
   const SYMS = ['♥', '♡', '✦', '❥'];
