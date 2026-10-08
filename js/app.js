@@ -16,6 +16,19 @@
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+  /* v3.2 DH — mark the app as live so the inline no-JS fallback in index.html
+     never fires; real handlers below own every button. */
+  window.__dhReady = true;
+
+  /* any error that escapes our code becomes a visible toast instead of a
+     silently dead button (this is how "Email data"/"Delete day" broke before) */
+  window.addEventListener('error', ev => {
+    try {
+      const t = document.getElementById('toast');
+      if (t) { t.textContent = '⚠️ ' + (ev.message || 'Script error') + ' — please refresh.'; t.classList.add('show'); }
+    } catch (_) {}
+  });
+
   /* ---------- toast ---------- */
   const toastEl = $('#toast');
   let toastTimer;
@@ -30,10 +43,11 @@
      APP_VERSION is the single source of truth: it drives the badge shown on
      the home screen (header) so the version always stays in sync. When you
      bump a release here, also prepend one WHATS_NEW line describing it. */
-  const APP_VERSION = 'v3.0 DH';
+  const APP_VERSION = 'v3.2 DH';
   const WHATS_NEW = [
+    '🔧 v3.2: Delete-day button now visible on EVERY day (Day 1 included) and fully working; “✉ Email data” & “✨ AI write a day” hardened with an error-toast watchdog + no-JS fallback so buttons can never appear dead.',
     '✨ AI day-writer upgraded: pick MOOD (romantic / spicy / playful / intense / tender / slow burn), INTENSITY, WHO LEADS, VENUE, aftercare focus, special requests per partner, extra limits — plus a huge BDSM category & subcategory menu (sensory, bondage & rope, impact, sensation, power exchange, protocol, edging & denial, worship, roleplay, fetish, ritual, scene extras, aftercare & drop care) with safety rules baked into every choice.',
-    '🗑 Delete a day manually: every day page now has a “✖ Delete day” button (the permanent Day 1 is protected). Deleted days vanish from the contract AND from the cloud sync.',
+    '🗑 Delete a day manually: EVERY day page (Day 1 included) now shows a red “✖ Delete day” button next to “Clear this day”. Confirm once and the day vanishes from the contract AND from the cloud sync — it stays gone after reload.',
     '💌 HTML email completely restyled: romantic gradient banner, gold-rose dividers, labelled data cards, zebra-striped tables with wine headers, ✓ confirmed / ○ pending chips, RED-YELLOW-GREEN safeword pills, numbered day badges, signature panels and an elegant framed love-stamp footer — formatted data, not plain label dumps.',
     '♥ HTML email still carries EVERY important field from the Day section and the Pre-Scene Execution Affidavit: execution date & time, all checklist items, safeword verification, non-verbal signal, consent declarations, full toy inventory, debrief scores/notes/safeword-used, signature dates — plus Contract Overview and both signatures.',
     'Sign, stamp & logo preview everywhere — compressed base64 embeds with pixel-link and SVG fallbacks; no “View on Google Drive” text or links anywhere.'
@@ -519,15 +533,12 @@
      deleted. Deleting removes the page from the DOM, drops its per-day
      signature areas, prunes its saved field values and re-syncs the cloud day
      list so it stays gone on every device. */
-  const STATIC_DAY_IDS = new Set(['day1']);
+  /* v3.2 DH — per the user's request, EVERY day (including Day 1) can be deleted
+     manually after confirmation; no day is protected any more. */
   const deleteDay = btn => {
     const dayId = btn.dataset.day;
     const page  = $('#' + dayId);
     if (!page) return;
-    if (STATIC_DAY_IDS.has(dayId)) {
-      toast('💍 Day 1 is our founding page — it can be cleared, but never deleted.', 3600);
-      return;
-    }
     const title = $('h2', page)?.textContent.trim() || dayId.toUpperCase();
     if (!confirm(`Delete “${title}” completely?\nAll its entries, checks and signatures are removed from the contract and the cloud. This cannot be undone.`)) return;
     /* drop per-day signature state (signatories-dayN / debrief-dayN) */
@@ -1147,7 +1158,9 @@
   };
 
   /* ---------- append a freshly created day ---------- */
-  const STATIC_IDS = new Set(['day1']);   // days shipped in index.html — never persisted
+  const STATIC_IDS = new Set(['day1']);   /* days shipped in index.html are NOT persisted:
+                                              deleting one only removes it for the session
+                                              (reloading restores the original page). */
   const persistDays = () => {
     const list = $$('.page')
       .filter(p => dayNumber(p.id) && !STATIC_IDS.has(p.id))

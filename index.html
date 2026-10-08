@@ -15,6 +15,36 @@
 </head>
 <body>
 
+<!-- v3.2 DH — no-JS safety net: if js/app.js fails to load (or is still loading),
+     the toolbar buttons would look dead. This gives instant, clear feedback and
+     auto-retries revealing the real handlers once app.js is ready. -->
+<script>
+window.__dhReady = false;
+setTimeout(function () {
+  if (window.__dhReady) return;
+  ['email-contract', 'ai-assistant'].forEach(function (id) {
+    var b = document.getElementById(id);
+    if (b && !b.dataset.dhFallback) {
+      b.dataset.dhFallback = '1';
+      b.addEventListener('click', function () {
+        alert('⏳ The app script (js/app.js) has not loaded yet.\n\nIf this message keeps appearing:\n• Make sure the "js" folder sits next to index.html\n• Open index.html through a local server or refresh the page');
+      });
+    }
+  });
+}, 4000);
+document.addEventListener('click', function (e) {
+  var del = e.target.closest ? e.target.closest('.delete-day-btn') : null;
+  if (!del) return;
+  var btn = del;
+  setTimeout(function () {
+    var p = document.getElementById(btn.dataset.day);
+    if (p && document.body.contains(btn)) {
+      alert('⏳ Delete could not run — js/app.js is not active yet. Please refresh the page.');
+    }
+  }, 300);
+}, true);
+</script>
+
 <!-- ==================== LOGIN OVERLAY ==================== -->
 <div class="login-overlay" id="login-overlay">
   <div class="login-card" role="dialog" aria-labelledby="login-title">
@@ -226,6 +256,7 @@
       </select>
       <button class="collapse-toggle" type="button" aria-expanded="true" title="Collapse / expand this day">▾ Collapse</button>
       <button class="clear-day-btn" type="button" data-day="day1">🗑 Clear this day</button>
+      <button class="delete-day-btn danger" type="button" data-day="day1" title="Permanently remove Day 1 from the contract and the cloud">✖ Delete day</button>
     </div>
     <p class="lock-note">🔒 This day is marked as finished — everything (signatures included) is sealed. Set “Day finished” to ❌ No to edit again.</p>
 
