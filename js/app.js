@@ -16,14 +16,57 @@
   const $  = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
+  /* bind a listener without crashing when the element isn't in the page yet */
+  const on = (sel, ev, fn) => { const el = $(sel); if (el) el.addEventListener(ev, fn); };
+
   /* ---------- toast ---------- */
-  const toastEl = $('#toast');
+  const toastEl = $('#toast') || (() => {         // never crash if #toast is missing
+    const t = document.createElement('div');
+    t.id = 'toast'; t.className = 'toast'; t.setAttribute('role', 'status');
+    document.body.appendChild(t);
+    return t;
+  })();
   let toastTimer;
   const toast = (msg, ms = 2600) => {
-    toastEl.textContent = msg;
-    toastEl.classList.add('show');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
+    try {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), ms);
+    } catch { /* ignore */ }
+  };
+
+  /* ============================================================
+     GLOBAL ERROR GUARD
+     Any unexpected script error (e.g. a TDZ "Cannot access X
+     before initialization", a missing file, an old cached service
+     worker) surfaces as a friendly toast instead of silently
+     breaking the page — and is still logged to the console.
+     ============================================================ */
+  let lastSeenError = '';
+  window.addEventListener('error', e => {
+    const msg = (e && ((e.message) || (e.error && e.error.message))) || 'Unknown error';
+    if (msg === lastSeenError) return;             // don't spam the same error
+    lastSeenError = msg;
+    console.error('Uncaught error:', e.filename ? `${e.filename}:${e.lineno} — ${msg}` : msg, e);
+    toast(`⚠️ ${msg} — please refresh ♥`, 5200);
+  });
+  window.addEventListener('unhandledrejection', e => {
+    const msg = (e && e.reason && (e.reason.message || String(e.reason))) || 'Unhandled promise rejection';
+    if (msg === lastSeenError) return;
+    lastSeenError = msg;
+    console.error(msg, e);
+    toast(`⚠️ ${msg} — please refresh ♥`, 5200);
+  });
+
+  /* device shorthands work with OR without js/device.js loaded */
+  const isPhoneSafe = () => {
+    try {
+      if (typeof window.isPhone === 'function') return !!window.isPhone();
+      if (window.DHDevice && typeof window.DHDevice.current === 'function') return window.DHDevice.current() === 'phone';
+      return Math.min(window.innerWidth || 9999, document.documentElement.clientWidth || 9999) <= 600 &&
+             ((navigator.maxTouchPoints || 0) > 0);
+    } catch { return false; }
   };
 
   /* ---------- floating hearts (transform/opacity only → cheap) ---------- */
@@ -73,7 +116,7 @@
     }
   };
 
-  $('#login-btn').addEventListener('click', tryLogin);
+  on('#login-btn', 'click', tryLogin);
   pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
   pwToggle.addEventListener('click', () => {
     const show = pwInput.type === 'password';
@@ -160,7 +203,7 @@
     syncAllLocks();
   };
 
-  $('#save-contract').addEventListener('click', save);
+  on('#save-contract', 'click', save);
 
   /* ---------- Print / PDF ----------
      On phones window.print() is unreliable (no print service, or it silently
@@ -168,15 +211,15 @@
      js/pdf.js. Desktop keeps the native "Print → Save as PDF" dialog. */
   const useGeneratedPDF = () => {
     if (typeof makeContractPDF !== 'function') return false;
-    if (isPhone()) return true;                                    // phones: always build the file
-    try {                                                           // installed PWA: no browser chrome to print from
+    if (isPhoneSafe()) return true;                                // phones: always build the file
+    try {                                                          // installed PWA: no browser chrome to print from
       if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
       if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) return true;
-      if (navigator.standalone) return true;                        // iOS home-screen app
+      if (navigator.standalone) return true;                       // iOS home-screen app
     } catch { /* ignore */ }
     return false;
   };
-  $('#print-pdf').addEventListener('click', async e => {
+  on('#print-pdf', 'click', async e => {
     const btn = e.currentTarget;
     if (!useGeneratedPDF()) { window.print(); return; }
     const old = btn.textContent;
@@ -184,7 +227,8 @@
     try {
       writeStore();                                   // make sure the newest entries are on disk first
       const res = await makeContractPDF();
-      downloadBlob(res.blob, res.filename);
+      if (typeof downloadBlob === 'function') downloadBlob(res.blob, res.filename);
+      else throw new Error('Download helper unavailable');
       toast('📄 PDF ready — check your Downloads folder ♥', 3400);
     } catch (err) {
       console.warn(err);
@@ -429,17 +473,17 @@
      Runs fully offline with a consent-first scene template engine.
      ============================================================ */
   const aiModal    = $('#ai-modal');
-  const aiDaySel   = $('#ai-day-select');
+  const aiDaySel   = $('#ai-day-select') || document.createElement('select');
   const aiChipsM   = $$('#ai-mode-chips .ai-chip');
   const aiChipsS   = $$('#ai-seq-chips .ai-chip');
   const aiPreview  = $('#ai-preview');
-  const aiApplyBtn = $('#ai-apply-btn');
-  const openAi  = () => { refreshAiDayOptions(); aiModal.classList.add('active'); };
-  const closeAi = () => aiModal.classList.remove('active');
-  $('#ai-assistant').addEventListener('click', openAi);
-  $('#ai-close-btn').addEventListener('click', closeAi);
-  $('#ai-close-footer-btn').addEventListener('click', closeAi);
-  aiModal.addEventListener('click', e => { if (e.target === aiModal) closeAi(); });
+  const aiApplyBtn = $('#ai-apply-btn') || Object.assign(document.createElement('button'), { disabled: true });
+  const openAi  = () => { refreshAiDayOptions(); if (aiModal) aiModal.classList.add('active'); };
+  const closeAi = () => { if (aiModal) aiModal.classList.remove('active'); };
+  on('#ai-assistant', 'click', openAi);
+  on('#ai-close-btn', 'click', closeAi);
+  on('#ai-close-footer-btn', 'click', closeAi);
+  if (aiModal) aiModal.addEventListener('click', e => { if (e.target === aiModal) closeAi(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAi(); });
 
   let aiMode = 'create';           // 'create' | 'write'
@@ -539,10 +583,13 @@
   const escH = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 
   const buildPlan = () => {
-    const picked = SEQ_ORDER.filter(k => $(`#ai-seq-chips [data-seq="${k}"]`).classList.contains('active'));
+    const picked = SEQ_ORDER.filter(k => {
+      const chip = $(`#ai-seq-chips [data-seq="${k}"]`);
+      return !!(chip && chip.classList.contains('active'));
+    });
     const seqs = picked.length ? picked : ['sensory', 'restraint', 'sensation', 'edging', 'aftercare'];
-    const duration = $('#ai-duration').value.trim() || 'Seventy-five (75) minutes of active scene play, plus generous aftercare';
-    const notes    = $('#ai-notes').value.trim();
+    const duration = ($('#ai-duration')?.value || '').trim() || 'Seventy-five (75) minutes of active scene play, plus generous aftercare';
+    const notes    = ($('#ai-notes')?.value || '').trim();
     const target   = aiDaySel.value;
     const n        = dayNumber(target.startsWith('new:') ? target.slice(4) : target) || 99;
     const dateStr  = n === 1 ? '30 July 2026' : 'to be filled in ✍️';
@@ -554,6 +601,7 @@
     const acts = p.seqs.map(k => `<li><strong>${escH(SEQ_LIB[k].name)}</strong> — ${escH(SEQ_LIB[k].toy)}</li>`).join('');
     const lims = p.seqs.map(k => `<li>${escH(SEQ_LIB[k].hard)}</li>`).join('');
     const steps = p.seqs.map((k, i) => `<li>T+${i * 10} · <strong>${escH(SEQ_LIB[k].name)}</strong>: ${escH(SEQ_LIB[k].step.join('; '))}</li>`).join('');
+    if (!aiPreview) return;
     aiPreview.innerHTML =
       `<p><strong>Day ${p.n} · ${escH(p.dateStr)} — Private Bedroom / Play Space</strong></p>` +
       `<p><em>Duration:</em> ${escH(p.duration)}</p>` +
@@ -565,7 +613,7 @@
       `<p class="muted">Everything above is drafted with consent-first safeguards — review, tweak, then apply.</p>`;
   };
 
-  $('#ai-generate-btn').addEventListener('click', () => {
+  on('#ai-generate-btn', 'click', () => {
     if (aiMode === 'write' && !aiDaySel.value) { toast('⚠️ No open day to write into — mark a day ❌ Not finished first.', 3400); return; }
     aiDraft = buildPlan();
     renderPreview(aiDraft);
@@ -829,7 +877,7 @@
       if (kb === lastKb) return;
       lastKb = kb;
       document.documentElement.style.setProperty('--kb', kb + 'px');
-      if (isPhone()) $$('#main-contract input, #main-contract select, #main-contract textarea').forEach(el => {
+      if (isPhoneSafe()) $$('#main-contract input, #main-contract select, #main-contract textarea').forEach(el => {
         el.addEventListener('focus', () => {
           setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { /* ignore */ } }, 260);
         });
@@ -849,12 +897,12 @@
   let fmt  = 'plain';
   let plainText = '', htmlText = '';
 
-  const openModal  = () => { modal.classList.add('active'); $( '.modal-close', modal ).focus(); };
-  const closeModal = () => modal.classList.remove('active');
+  const openModal  = () => { if (!modal) return; modal.classList.add('active'); const c = $('.modal-close', modal); if (c) c.focus(); };
+  const closeModal = () => { if (modal) modal.classList.remove('active'); };
 
-  $('#modal-close-btn').addEventListener('click', closeModal);
-  $('#modal-close-footer-btn').addEventListener('click', closeModal);
-  modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+  on('#modal-close-btn', 'click', closeModal);
+  on('#modal-close-footer-btn', 'click', closeModal);
+  if (modal) modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
   tabButtons.forEach(b => b.addEventListener('click', () => {
@@ -866,6 +914,7 @@
   }));
 
   const renderModal = () => {
+    if (!modalBody) return;
     if (fmt === 'plain') {
       modalBody.textContent = plainText;
       modalBody.classList.remove('html-body');
@@ -1033,7 +1082,7 @@
     return { plain, html };
   };
 
-  $('#email-contract').addEventListener('click', () => {
+  on('#email-contract', 'click', () => {
     const out = buildEmail();
     if (!out) return;
     plainText = out.plain; htmlText = out.html;
@@ -1041,7 +1090,7 @@
     openModal();
   });
 
-  $('#modal-copy-btn').addEventListener('click', async () => {
+  on('#modal-copy-btn', 'click', async () => {
     const text = fmt === 'plain' ? plainText : htmlText;
     try { await navigator.clipboard.writeText(text); toast('📋 Copied to clipboard.'); }
     catch {
@@ -1053,7 +1102,7 @@
     }
   });
 
-  $('#modal-email-btn').addEventListener('click', () => {
+  on('#modal-email-btn', 'click', () => {
     const subject = encodeURIComponent('Deep & Honey — Contract Data (' + new Date().toLocaleDateString() + ')');
     const body = encodeURIComponent(plainText);
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
@@ -1148,11 +1197,11 @@
         '</ol>';
     }
     installSteps.innerHTML = html;
-    installModal.classList.add('active');
+    if (installModal) installModal.classList.add('active');
   }
   const closeInstall = () => { if (installModal) installModal.classList.remove('active'); };
-  if ($('#install-close-btn')) $('#install-close-btn').addEventListener('click', closeInstall);
-  if ($('#install-close-footer-btn')) $('#install-close-footer-btn').addEventListener('click', closeInstall);
+  if ($('#install-close-btn')) on('#install-close-btn', 'click', closeInstall);
+  if ($('#install-close-footer-btn')) on('#install-close-footer-btn', 'click', closeInstall);
   if (installModal) installModal.addEventListener('click', e => { if (e.target === installModal) closeInstall(); });
 
   /* ---------- service worker (offline + app-like shell) ---------- */
