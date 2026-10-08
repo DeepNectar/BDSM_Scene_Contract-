@@ -49,6 +49,16 @@
   var STORE_KEY = 'dhContract.fields.v1';   // var → readable everywhere in this IIFE & the SW
   var PW_KEY    = 'dhContract.pw.v1';        // install-prompt bookkeeping (device-local only)
 
+  /* ---------- day ids / static pages — declared FIRST so every helper below
+     (restoreDays, persistDays, dayPages…) can use them without hitting a TDZ
+     ReferenceError. v3.5 DH: these used to be declared hundreds of lines lower,
+     which is exactly how "Cannot access 'X' before initialization" crashes kept
+     coming back at boot on some devices/browsers. ---------- */
+  const STATIC_IDS = new Set(['day1']);   /* days shipped in index.html are NOT persisted:
+                                              deleting one only removes it for the session
+                                              (reloading restores the original page). */
+  const dayNumber = id => { const m = /^day(\d+)$/.exec(id); return m ? +m[1] : null; };
+
   /* ---------- device helpers with safe fallbacks ----------
      js/device.js defines window.isPhone / downloadBlob / DHDevice, but it is not
      loaded by index.html (and test harnesses skip it). These shims keep every
@@ -253,12 +263,23 @@
      Source order: explicit arg (cloud list) → in-memory cloud mirror → local copy. */
   var DAYS_KEY = 'dhContract.days.v1';   // var (not const) → also readable from the service worker
   const restoreDays = (listArg) => {
+    /* v3.5 DH — the cloud mirror is the single source of truth. If a fresh cloud
+       list arrived (or was pulled into the mirror), apply it directly: remove any
+       restored AI day that no longer exists in the cloud (deleted on another
+       device), then re-attach the pages that do. This is what makes Supabase sync
+       visibly work on every reload. */
     let list = Array.isArray(listArg) ? listArg : null;
     if (!list && window.CloudStore && typeof window.CloudStore.days === 'function') {
-      try { const d = window.CloudStore.days(); if (Array.isArray(d) && d.length) list = d; } catch { /* ignore */ }
+      try { const d = window.CloudStore.days(); if (Array.isArray(d)) list = d; } catch { /* ignore */ }
     }
     if (!list) {
       try { const raw = JSON.parse(localStorage.getItem(DAYS_KEY)); if (raw && Array.isArray(raw.list)) list = raw.list; } catch { /* ignore */ }
+    }
+    if (list) {
+      const keep = new Set(list.map(d => d && d.id).filter(Boolean));
+      $$('.page').forEach(p => {
+        if (dayNumber(p.id) && !STATIC_IDS.has(p.id) && !keep.has(p.id)) p.remove();
+      });
     }
     if (!list || !list.length) return;
     const summary = $('#summary');
