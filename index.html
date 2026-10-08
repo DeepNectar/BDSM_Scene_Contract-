@@ -49,6 +49,60 @@
   </div>
 </div>
 
+<!-- ==================== AI ASSISTANT MODAL ==================== -->
+<div class="ai-overlay" id="ai-modal" role="dialog" aria-modal="true" aria-labelledby="ai-title">
+  <div class="ai-card">
+    <div class="ai-header">
+      <h3 id="ai-title">✨ AI Assistant — write our day</h3>
+      <button class="ai-close" id="ai-close-btn" type="button" aria-label="Close dialog">×</button>
+    </div>
+    <div class="ai-body">
+      <div class="ai-block">
+        <label for="ai-day-select">Target day</label>
+        <select id="ai-day-select" class="ai-field"></select>
+      </div>
+      <div class="ai-block">
+        <label>What should the AI do?</label>
+        <div class="ai-chips" id="ai-mode-chips" role="group">
+          <button class="ai-chip active" data-mode="create" type="button">🆕 Create a new day</button>
+          <button class="ai-chip" data-mode="write" type="button">✍️ Write into an existing day</button>
+        </div>
+      </div>
+      <div class="ai-block">
+        <label>What to create / write — pick the BDSM sequence elements ♥</label>
+        <div class="ai-chips" id="ai-seq-chips" role="group">
+          <button class="ai-chip" data-seq="sensory" type="button">Sensory deprivation</button>
+          <button class="ai-chip" data-seq="restraint" type="button">Restraint</button>
+          <button class="ai-chip" data-seq="bondage" type="button">Bondage / rope</button>
+          <button class="ai-chip" data-seq="impact" type="button">Impact play</button>
+          <button class="ai-chip" data-seq="sensation" type="button">Temperature / sensation</button>
+          <button class="ai-chip" data-seq="powerexchange" type="button">Power exchange / orders</button>
+          <button class="ai-chip" data-seq="service" type="button">Service submission</button>
+          <button class="ai-chip" data-seq="edging" type="button">Teasing &amp; edging</button>
+          <button class="ai-chip" data-seq="aftercare" type="button">Aftercare</button>
+        </div>
+      </div>
+      <div class="ai-block">
+        <label for="ai-duration">Planned duration</label>
+        <input id="ai-duration" class="ai-field" type="text" placeholder="e.g. 60 minutes + aftercare">
+      </div>
+      <div class="ai-block">
+        <label for="ai-notes">Extra notes / special requests (optional)</label>
+        <textarea id="ai-notes" class="ai-field" rows="2" placeholder="Anything specific you two want woven in…"></textarea>
+      </div>
+      <div class="ai-block">
+        <label>Preview</label>
+        <div class="ai-preview" id="ai-preview"><span class="muted">Choose your options above and press “Generate” to see what the AI would write, then apply it with “Create day” / “Write into day”.</span></div>
+      </div>
+    </div>
+    <div class="ai-footer">
+      <button class="btn btn-outline" id="ai-generate-btn" type="button">🪄 Generate</button>
+      <button class="btn btn-primary" id="ai-apply-btn" type="button" disabled>✨ Create day</button>
+      <button class="btn btn-ghost" id="ai-close-footer-btn" type="button">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== MAIN CONTRACT ==================== -->
 <main class="contract-container" id="main-contract">
 
@@ -101,6 +155,7 @@
       </select>
       <button class="clear-day-btn" type="button" data-day="day1">🗑 Clear this day</button>
     </div>
+    <p class="lock-note">🔒 This day is marked as finished — everything (signatures included) is sealed. Set “Day finished” to ❌ No to edit again.</p>
 
     <p><strong>Between:</strong> Deep (the Dominant) &amp; Honey (the Submissive)</p>
     <p><strong>Duration:</strong> This contract is valid for ♾ infinity, from 30 July 2026 onwards.</p>
@@ -201,7 +256,7 @@
     <p class="witness-line"><label>Witness (optional):</label> <span class="initials-slot"><input type="text" class="editable-field inline-input" placeholder="Signature"></span></p>
 
     <h3 class="section-title">Pre-Scene Execution Affidavit — Day 1</h3>
-    <p class="exec-line"><strong>Date of execution:</strong> <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span> <strong>Time:</strong> <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="HH"><i>:</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minutes"></span></p>
+    <p class="exec-line"><strong>Date of execution:</strong> <span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span> <strong>Time:</strong> <span class="datetime-group time-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="HH"><i>:</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Minutes"></span></p>
     <div class="checklist-item"><input type="checkbox" id="d1-a1"><label for="d1-a1">We have BOTH read and understood the entire Master Contract and this Scene Contract.</label></div>
     <div class="checklist-item"><input type="checkbox" id="d1-a2"><label for="d1-a2">We have BOTH used the bathroom and are physically comfortable.</label></div>
     <div class="checklist-item"><input type="checkbox" id="d1-a3"><label for="d1-a3">We have BOTH had water within the last 30 minutes.</label></div>
@@ -307,6 +362,7 @@
     <button class="btn btn-outline" id="save-contract" type="button">💾 Save locally</button>
     <button class="btn btn-primary" id="print-pdf" type="button">📄 Print / PDF</button>
     <button class="btn btn-outline" id="email-contract" type="button">✉ Email data</button>
+    <button class="btn btn-outline" id="ai-assistant" type="button">✨ AI write a day</button>
   </div>
 </main>
 
