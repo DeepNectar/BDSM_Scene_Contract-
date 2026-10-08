@@ -72,17 +72,57 @@
         </div>
       </div>
       <div class="ai-block">
-        <label>What to create / write — pick the BDSM sequence elements ♥</label>
-        <div class="ai-chips" id="ai-seq-chips" role="group">
-          <button class="ai-chip" data-seq="sensory" type="button">Sensory deprivation</button>
-          <button class="ai-chip" data-seq="restraint" type="button">Restraint</button>
-          <button class="ai-chip" data-seq="bondage" type="button">Bondage / rope</button>
-          <button class="ai-chip" data-seq="impact" type="button">Impact play</button>
-          <button class="ai-chip" data-seq="sensation" type="button">Temperature / sensation</button>
-          <button class="ai-chip" data-seq="powerexchange" type="button">Power exchange / orders</button>
-          <button class="ai-chip" data-seq="service" type="button">Service submission</button>
-          <button class="ai-chip" data-seq="edging" type="button">Teasing &amp; edging</button>
-          <button class="ai-chip" data-seq="aftercare" type="button">Aftercare</button>
+        <label>Mood &amp; tone of the day ♥</label>
+        <div class="ai-chips" id="ai-mood-chips" role="group">
+          <button class="ai-chip active" data-mood="romantic" type="button">🌹 Romantic</button>
+          <button class="ai-chip" data-mood="spicy" type="button">🌶️ Spicy</button>
+          <button class="ai-chip" data-mood="playful" type="button">😈 Playful</button>
+          <button class="ai-chip" data-mood="intense" type="button">⛓️ Intense</button>
+          <button class="ai-chip" data-mood="tender" type="button">🕊️ Tender</button>
+          <button class="ai-chip" data-mood="slowburn" type="button">🔥 Slow burn</button>
+        </div>
+      </div>
+      <div class="ai-block">
+        <label>Intensity level</label>
+        <div class="ai-chips" id="ai-intensity-chips" role="group">
+          <button class="ai-chip" data-intensity="soft" type="button">Soft &amp; gentle</button>
+          <button class="ai-chip active" data-intensity="medium" type="button">Medium</button>
+          <button class="ai-chip" data-intensity="firm" type="button">Firm</button>
+          <button class="ai-chip" data-intensity="deepend" type="button">Deep end</button>
+        </div>
+      </div>
+      <div class="ai-block">
+        <label>Who leads today?</label>
+        <div class="ai-chips" id="ai-lead-chips" role="group">
+          <button class="ai-chip active" data-lead="Deep" type="button">Deep · Dominant</button>
+          <button class="ai-chip" data-lead="Honey" type="button">Honey · Submissive</button>
+          <button class="ai-chip" data-lead="Both" type="button">Shared / switch</button>
+        </div>
+      </div>
+      <div class="ai-block">
+        <label>Setting / venue</label>
+        <div class="ai-chips" id="ai-venue-chips" role="group">
+          <button class="ai-chip active" data-venue="bedroom" type="button">🛏 Private bedroom</button>
+          <button class="ai-chip" data-venue="playroom" type="button">🕯 Play room / dungeon corner</button>
+          <button class="ai-chip" data-venue="bathroom" type="button">🛁 Bath / shower scene</button>
+          <button class="ai-chip" data-venue="outdoor" type="button">🌙 Balcony / secluded outdoor</button>
+          <button class="ai-chip" data-venue="anywhere" type="button">✨ Surprise us</button>
+        </div>
+      </div>
+      <div class="ai-block">
+        <label>Play categories &amp; subcategories — tap any that call to you two ♥</label>
+        <div class="ai-cat-group"><span class="ai-cat-label">Mind &amp; senses</span><div class="ai-chips ai-subchips" data-cat="senses" role="group"></div></div>
+        <div class="ai-cat-group"><span class="ai-cat-label">Bondage &amp; restraint</span><div class="ai-chips ai-subchips" data-cat="bondage" role="group"></div></div>
+        <div class="ai-cat-group"><span class="ai-cat-label">Sensation &amp; impact</span><div class="ai-chips ai-subchips" data-cat="sensation" role="group"></div></div>
+        <div class="ai-cat-group"><span class="ai-cat-label">Power &amp; protocol</span><div class="ai-chips ai-subchips" data-cat="power" role="group"></div></div>
+        <div class="ai-cat-group"><span class="ai-cat-label">Intimacy &amp; pleasure</span><div class="ai-chips ai-subchips" data-cat="intimacy" role="group"></div></div>
+        <div class="ai-cat-group"><span class="ai-cat-label">Roleplay &amp; fetish</span><div class="ai-chips ai-subchips" data-cat="roleplay" role="group"></div></div>
+        <div class="ai-cat-group"><span class="ai-cat-label">Service &amp; ritual</span><div class="ai-chips ai-subchips" data-cat="service" role="group"></div></div>
+        <div class="ai-cat-group"><span class="ai-cat-label">Scene extras</span><div class="ai-chips ai-subchips" data-cat="extras" role="group"></div></div>
+        <div class="ai-cat-group"><span class="ai-cat-label">Care &amp; closure</span><div class="ai-chips ai-subchips" data-cat="care" role="group"></div></div>
+        <div class="ai-chips" style="margin-top:8px">
+          <button class="ai-chip ai-chip-mini" id="ai-select-all" type="button">☑ Pick a curated full scene</button>
+          <button class="ai-chip ai-chip-mini" id="ai-clear-all" type="button">✖ Clear selections</button>
         </div>
       </div>
       <div class="ai-block">
@@ -90,7 +130,30 @@
         <input id="ai-duration" class="ai-field" type="text" placeholder="e.g. 60 minutes + aftercare">
       </div>
       <div class="ai-block">
-        <label for="ai-notes">Extra notes / special requests (optional)</label>
+        <label for="ai-aftercare">Aftercare focus</label>
+        <div class="ai-chips" id="ai-aftercare-chips" role="group">
+          <button class="ai-chip active" data-care="cuddle" type="button">🤍 Cuddles &amp; warmth</button>
+          <button class="ai-chip" data-care="massage" type="button">💆 Massage</button>
+          <button class="ai-chip" data-care="praise" type="button">💬 Praise &amp; reassurance</button>
+          <button class="ai-chip" data-care="treats" type="button">🍫 Tea, snacks &amp; hydration</button>
+          <button class="ai-chip" data-care="quiet" type="button">🌙 Quiet presence</button>
+          <button class="ai-chip" data-care="words" type="button">📝 Talking / debrief</button>
+        </div>
+      </div>
+      <div class="ai-block">
+        <label for="ai-special-sub">Special request — Honey (Submissive) 💞</label>
+        <input id="ai-special-sub" class="ai-field" type="text" placeholder="e.g. extra teasing and edging tonight…">
+      </div>
+      <div class="ai-block">
+        <label for="ai-special-dom">Special request — Deep (Dominant) 💞</label>
+        <input id="ai-special-dom" class="ai-field" type="text" placeholder="e.g. slow ice trails across her spine…">
+      </div>
+      <div class="ai-block">
+        <label for="ai-limits">Extra hard / soft limits to honour (optional)</label>
+        <textarea id="ai-limits" class="ai-field" rows="2" placeholder="Anything strictly off the table tonight…"></textarea>
+      </div>
+      <div class="ai-block">
+        <label for="ai-notes">Extra notes (optional)</label>
         <textarea id="ai-notes" class="ai-field" rows="2" placeholder="Anything specific you two want woven in…"></textarea>
       </div>
       <div class="ai-block">
