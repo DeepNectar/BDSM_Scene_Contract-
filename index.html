@@ -68,20 +68,20 @@
 
     <div class="seal">
       <p class="seal-title">✦&ensp;Seal this contract with your signature&ensp;✦</p>
-      <div class="accept-row">
-        <button class="accept-btn" data-party="Deep" type="button">Accept as Deep</button>
-        <button class="accept-btn" data-party="Honey" type="button">Accept as Honey</button>
-      </div>
       <div class="sig-cards">
-        <div class="sig-card" data-party="Deep">
+        <div class="sig-card" data-area="seal" data-party="Deep">
+          <!-- Sign image: https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj/view?usp=sharing (kept exactly as provided, local copy) -->
           <img class="sig-photo" src="img/signature-deep.png" alt="Deep's signature" loading="lazy">
           <span class="sig-name">Deep · Dominant</span>
           <span class="sig-status">Awaiting acceptance…</span>
+          <button class="accept-btn" data-area="seal" data-party="Deep" type="button">Accept as Deep</button>
         </div>
-        <div class="sig-card" data-party="Honey">
+        <div class="sig-card" data-area="seal" data-party="Honey">
+          <!-- Sign image: https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI/view?usp=sharing (kept exactly as provided, local copy) -->
           <img class="sig-photo" src="img/signature-honey.png" alt="Honey's signature" loading="lazy">
           <span class="sig-name">Honey · Submissive</span>
           <span class="sig-status">Awaiting acceptance…</span>
+          <button class="accept-btn" data-area="seal" data-party="Honey" type="button">Accept as Honey</button>
         </div>
       </div>
     </div>
@@ -173,26 +173,28 @@
 
     <h3 class="section-title">Signatories</h3>
     <div class="sig-cards sign-cards">
-      <div class="sig-card" data-party="Honey">
+      <div class="sig-card" data-area="signatories" data-party="Honey">
+        <!-- Sign image: https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI/view?usp=sharing (kept exactly as provided, local copy) -->
         <img class="sig-photo" src="img/signature-honey.png" alt="Honey's signature" loading="lazy">
         <span class="sig-name">Honey · Submissive</span>
         <span class="sig-status">Awaiting acceptance…</span>
-        <button class="accept-btn" data-party="Honey" type="button">Accept as Honey</button>
+        <button class="accept-btn" data-area="signatories" data-party="Honey" type="button">Accept as Honey</button>
       </div>
-      <div class="sig-card" data-party="Deep">
+      <div class="sig-card" data-area="signatories" data-party="Deep">
+        <!-- Sign image: https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj/view?usp=sharing (kept exactly as provided, local copy) -->
         <img class="sig-photo" src="img/signature-deep.png" alt="Deep's signature" loading="lazy">
         <span class="sig-name">Deep · Dominant</span>
         <span class="sig-status">Awaiting acceptance…</span>
-        <button class="accept-btn" data-party="Deep" type="button">Accept as Deep</button>
+        <button class="accept-btn" data-area="signatories" data-party="Deep" type="button">Accept as Deep</button>
       </div>
     </div>
     <div class="sign-row">
-      <div class="sign-field"><label>Submissive / Bottom — signature</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+      <div class="sign-field"><label>Submissive / Bottom — signature</label><span class="initials-slot" data-area="signatories" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
       <div class="sign-field"><label>Printed name</label><input class="editable-field" placeholder="Type printed name"></div>
       <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
     </div>
     <div class="sign-row">
-      <div class="sign-field"><label>Dominant / Top — signature</label><span class="initials-slot" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+      <div class="sign-field"><label>Dominant / Top — signature</label><span class="initials-slot" data-area="signatories" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
       <div class="sign-field"><label>Printed name</label><input class="editable-field" placeholder="Type printed name"></div>
       <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
     </div>
@@ -246,11 +248,11 @@
       <div class="full"><label>Debrief notes</label> <textarea class="note-box" placeholder="Write any observations, incidents, or adjustments…"></textarea></div>
     </div>
     <div class="sign-row">
-      <div class="sign-field"><label>Deep's signature (debrief)</label><span class="initials-slot" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+      <div class="sign-field"><label>Deep's signature (debrief)</label><span class="initials-slot" data-area="debrief" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
       <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
     </div>
     <div class="sign-row">
-      <div class="sign-field"><label>Honey's signature (debrief)</label><span class="initials-slot" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
+      <div class="sign-field"><label>Honey's signature (debrief)</label><span class="initials-slot" data-area="debrief" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
       <div class="sign-field"><label>Date</label><span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span></div>
     </div>
   </section>

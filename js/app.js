@@ -143,15 +143,26 @@
   const SIG_KEY   = 'signAccepted';
   const UNDO_MS   = 5 * 60 * 1000;         // undo window: 5 minutes
 
+  /* ---------- per-area signature state (legacy migration) ---------- */
+  const AREAS = ['seal', 'signatories', 'debrief'];   // every area accepts independently
   const readAccepts = () => {
-    try { return JSON.parse(localStorage.getItem(SIG_KEY)) || {}; }
-    catch { return {}; }
+    let raw;
+    try { raw = JSON.parse(localStorage.getItem(SIG_KEY)) || {}; }
+    catch { raw = {}; }
+    // migrate legacy global format {Deep:{ts}} -> per-area {seal:{Deep:{ts}}, ...}
+    if (raw.Deep && typeof raw.Deep.ts === 'number') {
+      const migrated = {};
+      AREAS.forEach(area => { migrated[area] = { Deep: raw.Deep, Honey: raw.Honey }; });
+      localStorage.setItem(SIG_KEY, JSON.stringify(migrated));
+      return migrated;
+    }
+    return raw;
   };
   const writeAccepts = a => localStorage.setItem(SIG_KEY, JSON.stringify(a));
 
-  /* overlay the signature image onto every slot of one party */
-  const fillSlots = party => {
-    $$('.initials-slot[data-party="' + party + '"]').forEach(slot => {
+  /* overlay the signature image onto every slot of one party IN ONE AREA ONLY */
+  const fillSlots = (party, area) => {
+    $$(`.initials-slot[data-party="${party}"][data-area="${area}"]`).forEach(slot => {
       if (slot.classList.contains('slot-filled')) return;   // prevent duplicates
       const inp = $('input.editable-field', slot) || $('input', slot);
       const img = document.createElement('img');
@@ -165,23 +176,21 @@
       if (inp) inp.readOnly = true;
       slot.classList.add('slot-filled');
     });
-    /* debrief / signatory date pills: auto-fill today's date when empty */
+    /* signatory / debrief date pills in this area: auto-fill today's date when empty */
     const pad = n => String(n).padStart(2, '0');
     const now = new Date();
     const dmy = [pad(now.getDate()), pad(now.getMonth() + 1), String(now.getFullYear())];
-    $$('.page').forEach(page => {
-      $$('.sign-row', page).forEach(row => {
-        if (!$(`.initials-slot[data-party="${party}"]`, row)) return;
-        const pill = $('.datetime-group', row);
-        if (!pill) return;
-        $$('input', pill).forEach((inp, i) => { if (!inp.value.trim()) inp.value = dmy[i] || ''; });
-      });
+    $$('.sign-row').forEach(row => {
+      if (!$(`.initials-slot[data-party="${party}"][data-area="${area}"]`, row)) return;
+      const pill = $('.datetime-group', row);
+      if (!pill) return;
+      $$('input', pill).forEach((inp, i) => { if (!inp.value.trim()) inp.value = dmy[i] || ''; });
     });
   };
 
-  /* undo: remove image, unlock input, clear only our auto-filled name/date */
-  const clearSlots = party => {
-    $$('.initials-slot[data-party="' + party + '"]').forEach(slot => {
+  /* undo: remove image, unlock input, clear only our auto-filled name/date — THIS AREA ONLY */
+  const clearSlots = (party, area) => {
+    $$(`.initials-slot[data-party="${party}"][data-area="${area}"]`).forEach(slot => {
       const img = $('.slot-sig', slot);
       if (img) img.remove();
       const inp = $('input.editable-field', slot) || $('input', slot);
@@ -191,25 +200,23 @@
       }
       slot.classList.remove('slot-filled');
     });
-    /* clear only the dates we auto-filled (still matching today) */
+    /* clear only the dates we auto-filled (still matching today) in this area */
     const pad = n => String(n).padStart(2, '0');
     const now = new Date();
     const dmy = [pad(now.getDate()), pad(now.getMonth() + 1), String(now.getFullYear())];
-    $$('.page').forEach(page => {
-      $$('.sign-row', page).forEach(row => {
-        if (!$(`.initials-slot[data-party="${party}"]`, row)) return;
-        const pill = $('.datetime-group', row);
-        if (!pill) return;
-        $$('input', pill).forEach((inp, i) => { if (inp.value.trim() === (dmy[i] || '')) inp.value = ''; });
-      });
+    $$('.sign-row').forEach(row => {
+      if (!$(`.initials-slot[data-party="${party}"][data-area="${area}"]`, row)) return;
+      const pill = $('.datetime-group', row);
+      if (!pill) return;
+      $$('input', pill).forEach((inp, i) => { if (inp.value.trim() === (dmy[i] || '')) inp.value = ''; });
     });
   };
 
-  const syncPartyUI = (party, accepted) => {
-    $$('.accept-btn[data-party="' + party + '"]').forEach(b => {
+  const syncAreaUI = (party, area, accepted) => {
+    $$(`.accept-btn[data-party="${party}"][data-area="${area}"]`).forEach(b => {
       b.textContent = accepted ? 'Signed \u2014 tap to undo' : 'Accept as ' + party;
     });
-    $$('.sig-card[data-party="' + party + '"]').forEach(card => {
+    $$(`.sig-card[data-party="${party}"][data-area="${area}"]`).forEach(card => {
       card.classList.toggle('signed', !!accepted);
       const st = $('.sig-status', card);
       if (st) st.textContent = accepted ? 'Accepted & signed' : 'Awaiting acceptance\u2026';
@@ -218,34 +225,39 @@
 
   const applySignatures = () => {
     const accepts = readAccepts();
-    Object.keys(SIG_CONFIG).forEach(party => {
-      const acc = accepts[party];
-      if (acc) { fillSlots(party); syncPartyUI(party, true); }
-      else     { clearSlots(party); syncPartyUI(party, false); }
+    AREAS.forEach(area => {
+      const byParty = accepts[area] || {};
+      Object.keys(SIG_CONFIG).forEach(party => {
+        const acc = byParty[party];
+        if (acc) { fillSlots(party, area); syncAreaUI(party, area, true); }
+        else     { clearSlots(party, area); syncAreaUI(party, area, false); }
+      });
     });
   };
 
-  /* event delegation on document */
+  /* event delegation on document — each area is independent */
   document.addEventListener('click', e => {
     const btn = e.target.closest('.accept-btn');
     if (!btn) return;
     const party = btn.dataset.party;
+    const area  = btn.dataset.area || 'seal';
     if (!SIG_CONFIG[party]) return;
     const accepts = readAccepts();
-    const acc = accepts[party];
+    const byParty = accepts[area] || (accepts[area] = {});
+    const acc = byParty[party];
     if (acc) {
       if (Date.now() - acc.ts > UNDO_MS) { toast('\ud83d\udd12 Sealed \u2014 the undo window has closed. Signed with love.', 3200); return; }
-      delete accepts[party];
+      delete byParty[party];
       writeAccepts(accepts);
-      clearSlots(party);
-      syncPartyUI(party, false);
-      toast(`\u21a9 ${party}'s signature withdrawn.`);
+      clearSlots(party, area);
+      syncAreaUI(party, area, false);
+      toast(`\u21a9 ${party}'s signature withdrawn here \u2014 other areas are untouched.`);
     } else {
-      accepts[party] = { ts: Date.now() };
+      byParty[party] = { ts: Date.now() };
       writeAccepts(accepts);
-      fillSlots(party);
-      syncPartyUI(party, true);
-      toast(`\u2764 ${party} accepted & signed \u2014 sealed in five minutes.`);
+      fillSlots(party, area);
+      syncAreaUI(party, area, true);
+      toast(`\u2764 ${party} accepted & signed here \u2014 sealed in five minutes.`);
     }
     save();
   });
@@ -351,7 +363,8 @@
       const slot  = $('.initials-slot', f);
       if (slot) {
         const party = slot.dataset.party;
-        const acc   = readAccepts()[party];
+        const area  = slot.dataset.area || 'signatories';
+        const acc   = (readAccepts()[area] || {})[party];
         const inp   = $('input', slot);
         add(label, acc ? `Signed by ${party} \u2014 accepted ${new Date(acc.ts).toLocaleString()}` : (inp?.value.trim() || '(awaiting signature)'));
         return;
@@ -439,20 +452,25 @@
     const now = new Date().toLocaleString();
     const days = done.map(s => ({ id: s.dataset.day, rows: collectDay($('#' + s.dataset.day)) }));
 
-    /* signature status block for the export (accepted → embed img; else awaiting) */
+    /* signature status block for the export — per AREA: accepted there → embed img; else awaiting */
     const accepts = readAccepts();
     let sigPlain = '';
     let sigHtml  = '<div style="margin:0 0 14px">';
-    Object.keys(SIG_CONFIG).forEach(party => {
-      const acc = accepts[party];
-      if (acc) {
-        sigPlain += `  ${party}: signed (${new Date(acc.ts).toLocaleString()})\n`;
-        sigHtml += `<div style="padding:4px 0"><strong>${esc(party)}:</strong> accepted &amp; signed ` +
-                   `<img src="${SIG_CONFIG[party]}" alt="${esc(party)} signature" style="height:40px;vertical-align:middle;margin-left:8px"></div>`;
-      } else {
-        sigPlain += `  ${party}: (awaiting signature)\n`;
-        sigHtml += `<div style="padding:4px 0"><strong>${esc(party)}:</strong> <em>(awaiting signature)</em></div>`;
-      }
+    const AREA_NAMES = { seal: 'Seal', signatories: 'Signatories', debrief: 'Debrief' };
+    AREAS.forEach(area => {
+      const byParty = accepts[area] || {};
+      Object.keys(SIG_CONFIG).forEach(party => {
+        const acc = byParty[party];
+        const tag = `${AREA_NAMES[area]} — ${party}`;
+        if (acc) {
+          sigPlain += `  ${tag}: signed (${new Date(acc.ts).toLocaleString()})\n`;
+          sigHtml += `<div style="padding:4px 0"><strong>${esc(tag)}:</strong> accepted &amp; signed ` +
+                     `<img src="${SIG_CONFIG[party]}" alt="${esc(party)} signature" style="height:40px;vertical-align:middle;margin-left:8px"></div>`;
+        } else {
+          sigPlain += `  ${tag}: (awaiting signature)\n`;
+          sigHtml += `<div style="padding:4px 0"><strong>${esc(tag)}:</strong> <em>(awaiting signature)</em></div>`;
+        }
+      });
     });
     sigHtml += '</div>';
 

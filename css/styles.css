@@ -190,7 +190,6 @@ select{border:1px solid var(--line);border-radius:8px;padding:4px 8px;background
 
 .seal{text-align:center;margin-top:18px;padding-top:14px;border-top:1px dashed var(--line)}
 .seal-title{font-family:var(--serif);font-style:italic;font-size:17px;color:var(--wine);letter-spacing:.04em}
-.accept-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:10px 0 14px}
 .accept-btn{
   font:inherit;font-weight:500;font-size:14px;letter-spacing:.05em;cursor:pointer;
   padding:8px 22px;border-radius:999px;border:1px solid var(--wine);color:var(--wine);background:transparent;
