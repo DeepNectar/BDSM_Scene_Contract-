@@ -30,11 +30,11 @@
      APP_VERSION is the single source of truth: it drives the badge shown on
      the home screen (header) so the version always stays in sync. When you
      bump a release here, also prepend one WHATS_NEW line describing it. */
-  const APP_VERSION = 'v2.6 DH';
+  const APP_VERSION = 'v2.7 DH';
   const WHATS_NEW = [
-    '♥ HTML email is now fully self-contained: sign, stamp & logo preview everywhere (compressed base64 embeds + pixel-link and SVG fallbacks) — no broken images in any HTML previewer.',
+    '♥ HTML email now includes EVERY important field from the Day section and the Pre-Scene Execution Affidavit: execution date & time, all checklist items (✓ Confirmed / ○ Pending), safeword verification (RED/YELLOW/GREEN spoken by each partner), non-verbal signal, consent declarations, full toy inventory, debrief scores/notes/safeword-used, signature dates — plus Contract Overview and both signatures.',
+    'Sign, stamp & logo preview everywhere — compressed base64 embeds with pixel-link and SVG fallbacks; no broken images in any HTML previewer.',
     'No "View on Google Drive" text or links anywhere in the HTML email — clean, professional look only.',
-    'Email carries ALL important data: Contract Overview (contract no., dates, names, safewords, consent), every finished day’s entries (even collapsed ones), and both signatures with status.',
     'Romantic & professional style: rose-bordered banner, Soulmate Code wordmark, heart divider, love-stamp footer with quote.',
     'Previous releases: auto-collapse of finished days (▾/▸ toggle), bigger header logo, version badge + What’s new toast.'
   ];
@@ -1093,10 +1093,15 @@
       if (who) add(who, q.textContent.replace(/^\s*\S+:/, '').replace(/[“”]/g, '').trim());
     });
 
-    /* checklist items ticked */
+    /* v2.7 DH — ALL important data must reach the HTML email, so every section of
+       the Day page AND the Pre-Scene Execution Affidavit is collected below. */
+
+    /* checklist items — ticked ones are CONFIRMED; unticked ones are still shown
+       as pending so the affidavit status is complete in the export */
     $$('.checklist-item', page).forEach(item => {
       const cb = $('input[type="checkbox"]', item);
-      if (cb?.checked) add('Confirmed', item.textContent.trim());
+      if (cb?.checked) add('✓ Confirmed', item.textContent.trim());
+      else             add('○ Pending',  item.textContent.trim());
     });
 
     /* safeword verification table */
@@ -1104,36 +1109,41 @@
     if (verify) $$('tr', verify).slice(1).forEach(tr => {
       const tds = $$('td', tr);
       if (tds.length < 3) return;
-      const word = tds[0].textContent.trim();
+      const word = tds[0].textContent.trim().replace(/[“”]/g, '');
       const state = cell => {
         const boxes = $$('input[type="checkbox"]', cell);
         if (boxes[0]?.checked) return 'Yes';
         if (boxes[1]?.checked) return 'No';
-        return '';
+        return '—';
       };
-      add(`${word} — spoken by Sub`, state(tds[1]));
-      add(`${word} — spoken by Dom`, state(tds[2]));
+      add(`Safeword "${word}" — spoken by Submissive`, state(tds[1]));
+      add(`Safeword "${word}" — spoken by Dominant`,  state(tds[2]));
     });
 
-    /* toy inventory */
+    /* toy inventory — report every listed item, even un-checked ones */
     const toys = $('.toy-table', page);
     if (toys) $$('tr', toys).slice(1).forEach(tr => {
       const tds = $$('td', tr);
       if (tds.length < 3) return;
       const conds = $$('label.yn', tds[1]).filter(l => $('input', l).checked).map(l => l.textContent.trim());
       const loc   = $('input', tds[2])?.value.trim() || '';
-      if (conds.length || loc) add(tds[0].textContent.trim(), [conds.join(', '), loc && `→ ${loc}`].filter(Boolean).join(' '));
+      add(`Toy · ${tds[0].textContent.trim()}`,
+          [conds.length ? conds.join(', ') : 'not confirmed', loc && `→ ${loc}`].filter(Boolean).join('  '));
     });
 
-    /* debrief */
+    /* debrief — capture score/notes AND every checkbox + extra input (e.g.
+       "Safeword used? Yes → which one") so nothing important is lost */
     $$('.debrief-grid > div', page).forEach(cell => {
       const label = $('label:not(.yn)', cell)?.textContent.trim() || 'Debrief';
-      const inp   = $('input:not([type="checkbox"])', cell);
-      const ta    = $('textarea', cell);
-      if (ta?.value.trim()) add(label, ta.value.trim());
-      else if (inp?.value.trim()) add(label, inp.value.trim());
+      const parts = [];
+      const ta = $('textarea', cell);
+      if (ta?.value.trim()) parts.push(ta.value.trim());
+      $$('input:not([type="checkbox"])', cell).forEach(inp => {
+        if (inp !== ta && inp.value.trim()) parts.push(inp.value.trim());
+      });
       const yn = $$('label.yn', cell).find(l => $('input', l).checked);
-      if (yn && !inp?.value.trim() && !ta) add(label, yn.textContent.trim());
+      if (yn) parts.unshift(yn.textContent.trim());
+      if (parts.length) add(label, parts.join(' · '));
     });
 
     /* execution date/time line */
@@ -1300,6 +1310,9 @@
 
     /* full standalone HTML document — pastes into any HTML preview and renders with images */
     const sectionH3 = t => `<h3 style="font-family:Georgia,serif;color:#7b2d3b;border-bottom:2px solid #dccdbd;padding-bottom:4px;margin:24px 0 10px;font-size:16px;letter-spacing:.08em;text-transform:uppercase">${t}</h3>`;
+    /* v2.7 DH — sub-heading used to split each day's export into its two big blocks */
+    const sectionH4 = t => `<h4 style="font-family:Georgia,serif;color:#a04b5c;margin:18px 0 6px;font-size:14px;letter-spacing:.06em">&#9825; ${t}</h4>`;
+    const rowHtml = r => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr><td style="padding:6px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong style="color:#7b2d3b">${esc(r.label)}:</strong> ${esc(r.value)}</td></tr></table>`;
     let bodyHtml =
       headHtml +
       (globalHtml ? sectionH3('Contract Overview') + globalHtml : '') +
@@ -1310,10 +1323,31 @@
       plain += `\n── ${title} ──\n`;
       bodyHtml += sectionH3(esc(title));
       if (!rows.length) { plain += '  (no entries recorded)\n'; bodyHtml += '<p style="color:#5b4437;font-size:14px;margin:0 0 10px">(no entries recorded)</p>'; }
-      rows.forEach(r => {
+
+      /* v2.7 DH — the collected rows are grouped so the HTML email clearly shows
+         both big blocks the couple asked for:
+         1) "Day Section"        → activities, timings, requests, signatures …
+         2) "Pre-Scene Execution Affidavit" → exec date/time, checklist confirmations,
+            safeword verification, toy inventory, debrief, debrief signatures.
+         Rows carrying an affidavit marker go to block 2; everything else to block 1. */
+      const AFFIDAVIT_MARKERS = [
+        '✓ Confirmed', '○ Pending',
+        'Date of execution', 'Time',
+        /^Safeword "/i, /^Toy · /i,
+        /signature \(debrief\)/i,
+        /Overall satisfaction|Aftercare effectiveness|Safeword used|Adjustments for next time|Debrief notes/i
+      ];
+      const isAffidavit = r => AFFIDAVIT_MARKERS.some(m => typeof m === 'string' ? r.label.startsWith(m) : m.test(r.label));
+      const dayRows = rows.filter(r => !isAffidavit(r));
+      const affRows = rows.filter(isAffidavit);
+
+      const renderGroup = list => list.forEach(r => {
         plain += `  ${r.label}: ${r.value}\n`;
-        bodyHtml += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse"><tr><td style="padding:6px 0;border-bottom:1px solid #f3e6da;font-size:14px;color:#4a362c"><strong style="color:#7b2d3b">${esc(r.label)}:</strong> ${esc(r.value)}</td></tr></table>`;
+        bodyHtml += rowHtml(r);
       });
+
+      if (dayRows.length) { bodyHtml += sectionH4('Day Section'); renderGroup(dayRows); }
+      if (affRows.length) { bodyHtml += sectionH4(`Pre-Scene Execution Affidavit — ${esc(title)}`); renderGroup(affRows); }
     });
     bodyHtml += footHtml;
 
