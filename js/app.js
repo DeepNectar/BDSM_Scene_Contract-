@@ -185,6 +185,25 @@
   /* ---------- per-area signature state (cloud-backed, in-memory mirror) ---------- */
   const BASE_AREAS = ['seal', 'signatories', 'debrief'];   // every area accepts independently
   let AREAS = [...BASE_AREAS];   // grows dynamically when the AI creates new day areas
+
+  /* v1.9 DH — legacy fix: older builds stored Day-1 signatory/debrief accepts under
+     the generic areas but showed Day-1 buttons without data-area (they fell back to
+     'seal'), and Deep's Day-1 accepts were sometimes saved only under 'seal'.
+     Once, on load, merge any seal-only accept into the signatories & debrief areas
+     for the static pages (day1 / summary) so those Accept buttons show
+     "Signed ✓ · Undo" instead of looking dead for Deep. Runs BEFORE syncAreas(). */
+  const migrateLegacyAccepts = () => {
+    const a = window.CloudStore.accepts();
+    if (!a || typeof a !== 'object') return;
+    let changed = false;
+    const hasGeneric = !!(a['signatories'] || a['debrief']);
+    if (!hasGeneric && a.seal) {
+      ['signatories', 'debrief'].forEach(area => {
+        if (!a[area]) { a[area] = JSON.parse(JSON.stringify(a.seal)); changed = true; }
+      });
+    }
+    if (changed) window.CloudStore.saveAccepts(a);
+  };
   /* discover any data-area present in the DOM (e.g. signatories-day2 / debrief-day2) */
   const syncAreas = () => {
     $$('#main-contract [data-area]').forEach(el => {
@@ -206,6 +225,21 @@
   const writeAccepts = a => {
     window.CloudStore.saveAccepts(a)
       .then(ok => { if (!ok && !window.CloudStore.ready) toast('⚠️ Signature kept in this session only — cloud not configured.', 3400); });
+  };
+
+  /* v1.9 DH — normalise legacy buttons: any .accept-btn / .sig-card / .initials-slot
+     without data-area inherits from its closest [data-area] ancestor, defaulting to
+     'seal'. This makes every Accept/Undo button genuinely functional (previously a
+     missing data-area could make Day-1 signs look dead for one party). */
+  const normaliseAreas = (root = document) => {
+    $$('[data-area]', root).forEach(hostEl => {
+      const area = hostEl.dataset.area;
+      $$('.accept-btn:not([data-area]), .initials-slot:not([data-area])', hostEl).forEach(el => {
+        el.dataset.area = area;
+      });
+    });
+    $$('.accept-btn:not([data-area])', root).forEach(b => { b.dataset.area = 'seal'; });
+    $$('.initials-slot:not([data-area])', root).forEach(s => { s.dataset.area = 'seal'; });
   };
 
   /* overlay the signature image onto every slot of one party IN ONE AREA ONLY */
@@ -278,6 +312,8 @@
   };
 
   const applySignatures = () => {
+    migrateLegacyAccepts();   // v1.9 DH: heal old seal-only accept records first
+    normaliseAreas(document); // v1.9 DH: guarantee every button/slot has a data-area
     syncAreas();   // include any AI-created day areas (signatories-day2, debrief-day2, …)
     const accepts = readAccepts();
     AREAS.forEach(area => {
@@ -297,6 +333,9 @@
     if (!btn) return;
     const party = btn.dataset.party;
     const area  = btn.dataset.area || 'seal';
+    /* v1.9 DH — normalise on click too: a button that never got a data-area
+       (e.g. witness / legacy markup) now works for BOTH parties, including Deep */
+    btn.dataset.area = area;
     if (!SIG_CONFIG[party]) return;
     const accepts = readAccepts();
     const byParty = accepts[area] || (accepts[area] = {});
@@ -681,6 +720,12 @@
         <div class="sign-field"><label>Honey's signature (debrief)</label><span class="initials-slot" data-area="debrief-day${N}" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
         <div class="sign-field"><label>Date</label>${dmyPill()}</div>
       </div>
+
+      <!-- Our love stamp — Drive ref: https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw/view?usp=sharing (local copy) -->
+      <div class="love-stamp">
+        <img src="img/love-stamp.png" alt="Our love stamp" loading="lazy">
+        <span class="stamp-caption">✦ Our love stamp ✦</span>
+      </div>
     </section>`;
   };
 
@@ -709,6 +754,9 @@
      Any .sign-row containing an initials-slot without its own accept button gets a
      compact inline "Accept / Signed ✓ · Undo" control wired into the same area. */
   const ensureSignAccepts = (root = document) => {
+    normaliseAreas(root);   // v1.9 DH: every slot/button gets a valid data-area first
+    /* accept buttons that live OUTSIDE any .sign-row (e.g. the witness line) */
+    $$('.accept-btn[data-party]:not([data-area])', root).forEach(b => { b.dataset.area = 'seal'; });
     $$('.sign-row', root).forEach(row => {
       $$('.initials-slot[data-party][data-area]', row).forEach(slot => {
         const party = slot.dataset.party;
@@ -965,7 +1013,26 @@
     return rows;
   };
 
-  const buildEmail = () => {
+  /* v1.9 DH — load a project image as a base64 data URI so the email HTML export
+     shows real images (relative paths & Drive /view links both break in email). */
+  const uriCache = {};
+  const fileToDataUri = async path => {
+    if (uriCache[path]) return uriCache[path];
+    try {
+      const res = await fetch(path);
+      if (!res.ok) throw new Error(res.status);
+      const blob = await res.blob();
+      uriCache[path] = await new Promise((res2, rej) => {
+        const r = new FileReader();
+        r.onload = () => res2(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(blob);
+      });
+      return uriCache[path];
+    } catch { return ''; }   // offline / missing file → caller degrades to text link
+  };
+
+  const buildEmail = async () => {
     const done = $$('.day-finished-select').filter(s => s.value === 'yes');
     if (!done.length) {
       toast('⚠️ Mark at least one day as finished before exporting.', 3200);
@@ -979,15 +1046,18 @@
     let sigPlain = '';
     let sigHtml  = '<div style="margin:0 0 14px">';
     const AREA_NAMES = { seal: 'Seal', signatories: 'Signatories', debrief: 'Debrief' };
+    const nameOf = a => AREA_NAMES[a] || a.replace(/-/g, ' · ').replace(/^(.)/, m => m.toUpperCase());
+    const [deepUri, honeyUri] = await Promise.all([fileToDataUri(SIG_CONFIG.Deep), fileToDataUri(SIG_CONFIG.Honey)]);
+    const partyUri = p => (p === 'Deep' ? deepUri : honeyUri) || SIG_CONFIG[p];
     AREAS.forEach(area => {
       const byParty = accepts[area] || {};
       Object.keys(SIG_CONFIG).forEach(party => {
         const acc = byParty[party];
-        const tag = `${AREA_NAMES[area]} — ${party}`;
+        const tag = `${nameOf(area)} — ${party}`;
         if (acc) {
           sigPlain += `  ${tag}: signed (${new Date(acc.ts).toLocaleString()})\n`;
           sigHtml += `<div style="padding:4px 0"><strong>${esc(tag)}:</strong> accepted &amp; signed ` +
-                     `<img src="${SIG_CONFIG[party]}" alt="${esc(party)} signature" style="height:40px;vertical-align:middle;margin-left:8px"></div>`;
+                     `<img src="${partyUri(party)}" alt="${esc(party)} signature" style="height:40px;vertical-align:middle;margin-left:8px"></div>`;
         } else {
           sigPlain += `  ${tag}: (awaiting signature)\n`;
           sigHtml += `<div style="padding:4px 0"><strong>${esc(tag)}:</strong> <em>(awaiting signature)</em></div>`;
@@ -996,9 +1066,18 @@
     });
     sigHtml += '</div>';
 
-    let plain = `♥ DEEP & HONEY — SCENE CONTRACT EXPORT ♥\nExported: ${now}\nCompleted: ${days.map(d => d.id.toUpperCase()).join(', ')}\n${'='.repeat(52)}\n\nSignatures:\n${sigPlain}`;
+    /* Our love stamp + Soulmate code logo — embedded as data URIs in the HTML email;
+       plain-text version carries the Drive links (in-app previews use local copies). */
+    const stampUri = await fileToDataUri('img/love-stamp.png');
+    const logoUri  = await fileToDataUri('img/soulmate-logo.png');
+    const brandHtml =
+      (logoUri  ? `<div style="text-align:center;padding:6px 0"><img src="${logoUri}" alt="Soulmate code logo" style="height:56px"></div>` : '') +
+      (stampUri ? `<div style="text-align:center;padding:6px 0"><img src="${stampUri}" alt="Our love stamp" style="height:72px"><div style="font-size:12px;color:#5b4437">\u2726 Our love stamp \u2726</div></div>` : '');
+
+    let plain = `\u2665 DEEP & HONEY \u2014 SCENE CONTRACT EXPORT \u2665\nExported: ${now}\nCompleted: ${days.map(d => d.id.toUpperCase()).join(', ')}\n${'='.repeat(52)}\n\nSignatures:\n${sigPlain}`;
+    plain += `\nOur love stamp: https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw/view?usp=sharing\nSoulmate code logo: https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS/view?usp=sharing\n`;
     let html  = `<div style="font-family:Georgia,serif;color:#2a1c16">` +
-                `<h2 style="letter-spacing:.05em;margin:0 0 4px">♥ Deep &amp; Honey — Scene Contract Export</h2>` +
+                `<h2 style="letter-spacing:.05em;margin:0 0 4px">\u2665 Deep &amp; Honey \u2014 Scene Contract Export</h2>` +
                 `<p style="margin:0 0 4px;color:#5b4437">Exported: ${esc(now)}</p>` +
                 `<p style="margin:0 0 8px;color:#5b4437">Completed: <strong>${days.map(d => esc(d.id.toUpperCase())).join(', ')}</strong></p>` +
                 `<h3 style="border-bottom:2px solid #dccdbd;padding-bottom:4px;margin:14px 0 8px">Signatures</h3>` + sigHtml;
@@ -1015,13 +1094,14 @@
     });
 
     plain += `\n${'='.repeat(52)}\nCONFIDENTIAL — private between Deep & Honey.\n`;
-    html  += `<p style="margin-top:18px;font-style:italic;color:#5b4437">Confidentiality notice: strictly private between Deep &amp; Honey.</p></div>`;
+    html  += brandHtml +
+             `<p style="margin-top:18px;font-style:italic;color:#5b4437">Confidentiality notice: strictly private between Deep &amp; Honey.</p></div>`;
 
     return { plain, html };
   };
 
-  $('#email-contract').addEventListener('click', () => {
-    const out = buildEmail();
+  $('#email-contract').addEventListener('click', async () => {
+    const out = await buildEmail();
     if (!out) return;
     plainText = out.plain; htmlText = out.html;
     renderModal();
