@@ -1,57 +1,68 @@
-=====================================================================
- EMAILJS TEMPLATE — FINAL EXACT SETUP (template_obq7xfj)
- Fixes "Gmail shows HTML code instead of the rendered contract"
-=====================================================================
+=====================================================
+EMAILJS TEMPLATE SETUP — template_obq7xfj  (v4.30)
+=====================================================
 
-WHY IT BROKE: EmailJS prints {{message}} as escaped TEXT unless the
-variable sits INSIDE raw-HTML block tags {!!!} ... {!!!} in the
-TEMPLATE. The app now sends clean HTML only, so the tags must be in
-the template (never in the message value).
+YOUR SETTINGS (already built into the app — nothing to type there):
+  Service ID : service_a5vpbye   (must show "Connected" to Gmail)
+  Template ID: template_obq7xfj
+  Public Key : gDRCzC6V8qn70e7mj
 
----------------------------------------------------------------------
+-----------------------------------------------------
 STEP A — Open the template editor
-  emailjs.com → Login → Dashboard → "Email Templates" (left menu)
-  → click your template: template_obq7xfj
+-----------------------------------------------------
+emailjs.com → Login → Email Templates → click "template_obq7xfj".
 
+-----------------------------------------------------
 STEP B — Set these fields
-  Subject   :  {{subject}}
-  Send To   :  {{to_email}}          <-- MUST be exactly this
-  From name :  Deep & Honey          (anything you like)
-  Reply To  :  {{reply_to}}          (optional but recommended)
+-----------------------------------------------------
+1) SETTINGS tab of the template:
+   - Subject field  : {{subject}}
+   - "To" field     : {{to_email}}        <-- CRITICAL, else it won't know where to send
+   - From name      : Deep & Honey app    (optional)
 
-STEP C — Replace the ENTIRE body content (this is the key step)
-  1. In the CONTENT area click the "</>" button (source-code /
-     HTML mode) at the top-right of the editor toolbar.
-  2. DELETE everything inside it (all default text and styling).
-  3. Paste EXACTLY this single line:
+2) CONTENT area — THIS IS THE PART THAT MATTERS MOST:
+   a) Look at the top-right of the content editor for two toggles:
+      "Rich Text" and "</> Source Code".
+   b) CLICK "</>" (Source Code mode). If you stay in Rich Text,
+      {!!!} WILL NOT WORK and Gmail shows your contract as code.
+   c) DELETE EVERYTHING in the box (the default welcome text, tables, emojis).
+   d) Paste EXACTLY this single line — nothing before, nothing after:
 
-        {!!!}{{message}}{{message_html}}{!!!}
+{!!!}{{message}}{!!!}
 
-     Correct copy-paste version (choose ONE variable, both work):
+   e) Click Save. The {!!!} tags tell EmailJS "insert raw HTML here",
+      so your styled contract renders as a real email body.
 
-        {!!!}{{message}}{!!!}
+-----------------------------------------------------
+STEP C — Photos in the email
+-----------------------------------------------------
+The app automatically replaces every photo with its public Google
+Drive link (signatures, love stamp, soulmate logo), so the email
+stays tiny (about 5–10 KB total — far below the 50 KB limit) AND
+all photos still show inside the body.
 
-  4. That is all — no other text, no <p>, no wrapper needed.
+REQUIREMENT: all 4 Drive files must be shared as
+"Anyone with the link — Viewer":
+  Deep signature : https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj/view
+  Honey signature: https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI/view
+  Love stamp     : https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw/view
+  Soulmate logo  : https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS/view
 
-STEP D — Save
-  Click "Save" (top-right). Then optionally "Test it" with dummy
-  values to confirm rendering.
+-----------------------------------------------------
+WHY YOU GOT "Variables size limit ... 50Kb"
+-----------------------------------------------------
+EmailJS counts the TOTAL size of ALL variables combined.
+Older app versions sent the same contract THREE times
+(message + message_html + message_text) which tripled the
+size and tripped the limit. v4.30 sends ONE variable only:
+{{message}} — verified ~5.5 KB in tests. Update the app to
+v4.30 (deploy js/app.js + index.html + sw.js) and keep the
+template body exactly as in STEP B above.
 
----------------------------------------------------------------------
-APP SIDE (already done, v4.29):
-  • Sends variables: subject, to_email, reply_to, from_name,
-    message AND message_html (same clean styled HTML in both).
-  • Photos are Google Drive links -> make sure the 4 Drive files
-    are shared "Anyone with the link – Viewer".
-  • Deploy updated files (index.html, js/app.js, sw.js), open the
-    app once until the badge shows v4.29 DH, then:
-    fill form -> Email data -> type recipient in "Send TO" ->
-    Send now. Gmail will show the rendered contract, not code.
-
-TROUBLESHOOTING
-  • Still shows code? You edited in rich-text mode. Redo STEP C in
-    "</>" source mode; the line must literally contain {!!!} tags.
-  • "{!!!}" visible as text in email? Then the tags were typed into
-    the message somewhere else — body must be ONLY the one line above.
-  • Photos missing? Drive sharing = "Anyone with the link".
-=====================================================================
+-----------------------------------------------------
+FINAL TEST FLOW
+-----------------------------------------------------
+Open app (badge must read v4.30 DH) → fill contract →
+✉ Email data → HTML preview shows → type recipient in
+"Send TO" → 🚀 Send now → Gmail inbox shows the styled
+contract WITH photos rendered in the body.

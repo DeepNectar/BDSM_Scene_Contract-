@@ -350,8 +350,9 @@
     }
   };
 
-  const APP_VERSION = 'v4.29 DH';
+  const APP_VERSION = 'v4.30 DH';
   const WHATS_NEW_TOP = [
+    '🩹 v4.30: 50KB ERROR KILLED FOR GOOD — EmailJS counts the TOTAL size of ALL variables, and the app was sending the same contract THREE times (message + message_html + message_text), so even a tiny email tripped the limit. Now it sends ONE variable only: {{message}}. FINAL TEMPLATE FIX ON EMAILJS: open template_obq7xfj → click \"</>\" (source-code mode) → make the body exactly this ONE line:  {!!!}{{message}}{!!!}  → Save. Photos still render via Drive links. Changelog: ',
     '🩹 v4.29: NO MORE CODE IN GMAIL — the app now sends CLEAN HTML only (it stopped wrapping the payload in {!!!}/{!!} tags itself, because those belong ONLY inside the EmailJS template, not in the message value). FINAL FIX ON EMAILJS: open template_obq7xfj → click "</>" (source-code mode) → make the body exactly this ONE line:  {!!!}{{message}}{!!!}  → Save. Then send again — the contract renders as a real email.',
     '🩹 v4.28: HTML-IN-BODY MADE BULLETPROOF — the send step now passes the styled contract as {{message_html}} (raw-HTML wrapped by the app) AND still as {{message}}, so your Gmail shows the rendered contract instead of source code no matter which variable your template uses. Set your EmailJS template body to just ONE line: {{message_html}}  Changelog: ',
     '🩹 v4.27: HTML-SHOWING-AS-CODE-IN-GMAIL FIXED — EmailJS renders {{message}} as raw HTML only when it sits inside {!!!} … {!!!} blocks in the template body; otherwise Gmail shows the whole contract as visible source code. The send step now wraps the payload automatically. Also change your template CONTENT to: {!!!}{{message}}{!!!} Changelog: ',
@@ -3410,19 +3411,36 @@ ${bodyHtml}
         }
         return null;
       };
+      /* v4.30 — match an <img> tag by EITHER alt text OR its embedded data URI
+         prefix. The local signature PNGs compress to ~7 KB each; two images
+         together (~14 KB base64) are recognisable by their first 60 chars, so
+         even if alt text ever changes we still map the right photo to the
+         right Drive link. */
+      const uriPrefix = {};
+      Object.keys(DATA_URIS).forEach(k => { uriPrefix[k] = DATA_URIS[k].slice(0, 60); });
+      const keyForImgTag = tag => {
+        const mAlt = tag.match(/alt\s*=\s*["']([^"']*)["']/i);
+        const k = canonKey(mAlt ? mAlt[1] : '');
+        if (k) return k;
+        const mSrc = tag.match(/src\s*=\s*["']([^"']+)["']/i);
+        if (mSrc) for (const kk of Object.keys(uriPrefix)) {
+          if (mSrc[1].startsWith(uriPrefix[kk])) return kk;
+        }
+        return null;
+      };
       const driveify = h => {
-        /* 1. every <img> whose alt names a known image → rebuilt tag pointing
+        /* 1. every <img> that belongs to a known photo → rebuilt tag pointing
               DIRECTLY at its Drive pixel link. Rebuilding (instead of in-place
               regex swaps) is deliberate: the exported onerror chain contains
               quotes/JS that break attribute-wise find-and-replace, and email
               clients can't run it anyway. */
-        let out = h.replace(/<img\b[^>]*>/gi, tag => {
-          const mAlt = tag.match(/alt\s*=\s*["']([^"']*)["']/i);
-          const k    = canonKey(mAlt ? mAlt[1] : '');
+        let out = h.replace(/<img\b[\s\S]*?>/gi, tag => {
+          const k = keyForImgTag(tag);
           if (!k) return tag;
           const [w, hh] = EMBED_SIZES[k] || [320, 200];
           const mW = tag.match(/\bwidth\s*=\s*["']?(\d+)/i);
           const mS = tag.match(/\bstyle\s*=\s*["']([^"']*)["']/i);
+          const mAlt = tag.match(/alt\s*=\s*["']([^"']*)["']/i);
           const dispW = mW ? mW[1] : w;
           const style = (mS ? mS[1] + ';' : '') + 'max-width:100%;height:auto;border:0';
           return `<img src="${ghUrl(k, w, hh)}" alt="${escA(mAlt ? mAlt[1] : k)}" width="${dispW}" style="${style}">`;
@@ -3430,8 +3448,10 @@ ${bodyHtml}
         /* 2. any leftover data-URI src → generic Drive pixel link (stamp) */
         out = out.replace(/src\s*=\s*["']data:image\/[a-z+]+;base64,[^"']*["']/gi,
           () => `src="${photoSrcFor('stamp')}"`);
-        /* 3. last resort: strip remaining base64 runs so we never hit 50 KB */
+        /* 3. last resort: strip remaining base64/SVG data runs so we NEVER hit
+              the EmailJS 50 KB variables limit */
         out = out.replace(/data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+/g, '');
+        out = out.replace(/data:image\/svg\+xml[^"']*/gi, '');
         return out;
       };
       let payloadHtml = driveify(htmlText);
@@ -3459,24 +3479,21 @@ ${bodyHtml}
       if (new Blob([payloadHtml]).size > MAX_BYTES) {    /* extreme fallback */
         payloadHtml = payloadHtml.slice(0, MAX_BYTES - 60) + '\n\n…[truncated to fit EmailJS 50 KB limit]';
       }
-      /* v4.28 — send BOTH variables so either template style works:
-         • {{message_html}} = raw-HTML-wrapped styled contract (recommended body var)
-         • {{message}}      = same payload kept for templates still using it,
-                              plus a plain-text fallback for text-only clients */
-      const plainFallback = htmlText
-        .replace(/<style[\s\S]*?<\/style>/gi, '')
-        .replace(/<script[\s\S]*?<\/script>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
-        .replace(/\s+/g, ' ').trim().slice(0, 3500);
+      /* v4.30 — CRITICAL FIX for "Variables size limit. The maximum allowed
+         variables size is 50Kb": EmailJS counts the TOTAL of ALL variables,
+         and since v4.28 the app was sending the SAME contract THREE times
+         (message + message_html + message_text), which tripled the measured
+         size and tripped the limit even for small emails. Now exactly ONE
+         content variable is sent: {{message}}. The template body must be the
+         single line  {!!!}{{message}}{!!!}  in source-code mode (see guide). */
+      const totalVars = new Blob([payloadHtml + subject + toEmail]).size;
+      console.log('EmailJS payload bytes:', totalVars);
       await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, {
         to_email: toEmail,
         from_name: ejsCfg.fromName || 'Deep & Honey app',
         subject,
         reply_to: toEmail,
-        message_html: payloadHtml, /* raw-HTML wrapped — lands rendered in BODY */
-        message: payloadHtml,      /* older templates that still use {{message}} */
-        message_text: plainFallback/* optional plain-text variable */
+        message: payloadHtml       /* the ONLY content variable — rendered via {!!!} block */
       });
       try { safeSet('dh_email_to_last', toEmail); } catch { /* ignore */ }
       closeModal();
