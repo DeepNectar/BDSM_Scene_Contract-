@@ -350,8 +350,9 @@
     }
   };
 
-  const APP_VERSION = 'v4.34 DH';
+  const APP_VERSION = 'v4.35 DH';
   const WHATS_NEW_TOP = [
+    '🔌 v4.35: ANY EMAIL PROVIDER NOW — the ⚙ EmailJS settings dialog gained a "Send via" picker: (1) 🟣 EmailJS (dashboard.emailjs.com — current service/template/pre-filled keys), (2) 📧 FormSubmit.co (NO account or key needed at all — point it at any inbox and the styled contract arrives as a real HTML email; first send to a new address needs one tap on their confirmation link), (3) ✉ Formspree / (4) 📨 Web3Forms (one free key from formspree.io / web3forms.com — paste the key/endpoint into the same field). The 🚀 Send button now works with whichever provider you pick, always delivering the rendered HTML preview in the body. Plus two bug fixes: the ✉ Send Email fallback button was crashing when pressed before ever opening the dialog (the clipboard copy now runs only inside the dialog), and the Gmail-draft button is created up-front again so it is always visible. Changelog: ',
     '🎯 v4.34: CODE-IN-BODY SOLVED FOR GOOD — EmailJS ALWAYS HTML-escapes template variables for Gmail (the {!!!} raw-HTML block is ignored by their Gmail integration; that is why your body showed source code no matter what we tried). The app now sends the full styled contract inside an <iframe srcdoc="…"> wrapper: even after escaping, Gmail renders the iframe as a real embedded page — so the complete HTML preview (photos included, via Drive links) appears directly in the email BODY. No template tricks needed anymore: {{message}} anywhere in the body works. Changelog: ',
     '🩹 v4.33: RENDER TEST + FULL DOCUMENT — two upgrades to kill "code in body" for good. (1) NEW 🧪 Send render test button inside ⚙ EmailJS settings: sends a tiny fixed HTML through your exact service/template — if it arrives as BIG RED styled text your template is fine; if it shows raw tags, the template escaping is confirmed and must be rebuilt. (2) The emailed copy is now the COMPLETE HTML document (with <head>, meta charset and its own style block) instead of an escaped fragment — Gmail renders full documents natively. Changelog: ',
     '🩹 v4.32: 50KB ERROR KILLED AT THE ROOT — EmailJS counts EVERY variable (including the SDK\'s hidden __token/__time ones), and multi-line/unicode HTML inside {{message}} trips both the size limit AND makes Gmail show raw code. The emailed copy is now ONE clean line, pure-ASCII (emoji/symbols converted to safe codes), <style> rules converted to inline styles (Gmail strips <style> blocks), photos as tiny Drive links — total ~3–8 KB, nowhere near 50 KB, and it RENDERS in the body. TEMPLATE MUST BE EXACTLY THIS (source-code mode </>): {!!!}{{message}}{!!!} on an otherwise EMPTY body — delete ALL the default template design (the 👤 box, "A message by {{name}}…" table). Changelog: ',
@@ -3209,7 +3210,25 @@ ${bodyHtml}
     renderModal(); openModal();
   });
 
+  /* v4.35 DH FIX — "in this html preview in body it is not coming": every footer
+     action (Copy / Save .html / ✉ Send Email / 🚀 Send now) reads htmlText, but
+     htmlText was ONLY filled when the dialog was opened via the ✉ Email data
+     button. If any of these buttons ran before that (or after a page reload),
+     the "HTML" sent/downloaded/copied was EMPTY — so nothing appeared in the
+     email body. Now each action guarantees the content exists first. */
+  const ensureEmailContent = async () => {
+    if (htmlText && plainText) return true;
+    try {
+      const out = await buildEmail();
+      if (!out || !out.html) { toast('⚠️ Could not build the contract content — press "✉ Email data" first.', 4200); return false; }
+      plainText = out.plain; htmlText = out.html;
+      renderModal();
+      return true;
+    } catch { toast('⚠️ Could not build the contract content — press "✉ Email data" first.', 4200); return false; }
+  };
+
   $('#modal-copy-btn').addEventListener('click', async () => {
+    if (!(await ensureEmailContent())) return;
     const text = fmt === 'plain' ? plainText : htmlText;
     try { await navigator.clipboard.writeText(text); toast('📋 Copied to clipboard.'); }
     catch {
@@ -3221,7 +3240,8 @@ ${bodyHtml}
     }
   });
 
-  $('#modal-download-btn')?.addEventListener('click', () => {
+  $('#modal-download-btn')?.addEventListener('click', async () => {
+    if (!(await ensureEmailContent())) return;
     try {
       const blob = new Blob([htmlText], { type: 'text/html' });
       const url  = URL.createObjectURL(blob);
@@ -3234,7 +3254,8 @@ ${bodyHtml}
     } catch { toast('Download failed — use 📋 Copy instead.', 3200); }
   });
 
-  $('#modal-email-btn').addEventListener('click', () => {
+  $('#modal-email-btn').addEventListener('click', async () => {
+    if (!(await ensureEmailContent())) return;
     /* v4.8 DH — mailto: can only carry PLAIN TEXT (email clients ignore/stripped
        HTML in a mailto body), so "Send Email" opens the mail app with the plain
        version, and the HTML file is downloaded alongside it as an attachment.
@@ -3260,20 +3281,14 @@ ${bodyHtml}
   });
 
   /* ---------- "Open Gmail (HTML in body)" — true HTML preview inside the email body.
+     v4.35: the button now lives directly in index.html's modal footer
+     (#modal-gmail-btn) so it is ALWAYS visible; JS only wires its click handler.
      Gmail's compose URI accepts a plain-text body only, so after the draft opens we
      copy the styled HTML to the clipboard: click in the Gmail message area and paste
      once — the romantic HTML layout lands directly in the email body. ---------- */
-  let gmailBtn = $('#modal-gmail-btn');
-  if (!gmailBtn) {
-    gmailBtn = document.createElement('button');
-    gmailBtn.type = 'button';
-    gmailBtn.id = 'modal-gmail-btn';
-    gmailBtn.className = 'btn btn-outline';
-    gmailBtn.textContent = '📤 Open Gmail (HTML in body)';
-    const footer = modal && $('.modal-footer', modal);
-    if (footer) footer.insertBefore(gmailBtn, $('#modal-close-footer-btn') || null);
-  }
-  gmailBtn.addEventListener('click', async () => {
+  const gmailBtn = $('#modal-gmail-btn');
+  gmailBtn?.addEventListener('click', async () => {
+    if (!(await ensureEmailContent())) return;
     try { await navigator.clipboard.writeText(htmlText); }
     catch {
       const ta = Object.assign(document.createElement('textarea'), { value: htmlText });
@@ -3289,29 +3304,41 @@ ${bodyHtml}
   });
 
   /* ============================================================
-     🚀 EMAILJS — true one-click send with the HTML preview
-     directly in the email BODY (no mail client, no pasting).
-     Requires a free https://www.emailjs.com account:
-       • Service ID   (send via your own Gmail — "Add a new sending service")
-       • Template ID  (create a template containing only {{message}})
-       • Public Key   (Account → General → Public Key)
-     Fill them once via the "⚙ EmailJS settings" button; they are
-     stored locally in this browser (localStorage) — never uploaded.
+     🚀 ONE-CLICK SEND with the HTML preview directly in the email
+     BODY (no mail client, no pasting). v4.35 DH supports FOUR
+     providers — pick one under ⚙ Settings → "Send via":
+       • 🟣 EmailJS        (free https://dashboard.emailjs.com account:
+                            Service ID + Template ID + Public Key)
+       • 📧 FormSubmit.co  (NO account/key at all — just the recipient
+                            address; first send needs a one-tap confirm)
+       • ✉ Formspree      (free https://formspree.io form key/endpoint)
+       • 📨 Web3Forms      (free https://web3forms.com access key)
+     Credentials are stored locally in this browser (localStorage)
+     — never uploaded. The recipient address is typed manually in
+     the email dialog every time before sending.
      ============================================================ */
   const EJS_KEY = 'dh_emailjs_v1';
   const ejsCfg  = (() => {
     try { return JSON.parse(safeGet(EJS_KEY)) || {}; } catch { return {}; }
   })();
-  /* v4.22 — EmailJS credentials are pre-filled (static config). The recipient
-     address is NOT stored here: it is entered manually in the email dialog
-     every time before sending. */
+  /* v4.22 — EmailJS credentials are pre-filled (static config). */
+  if (!ejsCfg.provider)   ejsCfg.provider   = 'emailjs';
   if (!ejsCfg.serviceId)  ejsCfg.serviceId  = 'service_a5vpbye';
   if (!ejsCfg.templateId) ejsCfg.templateId = 'template_obq7xfj';
   if (!ejsCfg.publicKey)  ejsCfg.publicKey  = 'gDRCzC6V8qn70e7mj';
   const saveEjs = () => safeSet(EJS_KEY, JSON.stringify(ejsCfg));
   let   ejsInited = false;
 
-  const ejsReady = () => !!(ejsCfg.serviceId && ejsCfg.templateId && ejsCfg.publicKey);
+  const PROVIDERS = ['emailjs', 'formsubmit', 'formspree', 'web3forms'];
+  const providerReady = p => {
+    p = p || ejsCfg.provider || 'emailjs';
+    if (p === 'emailjs')   return !!(ejsCfg.serviceId && ejsCfg.templateId && ejsCfg.publicKey);
+    /* formsubmit needs nothing besides the recipient (typed per send) */
+    if (p === 'formsubmit') return true;
+    /* formspree / web3forms need the single endpoint/key field */
+    return !!(ejsCfg.endpoint && ejsCfg.endpoint.trim());
+  };
+  const ejsReady = () => providerReady(ejsCfg.provider);
 
   /* ---------- settings sheet ---------- */
   let ejsModal = $('#ejs-modal');
@@ -3323,22 +3350,36 @@ ${bodyHtml}
     ejsModal.setAttribute('aria-modal', 'true');
     ejsModal.innerHTML = [
       '<div class="modal-card">',
-      '  <div class="modal-header"><h3>⚙ EmailJS settings</h3><button class="modal-close" id="ejs-close-btn" type="button">×</button></div>',
+      '  <div class="modal-header"><h3>⚙ Email settings</h3><button class="modal-close" id="ejs-close-btn" type="button">×</button></div>',
       '  <div class="modal-body html-body" style="text-align:left">',
-      '    <p style="margin:0 0 10px">EmailJS credentials are <b>pre-configured</b> (v4.22). Nothing to fill unless you want to change them. The recipient address is typed manually in the email dialog before each send.</p>',
+      '    <p style="margin:0 0 10px">Pick how 🚀 Send delivers the contract. EmailJS is <b>pre-configured</b>; the other providers need no EmailJS account at all.</p>',
+      '    <label for="ejs-provider" style="display:block;font-weight:600;margin:8px 0 2px">Send via</label>',
+      '    <select id="ejs-provider" class="field" style="width:100%">',
+      '      <option value="emailjs">🟣 EmailJS (dashboard.emailjs.com)</option>',
+      '      <option value="formsubmit">📧 FormSubmit.co (no account/key needed)</option>',
+      '      <option value="formspree">✉ Formspree (formspree.io)</option>',
+      '      <option value="web3forms">📨 Web3Forms (web3forms.com)</option>',
+      '    </select>',
+      '    <div id="ejs-emailjs-fields">',
       '    <label for="ejs-pk" style="display:block;font-weight:600;margin:8px 0 2px">Public Key</label>',
       '    <input id="ejs-pk" class="field" style="width:100%" placeholder="e.g. abcDEF123xyz" value="">',
       '    <label for="ejs-svc" style="display:block;font-weight:600;margin:8px 0 2px">Service ID</label>',
       '    <input id="ejs-svc" class="field" style="width:100%" placeholder="service_xxxxxxx" value="">',
       '    <label for="ejs-tpl" style="display:block;font-weight:600;margin:8px 0 2px">Template ID</label>',
       '    <input id="ejs-tpl" class="field" style="width:100%" placeholder="template_xxxxxxx" value="">',
+      '    <p style="margin:10px 0 0;font-size:.85rem;opacity:.8">Your EmailJS template must contain ONE variable: <b>{{message}}</b> — put it in the template body where the HTML should render, and set the template content mode to HTML/Rich Text.</p>',
+      '    </div>',
+      '    <div id="ejs-endpoint-fields" style="display:none">',
+      '    <label for="ejs-endpoint" style="display:block;font-weight:600;margin:8px 0 2px">Form key / Access key / Endpoint URL</label>',
+      '    <input id="ejs-endpoint" class="field" style="width:100%" placeholder="e.g. xyzabcd@yourmail.com (FormSubmit) · https://formspree.io/f/xxxxxxx or xxxxxxx (Formspree) · your 8-char access key (Web3Forms)" value="">',
+      '    <p id="ejs-endpoint-help" style="margin:8px 0 0;font-size:.85rem;opacity:.8"></p>',
+      '    </div>',
       '    <label for="ejs-from" style="display:block;font-weight:600;margin:8px 0 2px">From name (optional)</label>',
       '    <input id="ejs-from" class="field" style="width:100%" placeholder="Deep 💞" value="">',
-      '    <p style="margin:10px 0 0;font-size:.85rem;opacity:.8">Your EmailJS template must contain ONE variable: <b>{{message}}</b> — put it in the template body where the HTML should render, and set the template content mode to HTML/Rich Text.</p>',
       '    <label for="ejs-test-to" style="display:block;font-weight:600;margin:14px 0 2px">🧪 Render test recipient</label>',
       '    <input id="ejs-test-to" class="field" style="width:100%" placeholder="your own email for the test">',
       '    <button class="btn btn-ghost" id="ejs-test-btn" type="button" style="margin-top:8px">🧪 Send render test</button>',
-      '    <p style="margin:6px 0 0;font-size:.8rem;opacity:.75">Sends a tiny fixed HTML through the same service/template. BIG RED styled text = template OK. Visible &lt;tags&gt; as text = template still escaping (fix with a real raw-HTML block).</p>',
+      '    <p style="margin:6px 0 0;font-size:.8rem;opacity:.75">Sends a tiny fixed HTML through the selected provider. BIG RED styled text = OK. Visible &lt;tags&gt; as text = configuration issue.</p>',
       '  </div>',
       '  <div class="modal-footer">',
       '    <button class="btn btn-primary" id="ejs-save-btn" type="button">💾 Save settings</button>',
@@ -3348,52 +3389,174 @@ ${bodyHtml}
     ].join('\n');
     document.body.appendChild(ejsModal);
   }
+  /* v4.35 — provider-aware settings UI: show EmailJS fields OR the single
+     endpoint/key field, plus a short how-to for the chosen service. */
+  const PROVIDER_HELP = {
+    emailjs:     'EmailJS (dashboard.emailjs.com): create a Gmail Service, then a template whose body is the single variable <b>{{message}}</b>. Your service/template/public key are already pre-filled.',
+    formsubmit:  '<b>No account needed.</b> Type the destination inbox address here (any Gmail/Outlook/Yahoo address works). The FIRST send to a new address triggers a one-time activation email from FormSubmit — open it and click the link once; every later \u{1F680} Send delivers the styled contract straight into that inbox.',
+    formspree:   'Create a free form at <b>formspree.io</b>, then paste either the full endpoint (<b>https://formspree.io/f/xxxxxxx</b>) or just the form id (<b>xxxxxxx</b>).',
+    web3forms:   'Get a free access key at <b>web3forms.com</b> (it is emailed to you) and paste it here (e.g. <b>A1B2C3D4E5F6G7H8</b>). Mail arrives in the inbox tied to that key.'
+  };
+  const syncProviderUI = () => {
+    const p = ($('#ejs-provider') && $('#ejs-provider').value) || ejsCfg.provider || 'emailjs';
+    const ej = $('#ejs-emailjs-fields'), ef = $('#ejs-endpoint-fields');
+    if (ej) ej.style.display = (p === 'emailjs') ? '' : 'none';
+    if (ef) ef.style.display = (p === 'emailjs') ? 'none' : '';
+    const help = $('#ejs-endpoint-help');
+    if (help) help.innerHTML = PROVIDER_HELP[p] || '';
+    const ep = $('#ejs-endpoint');
+    if (ep) {
+      if (p === 'formsubmit')       ep.placeholder = 'destination inbox, e.g. honey@yourmail.com';
+      else if (p === 'formspree')   ep.placeholder = 'https://formspree.io/f/xxxxxxx  (or just xxxxxxx)';
+      else if (p === 'web3forms')   ep.placeholder = 'Web3Forms access key (e.g. A1B2C3D4E5F6G7H8)';
+    }
+  };
   const openEjsModal = () => {
+    $('#ejs-provider').value = ejsCfg.provider || 'emailjs';
     $('#ejs-pk').value  = ejsCfg.publicKey  || '';
     $('#ejs-svc').value = ejsCfg.serviceId  || '';
     $('#ejs-tpl').value = ejsCfg.templateId || '';
+    $('#ejs-endpoint').value = ejsCfg.endpoint || '';
     $('#ejs-from').value= ejsCfg.fromName   || '';
+    syncProviderUI();
     ejsModal.classList.add('active');
   };
+  $('#ejs-provider')?.addEventListener('change', syncProviderUI);
   $('#ejs-close-btn').addEventListener('click', () => ejsModal.classList.remove('active'));
   $('#ejs-cancel-btn').addEventListener('click', () => ejsModal.classList.remove('active'));
   ejsModal.addEventListener('click', e => { if (e.target === ejsModal) ejsModal.classList.remove('active'); });
   $('#ejs-save-btn').addEventListener('click', () => {
+    ejsCfg.provider   = $('#ejs-provider').value || 'emailjs';
     ejsCfg.publicKey  = $('#ejs-pk').value.trim();
     ejsCfg.serviceId  = $('#ejs-svc').value.trim();
     ejsCfg.templateId = $('#ejs-tpl').value.trim();
+    ejsCfg.endpoint   = $('#ejs-endpoint').value.trim();
     ejsCfg.fromName   = $('#ejs-from').value.trim();
     saveEjs();
     ejsInited = false;           /* force re-init with new key */
     ejsModal.classList.remove('active');
-    toast(ejsReady() ? '✅ EmailJS ready — type the recipient in the email dialog and press 🚀 Send now!' : 'Saved — but Public Key / Service ID / Template ID must all be filled.', 5200);
+    refreshSendBtn();
+    toast(ejsReady() ? '✅ Ready — type the recipient in the email dialog and press \u{1F680} Send!'
+                     : 'Saved — but the selected provider still needs its key/endpoint filled in.', 5200);
   });
   $('#modal-settings-btn')?.addEventListener('click', openEjsModal);
 
-  /* v4.33 — 🧪 DIAGNOSTIC TEST SEND (inside ⚙ settings). Sends a tiny fixed
-     payload through the SAME service/template. If this arrives RENDERED but
-     the full contract still shows as code, the problem is in the big payload;
-     if this ALSO shows as code, the EmailJS template is not using a real
-     raw-HTML block ({!!!}{{message}}{!!!}) — definitive either/or answer. */
+  /* ---------- provider dispatch (v4.35) — one send path per service ---------- */
+  const TEST_HTML = '<h1 style="color:#e11d48;font-size:32px">If you can read this as BIG RED styled text, your setup renders HTML correctly ✔</h1><p>If instead you see these angle brackets and tags as plain text, the provider/template is escaping HTML.</p>';
+
+  const formsubmitEndpoint = () => {
+    let ep = (ejsCfg.endpoint || '').trim();
+    if (/^https?:\/\//i.test(ep)) return ep;                       /* full URL given */
+    if (ep && !ep.includes('@')) ep += '@yourmail.invalid';        /* bare alias → needs a domain to POST to */
+    return 'https://formsubmit.co/' + ep;
+  };
+  const formspreeEndpoint = () => {
+    const ep = (ejsCfg.endpoint || '').trim();
+    if (!ep) return '';
+    return /^https?:\/\//i.test(ep) ? ep : 'https://formspree.io/f/' + ep;
+  };
+
+  /* All providers receive the same logical fields; each adapter maps them. */
+  const sendViaProvider = async ({ html, plain, subject, toEmail, fromName }) => {
+    const p = ejsCfg.provider || 'emailjs';
+
+    if (p === 'emailjs') {
+      if (!window.emailjs) throw new Error('EmailJS SDK not loaded — check your internet connection.');
+      if (!ejsInited) { emailjs.init({ publicKey: ejsCfg.publicKey }); ejsInited = true; }
+      await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, {
+        to_email: toEmail, from_name: fromName, subject, reply_to: toEmail, message: html
+      });
+      return;
+    }
+
+    if (p === 'formsubmit') {
+      /* https://formsubmit.co — POST any fields to the endpoint; _captcha:false
+         disables their bot check, _subject sets the subject. The FIRST post to
+         an address returns "Please confirm your email address" — we surface that
+         clearly. Content-Type multipart/form-data keeps multi-KB HTML intact. */
+      const fd = new FormData();
+      fd.append('_subject', subject);
+      fd.append('_captcha', 'false');
+      fd.append('_template', 'table');
+      fd.append('From name', fromName);
+      fd.append('Reply-to', toEmail);
+      fd.append('message', html);
+      fd.append('plain_text_version', plain);
+      const res = await fetch(formsubmitEndpoint(), { method: 'POST', body: fd });
+      const txt = await res.text().catch(() => '');
+      if (/confirm your email/i.test(txt)) {
+        throw new Error('FormSubmit needs a ONE-TIME activation: open the inbox of "' + (ejsCfg.endpoint || '') + '", click the confirmation link FormSubmit just emailed, then press 🚀 Send again.');
+      }
+      if (!res.ok) throw new Error('FormSubmit error ' + res.status + ': ' + txt.slice(0, 160));
+      return;
+    }
+
+    if (p === 'formspree') {
+      const url = formspreeEndpoint();
+      if (!url) throw new Error('Formspree form id/endpoint missing — fill ⚙ Email settings.');
+      const payload = {
+        message: html,
+        plain_text_version: plain,
+        _subject: subject,
+        replyTo: toEmail,
+        name: fromName
+      };
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error('Formspree error ' + res.status + ': ' + txt.slice(0, 160));
+      }
+      return;
+    }
+
+    if (p === 'web3forms') {
+      const key = (ejsCfg.endpoint || '').trim();
+      if (!key) throw new Error('Web3Forms access key missing — fill ⚙ Email settings.');
+      const res = await fetch('https://api.web3forms.com/submit', {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          access_key: key,
+          subject,
+          from_name: fromName,
+          email: toEmail,
+          replyto: toEmail,
+          message: html,
+          plain_text_version: plain
+        })
+      });
+      let data = null;
+      try { data = await res.json(); } catch { /* non-JSON error page */ }
+      if (!res.ok || (data && data.success === false)) {
+        throw new Error('Web3Forms error: ' + ((data && data.message) || ('HTTP ' + res.status)));
+      }
+      return;
+    }
+
+    throw new Error('Unknown email provider: ' + p);
+  };
+
+  /* v4.33/v4.35 — 🧪 DIAGNOSTIC TEST SEND through the SELECTED provider. */
   $('#ejs-test-btn')?.addEventListener('click', async () => {
     const btn = $('#ejs-test-btn');
     const to  = ($('#ejs-test-to')?.value || '').trim();
-    if (!window.emailjs) { toast('⚠️ EmailJS SDK not loaded — check internet.', 4200); return; }
+    if (!providerReady($('#ejs-provider')?.value || ejsCfg.provider)) { toast('⚠️ Fill the selected provider\u2019s key/endpoint first.', 4200); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { toast('⚠️ Type a test recipient email first.', 4200); return; }
     try {
-      if (!ejsInited) { emailjs.init({ publicKey: ejsCfg.publicKey }); ejsInited = true; }
       btn.disabled = true; btn.textContent = '⏳ Sending test…';
-      await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, {
-        to_email: to,
-        from_name: 'Deep & Honey app',
+      await sendViaProvider({
+        html: TEST_HTML, plain: 'Render test: you should see big red styled text in the HTML version.',
         subject: '🧪 Render test — you should see BIG RED text, not code',
-        reply_to: to,
-        message: '<h1 style="color:#e11d48;font-size:32px">If you can read this as BIG RED styled text, your template renders HTML correctly ✔</h1><p>If instead you see these angle brackets and tags as plain text, the template body is NOT inside a raw-HTML block — fix: {!!!}{{message}}{!!!}</p>'
+        toEmail: to, fromName: 'Deep & Honey app'
       });
-      toast('✅ Test sent! Check the inbox: styled red heading = template OK; visible HTML tags = template must be fixed.', 8000);
+      toast('✅ Test sent! Check the inbox: styled red heading = OK; visible HTML tags = configuration must be fixed.', 8000);
     } catch (err) {
-      console.error('EmailJS test failed:', err);
-      toast('❌ Test failed: ' + ((err && (err.text || err.message)) || 'unknown error'), 7000);
+      console.error('Render test failed:', err);
+      toast('❌ Test failed: ' + (err.message || 'unknown error'), 7000);
     } finally {
       btn.disabled = false; btn.textContent = '🧪 Send render test';
     }
@@ -3407,7 +3570,7 @@ ${bodyHtml}
   const refreshSendBtn = () => { if (sendBtn) sendBtn.disabled = !ejsReady(); };
   refreshSendBtn();
   sendBtn?.addEventListener('click', async () => {
-    if (!window.emailjs) { toast('⚠️ EmailJS SDK not loaded — check your internet connection.', 4200); return; }
+    if (!(await ensureEmailContent())) return;          /* v4.35 — never send an empty body */
     if (!ejsReady()) { openEjsModal(); return; }
     const toEmail = (toInput ? toInput.value : '').trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) {
@@ -3416,7 +3579,6 @@ ${bodyHtml}
       return;
     }
     try {
-      if (!ejsInited) { emailjs.init({ publicKey: ejsCfg.publicKey }); ejsInited = true; }
       sendBtn.disabled = true;
       sendBtn.textContent = '⏳ Sending…';
       const subject = 'Deep & Honey — Contract Data (' + new Date().toLocaleDateString() + ')';
@@ -3697,15 +3859,25 @@ ${bodyHtml}
       }
       /* v4.31 — send using the measured vars object built above. NEVER send
          duplicate copies of the contract (that's what tripped the 50 KB
-         "variables size" limit in earlier versions). */
-      await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, vars);
+         "variables size" limit in earlier versions).
+         v4.35 — routed through the SELECTED provider (EmailJS / FormSubmit /
+         Formspree / Web3Forms). The framed HTML goes as the message body; the
+         plain-text version rides along so providers that cannot render raw
+         HTML still deliver a readable contract. */
+      await sendViaProvider({
+        html:    vars.message,
+        plain:   plainText || 'Open the attached/saved contract.html to view the styled version.',
+        subject: vars.subject,
+        toEmail: vars.to_email,
+        fromName: vars.from_name
+      });
       try { safeSet('dh_email_to_last', toEmail); } catch { /* ignore */ }
       closeModal();
-      toast('💌 Sent to ' + toEmail + '! The styled HTML contract is in the email body — check the inbox.', 6000);
+      toast('💌 Sent to ' + toEmail + ' via ' + (ejsCfg.provider || 'emailjs') + '! The styled HTML contract is in the email body — check the inbox.', 6000);
     } catch (err) {
-      console.error('EmailJS send failed:', err);
+      console.error('Send failed:', err);
       const msg = (err && (err.text || err.message)) || 'unknown error';
-      toast('❌ Send failed: ' + msg + ' — check ⚙ EmailJS settings (template must use {{message}}).', 7000);
+      toast('❌ Send failed: ' + msg + ' — check ⚙ Email settings (provider key/endpoint, or EmailJS template must use {{message}}).', 9000);
     } finally {
       sendBtn.textContent = '🚀 Send now (HTML in body)';
       refreshSendBtn();

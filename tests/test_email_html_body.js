@@ -84,14 +84,15 @@ try { w.eval(src); } catch (e) { console.log('EVAL ERR:', e.message); process.ex
 
   /* ✉ Send Email → mailto + HTML download */
   w.document.getElementById('modal-email-btn').click();
-  await new Promise(r => setTimeout(r, 100));
+  /* v4.35: the mailto flow is async (ensureEmailContent awaits buildEmail) */
+  await new Promise(r => setTimeout(r, 600));
   checks.push(['Send Email opens mailto', log.mails.some(m => m.startsWith('mailto:'))]);
   checks.push(['Send Email also downloads styled contract.html', log.downloads.includes('deep-honey-contract.html')]);
 
   /* 📤 Gmail button → clipboard HTML + compose URL */
   const gmail = w.document.getElementById('modal-gmail-btn');
   checks.push(['Gmail (HTML in body) button exists', !!gmail]);
-  if (gmail) { gmail.click(); await new Promise(r => setTimeout(r, 100)); }
+  if (gmail) { gmail.click(); await new Promise(r => setTimeout(r, 600)); }
   checks.push(['Gmail flow copies full HTML to clipboard', log.clips.some(c => c.includes('Contract Overview'))]);
   checks.push(['Gmail compose window opened', log.opened.some(u => u.includes('mail.google.com/mail/?view=cm'))]);
 
