@@ -355,11 +355,9 @@ document.addEventListener('click', function (e) {
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <!-- v4.38 DH: EmailJS SDK removed — sending now goes through web3forms.com ONLY (its rich-text emails render our HTML instead of escaping it to code) -->
-<script src="js/app.js?v=64" defer></script>
+<script src="js/app.js?v=65" defer></script>
 <script src="js/sections.js?v=3" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
-<script src="js/app.js?v=63" defer></script>
-<script src="js/sections.js?v=2" defer></script>
-<!-- v4.37: duplicate sections.js load removed (was overwriting handlers with a stale copy) -->
+<!-- v4.39 DH: removed leftover EmailJS SDK tag and the duplicated app.js/sections.js
+     script tags from a bad merge — loading app.js twice re-ran its init and broke handlers -->
 </body>
 </html>

@@ -350,8 +350,9 @@
     }
   };
 
-  const APP_VERSION = 'v4.38 DH';
+  const APP_VERSION = 'v4.39 DH';
   const WHATS_NEW_TOP = [
+    '🛠 v4.39: EMAIL BODY PREVIEW BROKEN BY A LEFTOVER EMAILJS KEY — FIXED AT THE ROOT. The old EmailJS public key was still being auto-filled into ⚙ Email settings, so 🚀 Send posted THAT string to Web3Forms as an "access key" → rejected → no styled body ever arrived. Those stale credentials are now wiped on load, the fake "Ready" state is gone, and index.html / sw.js had duplicate & conflicting script tags removed (app.js was loading TWICE — that is what kept triggering the "app.js has not loaded" alert). ACTION NEEDED ONCE: hard-refresh (Ctrl+Shift+R), open ⚙ Email settings, paste your REAL web3forms.com access key, Save, press 🧪 Send render test, then 🚀 Send. Changelog: ',
     '🔌 v4.38: ONE SITE ONLY \u2014 https://web3forms.com. You asked for a single RELIABLE rendering service, so EmailJS / FormSubmit / Formspree are ALL removed (every one of them escaped our HTML into visible source code in their default templates). Web3Forms is the only free service that sends YOUR html string as the email\u2019s REAL text/html part \u2014 the styled contract renders directly in the body, no template to configure at all. SETUP ONCE (~1 min): open web3forms.com \u2192 type the receiving inbox \u2192 \u201cCreate Access Key\u201d \u2192 paste the emailed key into \u2699 Email settings \u2192 Save \u2192 press 🧪 Send render test (big RED styled text = working) \u2192 every 🚀 Send now lands as a properly rendered HTML email. The payload also got cleaner: <style> rules are converted to INLINE styles (Gmail strips style blocks) and the old iframe/entityize tricks are gone \u2014 they were themselves making some inboxes show markup as plain code. Changelog: ',
     '🛑 v4.37: THE LAST REASON CODE STILL APPEARED — FIXED AT THE ROOT. Two traps were found: (1) the PWA service worker kept serving the OLD cached script, so earlier fixes never actually ran on your phone — every asset is re-versioned now and the app force-updates itself on open; (2) FormSubmit\u2019s \u201Draw_html template\u201D was NEVER a real option (silently ignored — their default template escapes every field value, which is why code appeared there too). The app now posts the contract through FormSubmit\u2019s official **MESSAGE** field, whose content becomes the ACTUAL rendered email body — a real styled HTML email, no account, no keys. It also auto-fills your last-used recipient as the destination inbox in ⚙ settings. Verify in 30 seconds: hard-refresh (Ctrl+Shift+R), check the header badge says v4.37 DH, press 🧪 Send render test in ⚙ Email settings — BIG RED styled text = fixed.',
     '🛑 v4.36: WHY THE CODE KEPT COMING \u2014 AND THE REAL CURE. EmailJS\u2019s Gmail service ALWAYS HTML-escapes template variables (their {!!!} raw-HTML block is ignored for Gmail OAuth), so ANY markup sent through dashboard.emailjs.com shows up as literal source text in the body. No app-side trick can beat that escaper \u2014 which is why every previous fix still showed code. THE FIX: 🚀 Send now defaults to 📧 FormSubmit.co, which renders raw HTML natively (_template:\u201Draw_html\u201D) and needs NO account. Setup once: ⚙ Email settings \u2192 type your destination inbox in the Endpoint field \u2192 Save \u2192 🚀 Send \u2192 click the one-time confirmation link FormSubmit emails that inbox \u2192 from then on every send lands as a REAL styled HTML email. EmailJS stays selectable in ⚙ if you ever want it back. Changelog: ',
@@ -3350,11 +3351,18 @@ ${bodyHtml}
      source code in the body no matter what the template contained.
      FormSubmit renders our HTML natively via _template:"raw_html" and needs
      no account. If a saved older config still says 'emailjs', upgrade once. */
-  if (!ejsCfg.provider || ejsCfg.provider === 'emailjs') ejsCfg.provider = 'formsubmit';
-  if (!ejsCfg.serviceId)  ejsCfg.serviceId  = 'service_a5vpbye';
-  if (!ejsCfg.templateId) ejsCfg.templateId = 'template_obq7xfj';
-  if (!ejsCfg.publicKey)  ejsCfg.publicKey  = 'gDRCzC6V8qn70e7mj';
+  /* v4.39 DH FIX — "message email body preview is not coming": the leftover
+     migration lines above pre-filled ejsCfg.publicKey with the OLD EmailJS
+     public key, which passed the alnum key check, so ⚙ settings always looked
+     "Ready" and 🚀 Send posted that EmailJS string to Web3Forms as an access
+     key → rejected / no HTML body ever arrived. The stale EmailJS credentials
+     are now WIPED on load; only a real web3forms.com key can satisfy ejsReady(). */
+  const LEGACY_EJS_PK = 'gDRCzC6V8qn70e7mj';
+  ejsCfg.provider = 'web3forms';
+  if (ejsCfg.publicKey === LEGACY_EJS_PK) delete ejsCfg.publicKey;
+  if ((ejsCfg.endpoint || '') === LEGACY_EJS_PK) delete ejsCfg.endpoint;
   const saveEjs = () => safeSet(EJS_KEY, JSON.stringify(ejsCfg));
+  try { saveEjs(); } catch { /* ignore */ }   /* persist the wiped config immediately */
   let   ejsInited = false;
 
   /* v4.38 DH — ONE reliable site only: Web3Forms (https://web3forms.com).
@@ -3364,7 +3372,7 @@ ${bodyHtml}
      REAL text/html part of the email (rich-text emails), so the styled
      contract renders in the body exactly as written. */
   const w3fKey    = () => (ejsCfg.publicKey || '').trim();
-  const validKey  = k => /^[A-Za-z0-9_-]{8,64}$/.test(k);
+  const validKey  = k => /^[A-Za-z0-9_-]{8,64}$/.test(k) && k !== LEGACY_EJS_PK;
   const ejsReady  = () => validKey(w3fKey());
 
   /* ---------- settings sheet ---------- */
@@ -3433,6 +3441,8 @@ ${bodyHtml}
   ejsModal.addEventListener('click', e => { if (e.target === ejsModal) ejsModal.classList.remove('active'); });
   $('#ejs-save-btn').addEventListener('click', () => {
     ejsCfg.publicKey = $('#ejs-pk').value.trim();
+    /* v4.39 — never let a pasted EmailJS key masquerade as a Web3Forms key */
+    if (ejsCfg.publicKey === LEGACY_EJS_PK) ejsCfg.publicKey = '';
     ejsCfg.inbox     = $('#ejs-inbox').value.trim();
     ejsCfg.fromName  = $('#ejs-from').value.trim();
     saveEjs();
