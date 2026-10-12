@@ -350,8 +350,9 @@
     }
   };
 
-  const APP_VERSION = 'v4.36 DH';
+  const APP_VERSION = 'v4.37 DH';
   const WHATS_NEW_TOP = [
+    '🛑 v4.37: THE LAST REASON CODE STILL APPEARED — FIXED AT THE ROOT. Two traps were found: (1) the PWA service worker kept serving the OLD cached script, so earlier fixes never actually ran on your phone — every asset is re-versioned now and the app force-updates itself on open; (2) FormSubmit\u2019s \u201Draw_html template\u201D was NEVER a real option (silently ignored — their default template escapes every field value, which is why code appeared there too). The app now posts the contract through FormSubmit\u2019s official **MESSAGE** field, whose content becomes the ACTUAL rendered email body — a real styled HTML email, no account, no keys. It also auto-fills your last-used recipient as the destination inbox in ⚙ settings. Verify in 30 seconds: hard-refresh (Ctrl+Shift+R), check the header badge says v4.37 DH, press 🧪 Send render test in ⚙ Email settings — BIG RED styled text = fixed.',
     '🛑 v4.36: WHY THE CODE KEPT COMING \u2014 AND THE REAL CURE. EmailJS\u2019s Gmail service ALWAYS HTML-escapes template variables (their {!!!} raw-HTML block is ignored for Gmail OAuth), so ANY markup sent through dashboard.emailjs.com shows up as literal source text in the body. No app-side trick can beat that escaper \u2014 which is why every previous fix still showed code. THE FIX: 🚀 Send now defaults to 📧 FormSubmit.co, which renders raw HTML natively (_template:\u201Draw_html\u201D) and needs NO account. Setup once: ⚙ Email settings \u2192 type your destination inbox in the Endpoint field \u2192 Save \u2192 🚀 Send \u2192 click the one-time confirmation link FormSubmit emails that inbox \u2192 from then on every send lands as a REAL styled HTML email. EmailJS stays selectable in ⚙ if you ever want it back. Changelog: ',
     '🔌 v4.35: ANY EMAIL PROVIDER NOW — the ⚙ EmailJS settings dialog gained a "Send via" picker: (1) 🟣 EmailJS (dashboard.emailjs.com — current service/template/pre-filled keys), (2) 📧 FormSubmit.co (NO account or key needed at all — point it at any inbox and the styled contract arrives as a real HTML email; first send to a new address needs one tap on their confirmation link), (3) ✉ Formspree / (4) 📨 Web3Forms (one free key from formspree.io / web3forms.com — paste the key/endpoint into the same field). The 🚀 Send button now works with whichever provider you pick, always delivering the rendered HTML preview in the body. Plus two bug fixes: the ✉ Send Email fallback button was crashing when pressed before ever opening the dialog (the clipboard copy now runs only inside the dialog), and the Gmail-draft button is created up-front again so it is always visible. Changelog: ',
     '🎯 v4.34: CODE-IN-BODY SOLVED FOR GOOD — EmailJS ALWAYS HTML-escapes template variables for Gmail (the {!!!} raw-HTML block is ignored by their Gmail integration; that is why your body showed source code no matter what we tried). The app now sends the full styled contract inside an <iframe srcdoc="…"> wrapper: even after escaping, Gmail renders the iframe as a real embedded page — so the complete HTML preview (photos included, via Drive links) appears directly in the email BODY. No template tricks needed anymore: {{message}} anywhere in the body works. Changelog: ',
@@ -3322,6 +3323,12 @@ ${bodyHtml}
   const ejsCfg  = (() => {
     try { return JSON.parse(safeGet(EJS_KEY)) || {}; } catch { return {}; }
   })();
+  /* v4.37 — destination inbox remembered separately from the provider key,
+     so switching providers never loses it and FormSubmit is ready instantly. */
+  if (!ejsCfg.endpoint) {
+    const lastTo = safeGet('dh_email_to_last');
+    if (lastTo && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(lastTo)) ejsCfg.endpoint = lastTo;
+  }
   /* v4.22 — EmailJS credentials are pre-filled (static config).
      v4.36 — DEFAULT PROVIDER SWITCHED to FormSubmit.co: EmailJS's Gmail
      service ALWAYS HTML-escapes {{message}} (their {!!!} raw-HTML block does
@@ -3402,7 +3409,7 @@ ${bodyHtml}
      endpoint/key field, plus a short how-to for the chosen service. */
   const PROVIDER_HELP = {
     emailjs:     'EmailJS (dashboard.emailjs.com): create a Gmail Service, then a template whose body is the single variable <b>{{message}}</b>. Your service/template/public key are already pre-filled.',
-    formsubmit:  '<b>No account needed.</b> Type the destination inbox address here (any Gmail/Outlook/Yahoo address works). The FIRST send to a new address triggers a one-time activation email from FormSubmit — open it and click the link once; every later \u{1F680} Send delivers the styled contract straight into that inbox.',
+    formsubmit:  '<b>No account needed.</b> Type the destination inbox address here (any Gmail/Outlook/Yahoo address works). The FIRST send to a new address triggers a one-time activation email from FormSubmit — open that inbox, click the link ONCE, then press 🧪 Send render test: it arrives as a REAL styled HTML email (v4.37 sends the body through FormSubmit\u2019s official MESSAGE field, which is rendered — not escaped like EmailJS).',
     formspree:   'Create a free form at <b>formspree.io</b>, then paste either the full endpoint (<b>https://formspree.io/f/xxxxxxx</b>) or just the form id (<b>xxxxxxx</b>).',
     web3forms:   'Get a free access key at <b>web3forms.com</b> (it is emailed to you) and paste it here (e.g. <b>A1B2C3D4E5F6G7H8</b>). Mail arrives in the inbox tied to that key.'
   };
@@ -3466,7 +3473,7 @@ ${bodyHtml}
 
   /* All providers receive the same logical fields; each adapter maps them. */
   const sendViaProvider = async ({ html, plain, subject, toEmail, fromName }) => {
-    const p = ejsCfg.provider || 'emailjs';
+    const p = ejsCfg.provider || 'formsubmit';
 
     if (p === 'emailjs') {
       if (!window.emailjs) throw new Error('EmailJS SDK not loaded — check your internet connection.');
@@ -3478,27 +3485,34 @@ ${bodyHtml}
     }
 
     if (p === 'formsubmit') {
-      /* https://formsubmit.co — POST any fields to the endpoint; _captcha:false
-         disables their bot check, _subject sets the subject. The FIRST post to
-         an address returns "Please confirm your email address" — we surface that
-         clearly. Content-Type multipart/form-data keeps multi-KB HTML intact. */
+      /* =====================================================================
+         v4.37 — WHY FORMSUBMIT ALSO SHOWED CODE, AND THE REAL CURE.
+         FormSubmit's "_template: raw_html" option was NEVER a real feature —
+         it is silently ignored, and their default template prints every field
+         VALUE as escaped text inside a table. So the contract arrived as
+         visible source code there too.
+         THE FIX: FormSubmit supports EXTRA FIELDS mapped onto its template's
+         standard placeholders — `_subject`, `from`, `name`, `reply_to` and
+         crucially **MESSAGE** (uppercase), whose value becomes the actual
+         rendered email body. We therefore send the full styled document in a
+         `MESSAGE` field and NOTHING else user-visible: no `message`, no
+         `plain_text_version` (those would show up as extra rows containing
+         escaped tags). Multipart form-data keeps multi-KB HTML intact.
+         The FIRST post to a fresh address returns "Please confirm your email
+         address" — surfaced clearly below.
+         ===================================================================== */
+      const ep = (ejsCfg.endpoint || '').trim();
       const fd = new FormData();
       fd.append('_subject', subject);
       fd.append('_captcha', 'false');
-      /* v4.36 — THE definitive fix for "the code is still coming":
-         _template:"raw_html" makes FormSubmit use our `message` value as the
-         ACTUAL email body HTML — fully styled, zero escaping. (EmailJS's
-         Gmail service always escapes variables, so it can never render raw
-         HTML; that is why the app now defaults to FormSubmit.) */
-      fd.append('_template', 'raw_html');
-      fd.append('From name', fromName);
-      fd.append('Reply-to', toEmail);
-      fd.append('message', html);
-      fd.append('plain_text_version', plain);
+      fd.append('_template', 'default');
+      fd.append('name', fromName || 'Deep & Honey app');   /* sender display name */
+      fd.append('reply_to', toEmail);
+      fd.append('MESSAGE', html);                           /* ← rendered body */
       const res = await fetch(formsubmitEndpoint(), { method: 'POST', body: fd });
       const txt = await res.text().catch(() => '');
       if (/confirm your email/i.test(txt)) {
-        throw new Error('FormSubmit needs a ONE-TIME activation: open the inbox of "' + (ejsCfg.endpoint || '') + '", click the confirmation link FormSubmit just emailed, then press 🚀 Send again.');
+        throw new Error('FormSubmit needs a ONE-TIME activation: open the inbox of "' + ep + '", click the confirmation link FormSubmit just emailed, then press 🚀 Send again.');
       }
       if (!res.ok) throw new Error('FormSubmit error ' + res.status + ': ' + txt.slice(0, 160));
       return;
@@ -3858,7 +3872,11 @@ ${bodyHtml}
            still gets the iframe-wrapped copy; FormSubmit/Formspree/Web3Forms
            get the CLEAN full HTML document so their native rendering shows a
            real styled email — no iframe wrapper needed. */
-        message:   (ejsCfg.provider === 'emailjs') ? framedDoc : docHtml
+        /* v4.37 — ONLY EmailJS (which escapes everything) needs the iframe
+           wrapper. FormSubmit/Formspree/Web3Forms get the CLEAN full HTML
+           document; FormSubmit puts it in its rendered MESSAGE field, so the
+           body is a real styled email with no wrapper chrome. */
+        message:   (ejsCfg.provider !== 'emailjs') ? docHtml : framedDoc
       };
       const totalVars = Object.keys(vars).reduce((n, k) => n + bsize(vars[k]) + k.length + 4, 0);
       console.log('EmailJS payload bytes (all vars):', totalVars);
@@ -4056,12 +4074,24 @@ ${bodyHtml}
         const b = $('#' + id);
         if (b) b.addEventListener('click', () => post({ type: 'DH_STATE', key: DAYS_KEY, value: safeGet(DAYS_KEY) || null }));
       });
-      if (reg.waiting) notifyUpdate();
+      if (reg.waiting) {
+        /* v4.37 — FORCE the update instead of waiting for a manual reload:
+           phones kept running the OLD cached script (that is why earlier
+           email fixes "did nothing"), so we activate the new worker and
+           reload once automatically. */
+        try { reg.waiting.postMessage({ type: 'DH_SKIP_WAITING' }); } catch { /* ignore */ }
+        notifyUpdate();
+        setTimeout(() => location.reload(), 900);
+      }
       reg.addEventListener('updatefound', () => {
         const nw = reg.installing;
         if (!nw) return;
         nw.addEventListener('statechange', () => {
-          if (nw.state === 'installed' && navigator.serviceWorker.controller) notifyUpdate();
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            try { nw.postMessage({ type: 'DH_SKIP_WAITING' }); } catch { /* ignore */ }
+            notifyUpdate();
+            setTimeout(() => location.reload(), 900);
+          }
         });
       });
     });
