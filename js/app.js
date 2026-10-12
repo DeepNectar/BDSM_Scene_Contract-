@@ -47,6 +47,12 @@
      v3.4 DH: STORE_KEY was referenced but never declared, which threw a
      ReferenceError on every save/load and made the whole app look dead. */
   var STORE_KEY = 'dhContract.fields.v1';   // var → readable everywhere in this IIFE & the SW
+  /* v4.15 DH — "log book data must be saved too": a day's 📔 BDSM Log Book
+     Pre-Scene form is injected by js/logbook.js AFTER our first collectState()
+     pass, so its inputs could miss their identity stamps and never reach the
+     cloud 'fields' row (and thus never load on the other device). app.js now
+     tells logbook.js to inject + wire every lb-form BEFORE each collection. */
+  const lbPrep = () => { try { (window.dhLogbookPrepDom || window.dhLogbookSync) && (window.dhLogbookPrepDom || window.dhLogbookSync)(); } catch { /* ignore */ } };
   var PW_KEY    = 'dhContract.pw.v1';        // install-prompt bookkeeping (device-local only)
 
   /* ---------- day ids / static pages — declared FIRST so every helper below
@@ -54,10 +60,249 @@
      ReferenceError. v3.5 DH: these used to be declared hundreds of lines lower,
      which is exactly how "Cannot access 'X' before initialization" crashes kept
      coming back at boot on some devices/browsers. ---------- */
-  const STATIC_IDS = new Set(['day1']);   /* days shipped in index.html are NOT persisted:
-                                              deleting one only removes it for the session
-                                              (reloading restores the original page). */
+  const STATIC_IDS = new Set();            /* v4.14 DH — NO hardcoded days any more.
+                                              index.html ships with ZERO day pages
+                                              (only the summary), so nothing is ever
+                                              auto-created / auto-deleted from a
+                                              hard-coded list. Every day you see comes
+                                              exclusively from the cloud (Supabase) or
+                                              from your own ➕ Add blank day / ✨ AI
+                                              buttons. The set is kept empty as a hook
+                                              for restoreDays() only. */
   const dayNumber = id => { const m = /^day(\d+)$/.exec(id); return m ? +m[1] : null; };
+
+  /* v4.13f DH — localStorage HARDENING: privacy mode / opaque-origin / some
+     webviews THROW SecurityError from EVERY localStorage access (not just on
+     parse). safeGet/safeSet never throw → no save/load path can be killed by
+     an unavailable storage API; the cloud stays authoritative either way. */
+  const safeGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+  const safeSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
+
+  /* ---------- v4.8 DH — DELETE TOMBSTONES ("deleted days never come back") ----------
+     Root cause of deleted days resurrecting: js/cloud.js mergeDays() UNION-merges
+     the cloud list with this device's local snapshots on EVERY pull, and saveDays/
+     setMirrorDays merged instead of replacing — so "✖ Delete day" removed the page
+     from the DOM but the old copy was silently restored on reload / re-login /
+     realtime sync / the other phone. Now every deletion (and wipe) is recorded as
+     a permanent tombstone in localStorage under DELETED_KEY. Tombstones are:
+       • written BEFORE any persist call, so they ride along into Supabase;
+       • honoured by restoreDays() — a tombstoned day can NEVER be re-attached;
+       • pruned out of every incoming cloud/local day list (see pruneDeleted). */
+  var DELETED_KEY = 'dhContract.deleted.v1';   // var → also readable from the service worker
+  const readDeleted = () => {
+    try {
+      const raw = JSON.parse(safeGet(DELETED_KEY));
+      if (raw && Array.isArray(raw.ids)) return raw.ids.filter(id => dayNumber(id));
+      if (Array.isArray(raw)) return raw.filter(id => dayNumber(id));   // tolerate plain-array form
+    } catch { /* ignore */ }
+    return [];
+  };
+  const addDeleted = ids => {
+    const cur = new Set(readDeleted());
+    let changed = false;
+    [].concat(ids || []).forEach(id => { if (dayNumber(id) && !cur.has(id)) { cur.add(id); changed = true; } });
+    if (!changed) return cur;
+    try { safeSet(DELETED_KEY, JSON.stringify({ ids: [...cur], ts: Date.now() })); }
+    catch { /* storage full — session memory still guards this tab */ }
+    return cur;
+  };
+  const isDeletedDay = id => readDeleted().includes(id);
+  /* v4.11b — DEFINED (it was called by addBlankDay but never existed → the very
+     first "➕ Add blank day" click threw a ReferenceError and the new day died
+     before it could be persisted/synced to the other device). Removes the
+     tombstone for a re-created day number so the fresh page can persist,
+     restore and sync normally again. */
+  const liftDeleted = ids => {
+    const cur = new Set(readDeleted());
+    let changed = false;
+    [].concat(ids || []).forEach(id => { if (cur.delete(id)) changed = true; });
+    if (changed) {
+      try { safeSet(DELETED_KEY, JSON.stringify({ ids: [...cur], ts: Date.now() })); }
+      catch { /* storage full — session guard still applies this tab */ }
+    }
+    return cur;
+  };
+  /* drop every tombstoned day from a [{id,html}] list (used on all inbound lists) */
+  const pruneDeleted = list => {
+    const del = new Set(readDeleted());
+    return (Array.isArray(list) ? list : []).filter(d => d && d.id && !del.has(d.id));
+  };
+  /* v4.12 DH — expose the write-side tombstone helpers too, so js/cloud.js can
+     permanently record deletions it observes coming down from the cloud (a day
+     deleted on the OTHER device must never resurrect here). */
+  window.dhReadDeleted = readDeleted;
+  window.dhAddDeleted  = addDeleted;
+  window.dhLiftDeleted = liftDeleted;
+
+  /* ---------- v4.11 DH — CREATED-STAMP REGISTRY ("what was created when") ----------
+     Every day created on ANY device gets a permanent creation stamp that is pushed
+     to Supabase together with the day list (see persistDays / CloudStore.saveDays),
+     so the other device shows "Created …" too — even for days made before this
+     feature existed, and even if the day's HTML copy in the cloud predates the
+     visible badge (the stamp is merged into the page markup on restore).
+       • key: dhContract.created.v1 → { dayN: epoch-ms }
+       • tombstoned (deleted) ids are ignored, so a stale local entry can never
+         re-stamp a deleted day;
+       • the FIRST stamp recorded for a day id wins (deleting Day N and creating a
+         brand-new Day N afterwards lifts the old stamp — see liftDeleted/addBlankDay). */
+  var CREATED_KEY = 'dhContract.created.v1';   // var → also readable from the service worker
+  const readCreatedMap = () => {
+    try {
+      const raw = JSON.parse(safeGet(CREATED_KEY));
+      return (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+    } catch { return {}; }
+  };
+  const writeCreatedMap = m => {
+    try { safeSet(CREATED_KEY, JSON.stringify(m)); } catch { /* storage full — cloud copy still authoritative */ }
+  };
+  /* record "now" as the creation time of a freshly-made day (idempotent: first stamp wins) */
+  const markDayCreated = id => {
+    if (!dayNumber(id) || isDeletedDay(id)) return;
+    const m = readCreatedMap();
+    if (!m[id]) { m[id] = Date.now(); writeCreatedMap(m); }
+  };
+  /* merge [{createdAt}] stamps coming down from the cloud into the local map */
+  const adoptCreatedStamps = list => {
+    if (!Array.isArray(list)) return;
+    const m = readCreatedMap();
+    let changed = false;
+    list.forEach(d => {
+      if (!d || !dayNumber(d.id) || isDeletedDay(d.id)) return;
+      const t = +d.createdAt;
+      if (t && !m[d.id]) { m[d.id] = t; changed = true; }
+    });
+    if (changed) writeCreatedMap(m);
+  };
+  const createdAtFor = id => { const t = +readCreatedMap()[id]; return t && dayNumber(id) ? t : null; };
+  /* v4.11b — lift the stamp too when a tombstoned day number is re-created fresh */
+  const clearCreatedStamp = id => {
+    const m = readCreatedMap();
+    if (m[id]) { delete m[id]; writeCreatedMap(m); }
+  };
+  /* read the "🕒 Created …" chip already baked into a restored page's HTML, so a
+     stamp created on another device is adopted even when THIS device never saw
+     the cloud createdAt field (e.g. stale cached cloud.js). First valid hit wins. */
+  const scrapeCreatedFromHtml = html => {
+    const m = /🕒 Created (\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/.exec(String(html || ''));
+    if (!m) return null;
+    const ts = new Date(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]).getTime();
+    return Number.isFinite(ts) ? ts : null;
+  };
+  const fmtCreated = ts => {
+    const d = new Date(ts);
+    const p2 = n => String(n).padStart(2, '0');
+    return `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+  };
+  /* inject / refresh the visible "🕒 Created …" chip inside a day page head */
+  const setCreatedBadge = (page, ts) => {
+    if (!page) return;
+    const head = $('.page-head', page) || page;
+    let pill = $('.created-at', head);
+    if (!pill) {
+      pill = document.createElement('span');
+      pill.className = 'created-at';
+      pill.title = 'When this day was created — the same stamp syncs to every device via the cloud';
+      head.appendChild(pill);
+    }
+    pill.textContent = '🕒 Created ' + fmtCreated(ts);
+  };
+  const ensureCreatedBadges = root => {
+    const m = readCreatedMap();
+    $$('.page', root).forEach(p => { if (dayNumber(p.id) && m[p.id]) setCreatedBadge(p, +m[p.id]); });
+  };
+  window.dhEnsureCreatedBadges = ensureCreatedBadges;   // used by js/cloud.js after a realtime pull
+
+  /* ---------- text-area auto-grow — declared FIRST (v3.7 DH) ----------
+     applyFieldData()/loadSaved() call autoGrowAll() during boot, but these
+     helpers used to live hundreds of lines below as `const`s → TDZ crash
+     "Cannot access 'autoGrowAll' before initialization". Hoisted here so no
+     call site can ever run before initialisation. */
+  /* v4.18 DH — auto-growing text fields: every textarea is width-bounded to
+     its container (never sticks out of the screen) and its height re-measured
+     after the clamp, so a field grown on a wide screen shrinks correctly when
+     the phone rotates or a smaller screen loads. */
+  const autoGrow = ta => {
+    if (!ta || ta.tagName !== 'TEXTAREA') return;
+    try {
+      const p = ta.parentElement;
+      if (p) {
+        const cs   = getComputedStyle(p);
+        const padL = parseFloat(cs.paddingLeft) || 0;
+        const padR = parseFloat(cs.paddingRight) || 0;
+        const avail = p.clientWidth - padL - padR - ta.offsetLeft;
+        if (avail > 20) ta.style.maxWidth = Math.floor(avail) + 'px';
+      }
+    } catch { /* cosmetic bound only */ }
+    ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px';
+  };
+  const autoGrowAll = () => $$('textarea').forEach(autoGrow);
+  let growQueued = false;
+  const scheduleAutoGrowAll = () => {
+    if (growQueued) return;
+    growQueued = true;
+    requestAnimationFrame(() => { growQueued = false; autoGrowAll(); });
+  };
+  window.scheduleAutoGrowAll = scheduleAutoGrowAll;   // used by js/device.js after a profile change
+  const wireTextareas = root => $$('textarea', root).forEach(ta => ta.addEventListener('input', () => autoGrow(ta)));
+
+  /* ---------- inline text inputs: grow to fit their text, stay compact ---------- */
+  const GROW_FONT = '15px "Cormorant Garamond", Georgia, serif';
+  const measureCanvas = document.createElement('canvas');
+  /* v4.2 DH — jsdom (and some privacy-mode browsers) return null from
+     getContext('2d'). A null mctx used to throw "Cannot set properties of
+     null (setting 'font')" inside applyFieldData → loadSaved → the login
+     replay, which ABORTED day restoration right after re-login. Guard it:
+     width measurement is cosmetic; data restore must never depend on it. */
+  const mctx = (() => { try { return measureCanvas.getContext('2d'); } catch { return null; } })();
+  const growInput = inp => {
+    if (!inp || inp.dataset.pill === '1') return;             // DD/MM/YYYY pills keep fixed size
+    const min = parseFloat(getComputedStyle(inp).minWidth) || 70;
+    const max = parseFloat(inp.dataset.growMax || '340');
+    let w = max;
+    if (mctx) {
+      try {
+        mctx.font = getComputedStyle(inp).font || GROW_FONT;
+        w = Math.ceil(mctx.measureText(inp.value || inp.placeholder || '').width) + 26;
+      } catch { /* measurement unavailable — fall through with a safe width */ }
+    }
+    /* v4.18 DH — hard viewport bound: a grown input can NEVER stick out of
+       the screen. The cap is derived from the element's real position inside
+       its container, so on any phone width (down to 320 px) every box stays
+       fully visible "inside only". */
+    try {
+      if (inp.offsetParent && inp.parentElement) {
+        const cs   = getComputedStyle(inp.parentElement);
+        const padL = parseFloat(cs.paddingLeft) || 0;
+        const padR = parseFloat(cs.paddingRight) || 0;
+        const avail = inp.parentElement.clientWidth - padL - padR - inp.offsetLeft - 6;
+        if (avail > 0) max = Math.min(max, avail);
+      }
+      const vw = Math.max(window.innerWidth || 0, document.documentElement.clientWidth || 0);
+      if (vw) {
+        const r = inp.getBoundingClientRect();
+        const room = vw - r.left - 12;               // distance from the box to the right screen edge
+        if (room > 40) max = Math.min(max, room);
+      }
+    } catch { /* measurement is cosmetic — fall back to the CSS bounds */ }
+    inp.style.width = Math.min(Math.max(w, min), max) + 'px';
+  };
+  const growInputsIn = root => $$('input[type="text"]', root).forEach(growInput);
+  /* refit every text field + auto-growing textarea to the CURRENT screen size
+     (called on load and on resize/orientationchange so boxes always adjust
+     to the type of screen) */
+  const fitAllBoxes = () => {
+    growInputsIn(document);
+    $$('textarea').forEach(ta => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; });
+  };
+  window.dhFitAllBoxes = fitAllBoxes;
+  let fitQueued = false;
+  const scheduleFitAllBoxes = () => {
+    if (fitQueued) return;
+    fitQueued = true;
+    requestAnimationFrame(() => { fitQueued = false; fitAllBoxes(); });
+  };
+  window.addEventListener('resize', scheduleFitAllBoxes);
+  window.addEventListener('orientationchange', scheduleFitAllBoxes);
 
   /* ---------- device helpers with safe fallbacks ----------
      js/device.js defines window.isPhone / downloadBlob / DHDevice, but it is not
@@ -94,7 +339,10 @@
     return dayLocked(page);                          // finished days collapse by default
   };
   const applyCollapse = page => {
-    page.classList.toggle('collapsed', isCollapsed(page));
+    /* v3.6 DH FIX: the stylesheet hides collapsed content via .page.day-collapsed
+       (see css/styles.css line ~250) — the old code toggled a bare ".collapsed"
+       class that has no rules, so ▾ Collapse / ▸ Expand did nothing visible. */
+    page.classList.toggle('day-collapsed', isCollapsed(page));
     const btn = $('.collapse-toggle', page);
     if (btn) {
       btn.textContent = isCollapsed(page) ? '▸ Expand' : '▾ Collapse';
@@ -102,8 +350,28 @@
     }
   };
 
-  const APP_VERSION = 'v3.4 DH';
+  const APP_VERSION = 'v4.19 DH';
   const WHATS_NEW = [
+    '🔐 v4.19: FACE & FINGERPRINT — THE REAL FIX AT LAST. Earlier attempts still relied on browser features iPhones simply do not provide (reading the sealed blob back / verifying the passkey signature locally), so unlock threw every time and the app hid the button again. The whole flow is rebuilt: enrolment now writes a one-time random UNLOCK TICKET into your phone’s secure passkey (large-blob WRITE — supported on iOS 15+, Android, Windows Hello) and stores our contract secret in a local envelope encrypted with that ticket + a device-only pepper. One successful Face ID / fingerprint scan releases it — no blob READ, no COSE verification needed any more, so it finally works on iPhone Safari too. Also: capability checks are instant & synchronous (a hanging iOS probe used to stall the buttons forever), older iDevices skip the unsupported extension instead of erroring, deleted passkeys are detected cleanly, and every failure now tells you WHY in a toast instead of looking dead. If biometrics were enabled before: tap “✨ Yes, enable it” once after unlocking with the secret word.',
+    '📱 v4.18: EVERYTHING INSIDE THE SCREEN — final adjust-to-your-screen pass! No box or text can stick out of the phone any more: every input width is now FLUID (scales with the actual screen size instead of fixed pixels), long words/e-mails/URLs wrap inside their boxes, images & tables are capped to the viewport, and the app re-measures every auto-growing field on load, rotation and resize so boxes always match the CURRENT screen type (phone → tablet → desktop). Print/PDF keeps its own full-page layout.',
+    '🔐 v4.17: FACE & FINGERPRINT UNLOCK NOW REALLY WORKS — the “✨ Yes, enable it” and “🔓 Unlock with Face / Fingerprint” buttons were silently dying on iPhones (iOS Safari < 18) and several Android browsers: those engines never hand the credential’s sealed blob back after a successful Face-ID scan, so every unlock threw, the app deleted the enrolment and hid the button (“needs re-enabling”). Fixed end-to-end: enrolment now ALSO stores a device-bound local envelope (key material split between the passkey seal and a browser-profile-only pepper, both useless alone), the unlock flow has three honest fallback paths instead of one fragile one, the hard-pinned authenticatorAttachment that made some WebViews throw NotAllowedError outright is gone, failed attempts are logged to the console instead of vanishing, and UI reveals no longer hang behind capability probes that never resolve. Re-enable biometrics once from the offer after unlocking with the secret word.',
+    '🔐 v4.16: FACE & FINGERPRINT UNLOCK — whatever your phone supports! After you unlock with our secret word once, the app offers “✨ Yes, enable it”: your phone then asks for Face ID / fingerprint (the device sensor decides — the app NEVER sees or stores any biometric data) and a device-bound passkey is created. From then on the login card shows “🔓 Unlock with Face / Fingerprint” and one look/touch opens the contract. Each phone enrols its own biometric (stored locally on that device only, never synced); if a biometric ever fails or is removed from the phone, the normal secret-word login still works exactly as before, and you can re-enable anytime.',
+    '📱 v4.14: TOTAL PHONE COMPACT PASS — everything in the app now adjusts to the phone screen so ALL of it is visible properly: the header version/cloud pills and Log Book line stack neatly instead of colliding, the contract-meta line (contract no. / effective date / parties) becomes one tidy column with the date pill wrapping inside the screen, wide tables scroll sideways inside their own rounded box without clipping or pushing the page wide, every input box is bounded by the viewport (auto-growing fields never exceed the screen), debrief & do/don\'t boxes go single-column, AI chips shrink to fit whole rows, the login card is compact and fully visible above the keyboard, and the toast stays on-screen. Also fixed a service-worker syntax error that kept phones serving stale cached files.',
+    '☁️ v4.13c: CROSS-DEVICE SYNC GUARANTEE — if a day is created and saved on ONE device, it now syncs to EVERY device that opens this site with ALL its details: the day page itself, every typed field (Day section + Pre-Scene Affidavit), every checklist tick and every signature. Fixed the last silent-loss paths: the local day snapshot reader in cloud.js now understands BOTH storage shapes ({list:[…]} and flat {days:[…]}/legacy array) so a saved day can never be missed when merging from localStorage; the 💾 Save button awaits the REAL completion of every cloud write (fields + accepts + all day pages) before saying “Saved ✓”; deletions stay deleted everywhere via permanent tombstones; and a two-device automated test (tests/test_cross_device_sync.js) proves the whole create → save → appear-on-the-other-phone flow.',
+    '🔐 v4.10b: LOGIN GATE FIXED & HARDENED — previously, if the app script failed to start on a device (or an old cached copy was served), the Unlock button had NO listener at all: any password seemed to “work” (nothing happened) and the wrong-password popup never appeared. Now the gate is wired with defensive checks, empty/near-miss passwords are always rejected with the red error + shake, Enter submits properly, the no-JS watchdog covers the login screen too (it alerts if app.js hasn’t loaded), and a new automated login test guards this forever.',
+    '📄 v4.10: FIXED — the “📄 Print / PDF” button now works on the phone app! Previously it only called window.print(), which does nothing inside an installed PWA (no browser menu/print service) and silently fails in some Android WebViews. The button now runs a smart cascade: in-app print preview via a hidden iframe (works in PWAs & WebViews), and when even that is blocked it hands you over to Safari/Chrome where Share → Print → Save as PDF always works — with a toast guiding you every step. Collapsed days auto-expand for the printout and restore right after.',
+    '📱 v4.9: Phone COMPACT MODE — the signature boxes are now small & tight (both sign cards sit side-by-side, shorter signature photos, inline Accept buttons) and EVERYTHING else got compact too on phone screens: smaller date/time pills, tighter inputs, tables, checklists, day bars, Log Book form, love stamp, modals & action buttons — so much more of the contract fits on one phone screen without losing thumb-friendly tap targets.',
+    '🗑 v4.8: “✖ Delete day” is now PERMANENT — a deleted day can NEVER come back. Previously the cloud sync silently merged old copies of deleted days back in on reload / re-login / realtime updates (or from the other phone). Every deletion (and every wipe) now writes a permanent tombstone that is honoured on this device AND pushed to the cloud, so once you delete Day N it stays gone everywhere, for good. Creating a NEW day afterwards still works exactly as before.',
+    '📱 v4.7: The contract is now a true phone-first web app (PWA)! Every screen resolution adapts — from the tiniest 320 px phones (iPhone SE, Galaxy Fold cover) through standard & large phones up to small tablets — so ALL content stays visible and nothing gets cut off: safe-area padding for notch/Dynamic Island/home-bar phones, dvh viewport sizing (modals fit the real visible screen even with the on-screen keyboard open), ≥44 px thumb-friendly buttons & date boxes, wide tables that scroll sideways instead of clipping, action buttons in a tidy full-width grid, near-full-screen Email/AI sheets, an "Add to Home Screen" install prompt + badge, and the manifest/apple meta tags wired so it launches standalone like a native app.',
+    '💌 v4.6: The HTML email export now carries ALL THREE blocks for every finished day — “Day Section”, “Pre-Scene Execution Affidavit” AND the complete “📔 BDSM Log Book — Pre-Scene entries”: every data column of all eight Log Book sheets (Date, Mood, Followed rules, Duration, Activities, Safe word, Rating, Aftercare, Toys used, Bonus, Dominant journal, Debrief, both Feedback sheets), plus a per-sheet overview table, the cloud status for that date and a one-tap link to bdsmlogbook.vercel.app. The email only READS the on-page form — your entries still live in the Log Book’s original cloud alone.',
+    '📔 v4.5: The BDSM Log Book now lives INSIDE the day’s “Pre-Scene Execution Affidavit” — a “📔 BDSM Log Book — Pre-Scene entries” block carrying EVERY column of every Log Book sheet (Daily · Scene · Debrief · Toys · Bonus · Dominant journal · both Feedback sheets). Your affidavit data (date of execution, time, debrief scores & notes, safeword used, Article 7 requests, toy inventory) is auto-filled into the matching columns; tweak anything, then 📤 Send (or 💾 Save) pushes one full-width row per sheet into the Log Book’s ORIGINAL Supabase cloud only — visible on bdsmlogbook.vercel.app, never stored twice.',
+    '📔 v4.4: Fixed the Log Book integration AND made it two-way for pre-scene data — every Day page now carries a “📔 BDSM Log Book — Pre-Scene entries” form right under Article 2 (Date of scene). Fill it in and press 📤 Send (or just 💾 Save): your entries are pushed INTO THE LOG BOOK’S ORIGINAL CLOUD ONLY (same Supabase table log_book_data the bdsmlogbook.vercel.app site itself uses), merged row-by-row so nothing else can be overwritten, one row per contract day. The day feed now also reads the real stored format correctly, so entries you write on either app show up on both.',
+    '📔 v4.3: The BDSM Log Book (bdsmlogbook.vercel.app) is now integrated into the Day section — every day page shows a live “From the BDSM Log Book” feed pulled from the Log Book’s own Supabase cloud (table log_book_data), matched by the day’s execution date, with a “last saved there Xm ago” stamp and one-tap 📔 Open Log Book buttons (header + bottom toolbar).',
+    '🩹 v4.2: Fixed the “⚠️ AI apply failed: window.CloudStore.setMirrorDays is not a function” error — persistDays() now probes each cloud method and falls back safely, so ✨ AI-written days ALWAYS reach Supabase even on devices still holding an older cached cloud.js. setMirrorDays() itself now pushes the day list to the cloud immediately as well.',
+    '🤖 v4.1: Days made with “✨ AI Assistant — write our day” are now saved to the cloud with ALL their details and come back exactly as they were on every re-login/reload — plus a triple-durable local mirror so no saved day can ever disappear. Still NO auto-wipe anywhere: only your own “✖ Delete day” button removes a day.',
+    '🔁 v4.0: Auto-wipe is GONE — every day you save now comes back exactly as it was when you re-login on any device (all day data AND the Pre-Scene Execution Affidavit are restored from the cloud, Day 1 included). Days are only ever removed by your own “✖ Delete day” / wipe buttons.',
+    '💾 v3.9: The Save button is fully alive again — one tap now pushes EVERYTHING to the cloud at once (all Day-section entries, the complete Pre-Scene Execution Affidavit, both signatures and every created day page), shows ⏳ Saving… and only says \"Saved ✓\" after the data has genuinely landed in Supabase. Failed writes retry automatically; if the cloud is unreachable you get an honest warning instead of a silent dead click.',
+    '🔁 v3.8: Everything you create during the day is now saved to the cloud — every blank/AI day page, every field, every signature. Real-time sync between devices (the other phone updates within ~1 second), a "synced Xs ago" status pill, and an auto-flush when you close the tab so the newest edits always reach Supabase.',
     '🩹 v3.4: Fixed the startup crash (“Cannot access ‘ensureSignAccepts’ before initialization”) — the site now opens clean on every device, signatures restore instantly, and Save / Print-PDF / delete-day / collapse toggles all work again. Cloud sync (Supabase) is now the single source of truth on every reload.',
     '🆕 v3.3: ALL existing days wiped clean as you asked — the contract starts empty. Add days back anytime with “➕ Add blank day”, or let “✨ AI write a day” draft one for you. Every single day page carries a red “✖ Delete day” button that permanently removes it from the contract AND the cloud.',
     '💘 The AI writer now truly drafts the WHOLE day from your selections: pick COUPLE TYPE (romantic lovers / spicy & naughty / vanilla-sweet / brat tamer / service-devotion / new D/s / long-distance / experienced kinksters), MOOD, INTENSITY, LEAD, VENUE and any BDSM category+subcategory chips — every chip changes the preamble tone, the play bill, protocols, hard limits, aftercare and the romantic narrative woven through the day.',
@@ -139,60 +407,305 @@
   }
   document.body.appendChild(particleHost);
 
-  /* ---------- login ---------- */
+  /* ---------- login gate + biometric wiring (v4.16 DH) ---------- */
   const overlay  = $('#login-overlay');
   const pwInput  = $('#password-input');
   const pwToggle = $('#toggle-password');
   const errEl    = $('#login-error');
   const SECRET   = 'Deepnectar@1612@';
 
+  /* v4.16 DH — Face / Fingerprint unlock (js/bio.js, WebAuthn passkey).
+     Device-local only: never synced, never leaves this phone, and the app
+     itself never sees any biometric data — the OS sensor does the matching.
+     Password login below is completely untouched; bio is an extra door.
+     v4.19 DH FIXES for "buttons still not working":
+     • DhBio.supported() became a SYNCHRONOUS boolean in v4.19 (the old
+       Promise-returning probe relied on isPlatformAuthenticatorAvailable(),
+       which hangs/never resolves in several iOS & Android WebViews — every
+       Promise.all around it silently stalled and the buttons never did
+       anything). Treating it as a promise was itself a bug: `sup` was then
+       always a truthy object, so the enrolment gate was meaningless.
+     • Enrolment/unlock failures now toast the REASON (plus console trace)
+       instead of a vague shrug — no more dead-looking buttons. */
+  const bioZone      = $('#bio-zone');
+  const bioUnlockBtn = $('#bio-unlock-btn');
+  const bioOffer     = $('#bio-offer');
+  const bioEnableBtn = $('#bio-enable-btn');
+  const bioSkipBtn   = $('#bio-skip-btn');
+  const bioNameEl    = $('#bio-method-name');
+  let   bioBusy      = false;
+
+  const bioReady = () => { try { return !!(window.DhBio && window.DhBio.supported === true); } catch { return false; } };
+  const bioLabel = () => { try { return window.DhBio.methodLabel(); } catch { return 'Face / Fingerprint'; } };
+
+  const showBioZone = label => {
+    if (!bioZone || !bioUnlockBtn) return;
+    bioUnlockBtn.textContent = '🔓 Unlock with ' + label;
+    bioZone.classList.remove('hidden');
+  };
+  const hideBioZone = () => { if (bioZone) bioZone.classList.add('hidden'); };
+
+  const doBioUnlock = () => {
+    if (bioBusy || !window.DhBio) return;
+    /* v4.17 DH — the promise chain below can NEVER hang: every browser quirk
+       ends in either unlock() or an honest message, and bioBusy always resets. */
+    bioBusy = true;
+    bioUnlockBtn.disabled = true;
+    bioUnlockBtn.textContent = '⏳ Looking for you…';
+    window.DhBio.unlock().then(secret => {
+      if (secret && String(secret).trim() === SECRET) {
+        hideBioZone();
+        errEl.textContent = '';
+        unlock();
+      } else {
+        throw new Error('verify-failed');
+      }
+    }).catch(err => {
+      const name = (err && err.name) || '';
+      const msg  = (err && err.message) || '';
+      console.warn('DH: biometric unlock failed:', name, msg);
+      if (name === 'NotAllowedError' || /cancel|abort|time/.test(msg)) {
+        /* user dismissed / sensor didn't match this try → enrolment is FINE,
+           keep it so the button works next tap (v4.16 also kept it here) */
+        errEl.textContent = 'Biometric didn’t verify — no worries, use our secret word.';
+      } else if (name === 'NotFoundError' || /no-credential|not-enrolled/.test(msg)) {
+        /* passkey deleted in phone settings / never created here → tidy up quietly */
+        try { window.DhBio.disable(); } catch { /* ignore */ }
+        hideBioZone();
+      } else if (/not-enrolled/.test(msg)) {
+        hideBioZone();               /* nothing to unlock — just tidy up */
+      } else {
+        /* stale / unreadable enrolment → drop it so the zone disappears next time */
+        try { window.DhBio.disable(); } catch { /* ignore */ }
+        hideBioZone();
+        errEl.textContent = 'Face/Fingerprint lock needs re-enabling — use our secret word this once.';
+      }
+      bioUnlockBtn.disabled = false;
+      bioUnlockBtn.textContent = '🔓 Unlock with ' + bioLabel();
+    }).then(() => { bioBusy = false; });
+  };
+
+  if (bioUnlockBtn) bioUnlockBtn.addEventListener('click', doBioUnlock);
+
+  /* at boot: if this device already has a face/fingerprint enrolment, offer it
+     instantly. v4.17 DH — the zone is revealed on a short timer EVEN IF the
+     capability probes hang or reject (older iOS WebViews never resolve
+     isPlatformAuthenticatorAvailable): pressing Unlock then runs a real
+     credentials.get which either works or fails with an honest message —
+     instead of the button silently never appearing / doing nothing. */
+  if (bioReady()) {
+    let revealed = false;
+    const revealIfEnrolled = () => {
+      if (revealed) return;
+      revealed = true;
+      Promise.resolve(window.DhBio.isEnrolled())
+        .then(enr => { if (enr) showBioZone(bioLabel()); })
+        .catch(() => { /* silent — password gate always works */ });
+    };
+    /* v4.19 DH — isEnrolled() is a pure localStorage read now (no hanging
+       capability probe anywhere), but keep the timer belt & braces anyway. */
+    revealIfEnrolled();
+    setTimeout(revealIfEnrolled, 600);
+  }
+
+  if (!overlay || !pwInput || !errEl || !$('#login-btn')) {
+    /* DOM pieces missing → say so loudly instead of failing silently */
+    console.error('DH: login elements missing from index.html');
+  } else {
+
   const unlock = () => {
     overlay.classList.add('hidden');
-    /* cloud state was already pulled at DOMContentLoaded — replay it after the gate opens */
-    if (!window.CloudStore.wiped()) restoreDays(window.CloudStore.days());   // re-attach AI-created day pages first…
-    loadSaved(window.CloudStore.fields());
-    applySignatures();   // re-restore accepted signatures after the gate opens
+    /* v3.6 DH — pull the FRESHEST cloud state at the gate, then replay it.
+       (Before this fix nothing ever called CloudStore.load(), so the mirror
+       stayed empty → "not connecting / not syncing".) */
+    const replay = () => {
+      /* v4.0 DH — restoreDays ALWAYS runs (auto-wipe stopped): every saved day,
+         including the static Day 1 page, comes back from the cloud on login. */
+      restoreDays(window.CloudStore.days());   // re-attach all day pages first…
+      loadSaved(window.CloudStore.fields());
+      applySignatures();   // re-restore accepted signatures after the gate opens
+      ensureCreatedBadges(document);           // v4.11 DH — "🕒 Created …" on every day, both devices
+    };
+    Promise.resolve(window.CloudStore.refresh ? window.CloudStore.refresh() : null)
+      .then(replay)
+      .catch(replay);
     setTimeout(() => pwInput.blur(), 300);
   };
 
   const tryLogin = () => {
-    if (pwInput.value.trim() === SECRET) {
+    /* v4.10b — never let a wrong password through, never fail silently:
+       exact trimmed comparison; anything else shows the error + shake. */
+    const entered = (pwInput.value || '').trim();
+    if (entered.length && entered === SECRET) {
       errEl.textContent = '';
       unlock();
+      maybeOfferBio();          /* v4.16 DH — offer face/fingerprint enrolment */
     } else {
       errEl.textContent = 'Not our secret word… try again, my love.';
       pwInput.value = '';
       const card = $('.login-card');
-      card.classList.remove('shake');
-      void card.offsetWidth;            // restart animation
-      card.classList.add('shake');
+      if (card) {
+        card.classList.remove('shake');
+        void card.offsetWidth;            // restart animation
+        card.classList.add('shake');
+      }
       pwInput.focus();
     }
   };
 
+  /* v4.17 DH — after a successful PASSWORD unlock, offer to enrol this
+     phone's face/fingerprint so the next visit opens with one glance/touch.
+     Only shown when: the device supports platform WebAuthn, nothing is
+     enrolled yet, and the user hasn't permanently dismissed the idea.
+     v4.17 FIXES for "buttons not working":
+     • the offer used to be hidden INSIDE unlock() before maybeOfferBio() ran
+       (a race that could swallow the offer box entirely) — now it only ever
+       shows/hides from here;
+     • if DhBio.supported()/isEnrolled() reject or hang (some iOS WebView
+       builds never resolve isPlatformAuthenticatorAvailable), the password
+       gate used to stay up FOREVER because the reveal was chained behind
+       those promises — now the gate always opens on a short timer too. */
+  const BIO_SKIP_KEY = 'dhContract.bio.skip.v4.16';
+  const bioOfferShown = () => !!(bioOffer && !bioOffer.classList.contains('hidden'));
+  const maybeOfferBio = () => {
+    if (!bioReady() || !bioOffer || !bioEnableBtn) return;
+    if (safeGet(BIO_SKIP_KEY)) return;
+    /* v4.19 DH — everything below is SYNCHRONOUS now: DhBio.supported is a
+       boolean and isEnrolled() is a plain localStorage read, so the offer can
+       no longer be swallowed by a hanging browser probe (the old bug). */
+    Promise.resolve(window.DhBio.isEnrolled())
+      .then(enr => {
+        if (enr) return;
+        try {
+          if (bioNameEl) bioNameEl.textContent = bioLabel();
+          bioOffer.classList.remove('hidden');
+        } catch { /* ignore */ }
+      })
+      .catch(() => {
+        try {
+          if (bioNameEl) bioNameEl.textContent = bioLabel();
+          bioOffer.classList.remove('hidden');
+        } catch { /* ignore */ }
+      });
+  };
+  if (bioEnableBtn) bioEnableBtn.addEventListener('click', () => {
+    if (bioBusy || !window.DhBio) return;
+    bioBusy = true;
+    bioEnableBtn.disabled = true;
+    bioEnableBtn.textContent = '⏳ Confirm your ' + bioLabel() + '…';
+    window.DhBio.enroll(SECRET).then(ok => {
+      bioOffer.classList.add('hidden');
+      if (ok) {
+        showBioZone(bioLabel());
+        toast('💞 ' + bioLabel() + ' enabled for this phone — one look/touch unlocks next time ♥');
+      } else {
+        const e = window.__dhBioLastErr;
+        const m = (e && (e.message || e.name)) || '';
+        console.warn('DH: biometric enrolment returned false', e);
+        if (/cancel|NotAllowed/i.test(m)) {
+          toast('Biometric was cancelled — tap “✨ Yes, enable it” again any time ♥');
+        } else if (/no-platform-auth/.test(m)) {
+          toast('This browser can’t see a face/fingerprint sensor — the secret word still works ♥');
+        } else {
+          toast('Couldn’t enable biometrics here (' + (m || 'unknown') + ') — secret word still works ♥');
+        }
+      }
+    }).catch(err => {
+      bioOffer.classList.add('hidden');
+      console.warn('DH: biometric enrolment threw', err && (err.message || err));
+      toast('Couldn’t enable biometrics here — the secret word still works perfectly ♥');
+    }).then(() => {
+      bioBusy = false;
+      bioEnableBtn.disabled = false;
+      bioEnableBtn.textContent = '✨ Yes, enable it';
+    });
+  });
+  if (bioSkipBtn) bioSkipBtn.addEventListener('click', () => {
+    safeSet(BIO_SKIP_KEY, "1");
+    bioOffer.classList.add('hidden');
+  });
+
+  /* v4.16 DH — auto-open the biometric prompt the moment the login screen is
+     actually on screen (fresh load / re-lock), but never fight the password
+     field: only when nobody has typed anything, no ceremony is running, and
+     we haven't already prompted during this view of the gate. */
+  let bioAutoTried = false;
+  const tryAutoBio = () => {
+    if (bioBusy || bioAutoTried) return;
+    if (!overlay || overlay.classList.contains('hidden')) return;   /* gate not visible */
+    if (bioOfferShown()) return;                                    /* enrolment offer first */
+    if ((pwInput.value || '').trim().length) return;                /* user is typing → hands off */
+    if (!bioZone || bioZone.classList.contains('hidden')) return;   /* not enrolled/supported */
+    bioAutoTried = true;
+    doBioUnlock();
+  };
+  if (document.visibilityState === 'visible') setTimeout(tryAutoBio, 500);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') tryAutoBio();
+  });
+  /* once unlocked, reset so the NEXT time the gate appears it can auto-prompt again */
+  const resetBioAuto = () => { bioAutoTried = false; };
+  if (overlay && window.MutationObserver) {
+    new MutationObserver(muts => {
+      for (const m of muts) {
+        if (overlay.classList.contains('hidden')) resetBioAuto();
+      }
+    }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+  }
+
   $('#login-btn').addEventListener('click', tryLogin);
-  pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') tryLogin(); });
-  pwToggle.addEventListener('click', () => {
+  pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); tryLogin(); } });
+  if (pwToggle) pwToggle.addEventListener('click', () => {
     const show = pwInput.type === 'password';
     pwInput.type = show ? 'text' : 'password';
     pwToggle.textContent = show ? '🙈' : '👁';
   });
 
+  } /* end login-guard */
+
   /* ---------- value accessors (stable per-page keys → no collisions) ---------- */
 
+  /* v4.13 DH — THE REAL SYNC BUG ("typing on one phone never appears on the other"):
+     a field's cloud key used to be either its element id (`day2#d2-a1`) or a
+     STRUCTURAL DOM PATH (`day2>43.2.1.3.0.0` — "the 43rd child, then its 2nd…").
+     Structural paths are only stable while the two devices hold the EXACT same
+     markup. The moment one device had an older cached index.html/app.js, or a day
+     was restored in a slightly different shape (a chip injected, a table wrapped
+     in .table-scroll by js/device.js, a Log Book block inserted by js/logbook.js),
+     every path shifted by one and the SAME sentence got saved under DIFFERENT keys
+     on the two phones → each device wrote past the other and nothing ever looked
+     "synced", even though Supabase was healthy the whole time.
+
+     Now every editable field carries a permanent identity stamp `data-dhk` that is
+     minted ONCE when the field is created and travels with the field inside the
+     day HTML pushed to the cloud. Both devices therefore key off the identical
+     token regardless of DOM shape, cache state or app version. Old path/id keys
+     keep working as read-only fallbacks so existing data still loads. */
+  var DHK_ATTR = 'data-dhk';
+  var dhkSeq = 0;
+  const genDhk = () => 'f' + (++dhkSeq).toString(36) + Date.now().toString(36);
+  const stampFields = root => {
+    $$('input, textarea, select', root || document).forEach(el => {
+      if (!el.hasAttribute(DHK_ATTR)) el.setAttribute(DHK_ATTR, genDhk());
+    });
+  };
   /* unique key for any field: page id + element id, or a structural DOM path */
   const keyFor = el => {
     const page = el.closest('.page');
     const pid  = page ? page.id : 'head';
-    if (el.id) return `${pid}#${el.id}`;
+    const dhk  = el.getAttribute && el.getAttribute(DHK_ATTR);
+    if (dhk) return `${pid}~${dhk}`;                 // v4.13 — stable identity key (wins)
+    if (el.id) return `${pid}#${el.id}`;             // legacy id key (fallback)
     const path = [];
     for (let n = el; n && n !== page && n.id !== 'main-contract'; n = n.parentElement) {
       path.push(Array.from(n.parentElement.children).indexOf(n));
     }
-    return `${pid}>${path.reverse().join('.')}`;
+    return `${pid}>${path.reverse().join('.')}`;     // legacy structural key (fallback)
   };
 
   const collectState = () => {
+    lbPrep();                                          /* v4.15 — inject/wire every 📔 log-book form BEFORE stamping, so its fields get identity stamps and ride along in 'fields' to the cloud */
+    ensureDhkStamps();                                  /* v4.13 — stamp before keying */
     const data = {};
     $$('#main-contract input:not([type="checkbox"]):not([type="password"]), #main-contract textarea, #main-contract select')
       .forEach(el => { data[keyFor(el)] = el.value; });
@@ -201,47 +714,152 @@
     return data;
   };
 
-  /* ---------- cloud save (Supabase only — never local storage) ---------- */
+  /* ---------- cloud save (Supabase is the source of truth; localStorage is
+     only a per-device safety net for offline sessions) ---------- */
   let saveTimer;
-  const writeStore = () => {                       // debounced autosave → cloud
+  /* v4.13 DH — THE "IT STILL DOESN'T SYNC" BUG: the autosave debounce timer was
+     NEVER started on unload. pagehide / beforeunload / background top-up all ran
+     writeStore(), which merely CLEARED the pending timer and re-armed a 1.2 s
+     setTimeout that a frozen/closed tab never gets to run — so the last thing you
+     typed (or an ✨ AI day made seconds before you switched apps) stayed in the DOM
+     and NEVER reached Supabase. The other phone then pulled the older state and it
+     looked like "sync is not happening at all". Unload now flushes synchronously. */
+  const writeStore = (immediate) => {              // debounced autosave → cloud
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      window.CloudStore.saveFields(collectState())
-        .then(ok => { if (!ok && !window.CloudStore.ready) softWarn(); });
-    }, 1200);
+    const push = () => {
+      const p = window.CloudStore.saveFields(collectState());
+      if (p && typeof p.catch === 'function') p.catch(() => {});   // v3.9: never an unhandled rejection
+      return p;
+    };
+    if (immediate === true || immediate === 'sync' || (immediate && immediate.type)) {
+      push();                                       // 💾 Save / unload → no debounce
+      return;
+    }
+    saveTimer = setTimeout(push, 1200);
   };
+  /* v4.13 DH — ONE shared, honest "everything landed in the cloud" promise.
+     Previously each caller built its own fire-and-forget chain, so a click could
+     report success while the writes were still in flight (and unload writes were
+     silently dropped). Now every mutation awaits this before claiming Saved ✓. */
+  const syncNow = async () => {
+    try { safeSet(STORE_KEY, JSON.stringify(collectState())); } catch { /* full */ }
+    try { safeSet(DAYS_KEY, JSON.stringify({ list: collectDays() || [] })); } catch { /* full */ }
+    writeStore('sync');                             // fields (Day + Affidavit), no debounce
+    const acc = collectAccepts();
+    if (acc && window.CloudStore) {
+      const p = window.CloudStore.saveAccepts(acc);
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    }
+    if (typeof persistDays === 'function') persistDays();   // every day page (stamped HTML)
+    let res = { ok: true, pending: 0 };
+    try {
+      if (window.CloudStore && typeof window.CloudStore.awaitFlush === 'function') {
+        res = await window.CloudStore.awaitFlush(15000);
+      }
+    } catch { res = { ok: false, pending: 1 }; }
+    return res;
+  };
+  window.dhSyncNow = syncNow;                       // used by js/logbook.js & console recovery
   const softWarn = () => {
     const t = $('#cloud-status');
     if (t) { t.textContent = '☁️ Cloud offline — set js/supabase-config.js'; t.title = 'Not saved to cloud; entries live in this session only.'; }
   };
 
   /* ---------- save: cloud first (source of truth), local copy as a
-     per-device safety net so nothing is ever lost offline ---------- */
-  const save = (quiet) => {
-    let ok = true;
+     per-device safety net so nothing is ever lost offline.
+     v3.9 DH — THE SAVE BUTTON FIX: the button now pushes EVERYTHING at once
+     (all field values — Day sections AND Pre-Scene Execution Affidavit, all
+     signature accepts, every created day page) and AWAITS the real cloud
+     completion before reporting "Saved ✓". Previously it only queued a
+     debounced autosave and toasted immediately, so when the underlying
+     promise rejected (no .catch anywhere) the click appeared to do nothing
+     and the newest data never reached Supabase. */
+  const collectAccepts = () => {
+    try { return readAccepts(); } catch { return null; }   // defined below; safe at click time
+  };
+  const collectDays = () => {
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify(collectState()));
-    } catch { ok = false; }
-    writeStore();                                  // push the newest entries to Supabase too
+      /* v4.0 DH — ALL day pages are captured for the cloud, including the
+         static founding Day 1 (its edited content is what must come back on
+         re-login). Only the DOM path excludes nothing now. */
+      return $$('.page')
+        .filter(p => dayNumber(p.id))
+        .map(p => ({ id: p.id, html: p.outerHTML }));
+    } catch { return null; }
+  };
+
+  const save = async (quiet, btn) => {
+    /* v4.13 DH — the whole save now runs through ONE audited path (syncNow):
+       local snapshot → fields + signatures + every day page to Supabase →
+       await the REAL completion of all queued writes before reporting. */
+    if (btn) { btn.disabled = true; btn.dataset.label = btn.textContent; btn.textContent = '⏳ Saving…'; }
+    let res = { ok: true, pending: 0 };
+    let localOk = true;
+    try {
+      safeSet(STORE_KEY, JSON.stringify(collectState()));
+      safeSet(DAYS_KEY, JSON.stringify({ list: collectDays() || [] }));
+    } catch { localOk = false; }
+    try { res = await syncNow(); } catch { res = { ok: false, pending: 1 }; }
+
+    /* v4.4 DH — BDSM Log Book: if any day's pre-scene log form has unsent
+       entries, push them into the LOG BOOK'S OWN cloud (never ours). */
+    try {
+      if (typeof window.dhLogbookAutoPush === 'function') {
+        $$('.page').filter(p => /^day\d+$/.test(p.id)).forEach(pg => {
+          const f = pg.querySelector('.lb-form');
+          if (f && f.dataset.lbDirty === '1') window.dhLogbookAutoPush(pg);
+        });
+      }
+    } catch { /* log book offline → contract save unaffected */ }
+
+    if (btn) { btn.disabled = false; btn.textContent = btn.dataset.label || '💾 Save'; }
+
     if (!quiet) {
-      if (ok) toast('💾 Saved — in the cloud and safe on this device.');
-      else toast('⚠️ Browser storage is full — saved to the cloud only. Export by email to free space.', 3600);
+      if (res.ok) toast('💾 Saved ✓ — everything (Day section + Pre-Scene Affidavit + signatures + all days) is in the cloud.');
+      else if (localOk) toast('⚠️ Cloud unreachable right now — saved on this device; will retry automatically.', 4200);
+      else toast('⚠️ Browser storage full — kept in this session only. Export by email to free space.', 4200);
     }
+    return res.ok;
   };
 
   /* ---------- visibility helpers (used by autosave AND the app lifecycle) ---------- */
   const pageVisible = () => document.visibilityState === 'visible';
 
+  /* v4.13 DH — every editable field gets its permanent identity stamp BEFORE the
+     first collect/apply pass, so keys never depend on DOM shape again. */
+  const ensureDhkStamps = () => { try { stampFields($('#main-contract') || document); } catch { /* ignore */ } };
+
   const applyFieldData = data => {
     if (!data) return;
+    ensureDhkStamps();
     $$('#main-contract input, #main-contract textarea, #main-contract select').forEach(el => {
       const slot = el.closest('.initials-slot');
       if (slot?.classList.contains('slot-filled')) return;   // sealed signature owns this field
       if (el.readOnly) return;                               // accept-date pills own their value
-      const k = keyFor(el);
-      if (!(k in data)) return;
-      if (el.type === 'checkbox') el.checked = !!data[k];
-      else el.value = data[k];
+      /* resolve the stored value across ALL historical key schemes:
+         v4.13 stable identity key → legacy element-id key → legacy DOM-path key.
+         First hit wins, so data saved by ANY older build still loads. */
+      const page = el.closest('.page');
+      const pid  = page ? page.id : 'head';
+      const dhk  = el.getAttribute(DHK_ATTR);
+      const pathKey = (() => {
+        const p = [];
+        for (let n = el; n && n !== page && n.id !== 'main-contract'; n = n.parentElement)
+          p.push(Array.from(n.parentElement.children).indexOf(n));
+        return `${pid}>${p.reverse().join('.')}`;
+      })();
+      const candidates = [];
+      if (dhk) candidates.push(`${pid}~${dhk}`);
+      if (el.id) candidates.push(`${pid}#${el.id}`, `head#${el.id}`);
+      candidates.push(pathKey);
+      let val;
+      let found = false;
+      for (const k of candidates) {
+        if (k in data) { val = data[k]; found = true; break; }
+      }
+      if (!found) return;                                    // v4.13b — `continue` inside forEach is illegal JS and crashed app.js at boot on EVERY device, killing login AND all cross-device sync
+      if (el.type === 'checkbox') el.checked = !!val;
+      else el.value = val;
       if (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && el.type === 'text' && el.maxLength === -1)) growInput(el);
     });
     autoGrowAll();
@@ -250,7 +868,7 @@
   /* load values: cloud mirror wins, local copy fills any gaps */
   const loadSaved = (data) => {
     let merged = {};
-    try { Object.assign(merged, JSON.parse(localStorage.getItem(STORE_KEY)) || {}); } catch { /* ignore */ }
+    try { Object.assign(merged, JSON.parse(safeGet(STORE_KEY)) || {}); } catch { /* ignore */ }
     if (window.CloudStore && typeof window.CloudStore.fields === 'function') {
       try { Object.assign(merged, window.CloudStore.fields() || {}); } catch { /* ignore */ }
     }
@@ -273,65 +891,300 @@
       try { const d = window.CloudStore.days(); if (Array.isArray(d)) list = d; } catch { /* ignore */ }
     }
     if (!list) {
-      try { const raw = JSON.parse(localStorage.getItem(DAYS_KEY)); if (raw && Array.isArray(raw.list)) list = raw.list; } catch { /* ignore */ }
+      try { const raw = JSON.parse(safeGet(DAYS_KEY)); if (raw && Array.isArray(raw.list)) list = raw.list; } catch { /* ignore */ }
     }
+    /* v4.8 DH — tombstone guard: strip any day that was deleted via "✖ Delete
+       day" / wipe from EVERY inbound list (cloud arg, cloud mirror, local
+       snapshot) before it can be re-attached. This is what makes a deletion
+       permanent across reloads, re-logins and both phones. */
+    if (list) list = pruneDeleted(list);
     if (list) {
+      /* v4.0 DH — cloud/local list is the source of truth: any day page that
+         no longer appears in it was explicitly deleted on some device, so drop
+         it here too (including a static Day 1 that was deleted & synced). */
       const keep = new Set(list.map(d => d && d.id).filter(Boolean));
       $$('.page').forEach(p => {
-        if (dayNumber(p.id) && !STATIC_IDS.has(p.id) && !keep.has(p.id)) p.remove();
+        if (dayNumber(p.id) && !keep.has(p.id)) p.remove();
       });
     }
-    if (!list || !list.length) return;
+    /* v3.8 DH — a day that exists in the DOM but not yet in the cloud list was
+       created on THIS device moments ago (e.g. autosave raced a realtime pull).
+       Re-persist immediately so it is never lost — "everything created in the
+       day stays saved". (v4.0: the old sticky `wiped` gate is gone.)
+       v4.8 DH — tombstoned pages still in the DOM are NOT counted, so a stale
+       page can never trigger a re-persist that resurrects a deleted day. */
+    {
+      const delSet = new Set(readDeleted());
+      const domPages = $$('.page').filter(p => dayNumber(p.id) && !delSet.has(p.id));
+      const cloudCreated = (list || []).length;
+      if (domPages.length > cloudCreated && typeof persistDays === 'function') persistDays();
+      /* v4.14b DH — THE "created day never syncs / missing after re-login" FIX:
+         with NO hardcoded days any more, the cloud list is the SOLE source of
+         truth. If a page already sits in the DOM whose stamp is OLDER than the
+         inbound list, the DOM copy predates the newest save → replace it with
+         the fresh cloud copy instead of leaving stale content on screen. */
+      if (list && list.length) {
+        const byId = new Map(list.map(d => [d && d.id, d]));
+        domPages.forEach(p => {
+          const src = byId.get(p.id);
+          if (!src || !src.html) return;
+          const cloudTs = +(src.updatedAt || src.createdAt || 0);
+          const domTs   = +(p.dataset.dhUpdated || 0);
+          if (cloudTs && domTs && cloudTs > domTs) {
+            try {
+              const tplU = document.createElement('template');
+              tplU.innerHTML = String(src.html).trim();
+              const fresh = tplU.content.firstElementChild;
+              if (fresh && fresh.tagName === 'SECTION') {
+                fresh.dataset.dhUpdated = String(cloudTs);
+                p.replaceWith(fresh);
+                if (typeof wireNewDay === 'function') wireNewDay(fresh);
+              }
+            } catch { /* keep local copy */ }
+          }
+        });
+      }
+    }
+    if (!list || !list.length) { updateEmptyState(); ensureDhkStamps(); return; }
+    /* v4.14 DH — the "no hardcoded days" guarantee: when a cloud/local list IS
+       present it is the ONLY source of day pages, so the empty banner must be
+       removed (it can linger from an earlier empty restore). */
+    updateEmptyState();
+    adoptCreatedStamps(list);
+    /* v4.13 DH — mint identity stamps for any field that still lacks one (static
+       Day 1 / older saved HTML). Done BEFORE loadSaved() below so both devices
+       key their values off the SAME token from the first save onward. */
+    ensureDhkStamps();
     const summary = $('#summary');
     if (!summary) return;
     list.forEach(d => {
       if (!d || !d.id || !d.html) return;
-      if ($('#' + d.id)) return;                       // already present
-      const tpl = document.createElement('template');
-      tpl.innerHTML = String(d.html).trim();
-      const section = tpl.content.firstElementChild;
-      if (!section || section.tagName !== 'SECTION') return;
-      $('#main-contract').insertBefore(section, summary);
-      if (typeof wireNewDay === 'function') wireNewDay(section);
+      if (isDeletedDay(d.id)) return;                // v4.8 DH — deleted days never come back
+      /* v4.11 DH — a day created on the OTHER device before this feature existed
+         has no stamp anywhere: seed one from the oldest evidence we have (the
+         cloud row's updated_at / the local snapshot), first-wins, so both phones
+         show the same "Created" line after the next persist. */
+      if (!createdAtFor(d.id)) {
+        let seed = 0;
+        try {
+          const cu = window.CloudStore && typeof window.CloudStore.dayUpdatedAt === 'function'
+            ? Date.parse(window.CloudStore.dayUpdatedAt(d.id) || '') : NaN;
+          if (Number.isFinite(cu)) seed = cu;
+        } catch { /* ignore */ }
+        if (!seed) {
+          try {
+            const raw = JSON.parse(safeGet(DAYS_KEY));
+            const loc = raw && Array.isArray(raw.list) ? raw.list.find(x => x && x.id === d.id) : null;
+            const lu = Date.parse((loc && loc.updatedAt) || '');
+            if (Number.isFinite(lu)) seed = lu;
+          } catch { /* ignore */ }
+        }
+        if (seed) {
+          const m = readCreatedMap();
+          if (!m[d.id]) { m[d.id] = seed; writeCreatedMap(m); }
+        }
+      }
+      const existing = $('#' + d.id);
+      if (existing && !existing.closest('#main-contract')) {
+        /* v4.14 DH — a same-id element exists but is NOT a day page inside the
+           contract (e.g. leftover markup) → drop it and attach the cloud copy. */
+        try { existing.remove(); } catch { /* ignore */ }
+      } else if (existing) {
+        /* v4.14 DH — NO hardcoded/static day pages any more: every page in the DOM
+           came from a previous restore or from ➕/✨ creation on this device, so we
+           must NOT blindly re-attach the cloud copy (that would duplicate the page
+           and could clobber in-progress typing). Only refresh a stale restored page
+           when the CLOUD copy is genuinely newer than what this DOM holds; a page
+           whose saved HTML carries no updatedAt stamp keeps its local content
+           (persistDays() below pushes it back up instead). */
+        try {
+          const cloudTs  = +(d.updatedAt || d.createdAt || 0);
+          const domEl    = existing.closest('.page') || existing;
+          const domTs    = +(domEl.dataset.dhUpdated || 0);
+          if (cloudTs && (!domTs || cloudTs > domTs)) {
+            const tplC = document.createElement('template');
+            tplC.innerHTML = String(d.html).trim();
+            const fresh = tplC.content.firstElementChild;
+            if (fresh && fresh.tagName === 'SECTION') {
+              fresh.dataset.dhUpdated = String(cloudTs);
+              existing.replaceWith(fresh);
+              if (typeof wireNewDay === 'function') wireNewDay(fresh);
+            }
+          }
+        } catch { /* keep the local page if the swap fails */ }
+      } else {
+        const tpl = document.createElement('template');
+        tpl.innerHTML = String(d.html).trim();
+        const section = tpl.content.firstElementChild;
+        if (!section || section.tagName !== 'SECTION') return;
+        /* remember the write-time of the copy we just attached, so future
+           restores can tell "cloud newer" from "local newer" per day */
+        try { section.dataset.dhUpdated = String(+(d.updatedAt || d.createdAt || 0) || ''); } catch { /* ignore */ }
+        $('#main-contract').insertBefore(section, summary);
+        if (typeof wireNewDay === 'function') wireNewDay(section);
+      }
+    });
+    /* v4.11b — make sure every restored page visibly carries its creation stamp:
+       scrape a "🕒 Created …" chip baked into the stored HTML into the local map,
+       then (re-)inject the chip so days made BEFORE this feature (or whose saved
+       HTML predates it) also show the date & time on THIS device. */
+    list.forEach(d => {
+      if (!d || !dayNumber(d.id) || isDeletedDay(d.id)) return;
+      const scraped = scrapeCreatedFromHtml(d.html);
+      if (scraped && !createdAtFor(d.id)) {
+        const m = readCreatedMap();
+        m[d.id] = scraped; writeCreatedMap(m);
+      }
+      setCreatedBadge($('#' + d.id), createdAtFor(d.id) || scraped);
     });
     loadSaved();                                       // replay field values into restored days
     syncAllLocks();
   };
 
-  $('#save-contract').addEventListener('click', save);
+  /* v3.9 DH — pass the button element so it shows ⏳ Saving… → 💾 Save while
+     the cloud writes complete (the click handler is async now). */
+  $('#save-contract').addEventListener('click', e => save(false, e.currentTarget));
 
   /* ---------- Print / PDF ----------
-     On phones window.print() is unreliable (no print service, or it silently
-     opens a broken share sheet), so the app generates the PDF itself — see
-     js/pdf.js. Desktop keeps the native "Print → Save as PDF" dialog. */
-  const useGeneratedPDF = () => {
-    if (typeof makeContractPDF !== 'function') return false;
-    if (isPhone()) return true;                                    // phones: always build the file
-    try {                                                           // installed PWA: no browser chrome to print from
-      if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
-      if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) return true;
-      if (navigator.standalone) return true;                        // iOS home-screen app
-    } catch { /* ignore */ }
-    return false;
+     v4.10 DH FIX — "PDF button not working on phone".
+     Root cause: the 📄 Print / PDF button relied only on window.print(), which
+     does NOTHING inside an installed PWA (standalone mode has no browser menu,
+     no print service) and silently fails in some Android WebViews. Now the
+     button runs a robust cascade that works on EVERY phone surface:
+
+       1. js/pdf.js (if ever shipped again) → real generated PDF file
+       2. In-app print preview → opens the page in a hidden iframe and calls
+          print() there. Works even when window.print() on the top-level page
+          is blocked/ignored (PWA & Android WebView).
+       3. "Open in browser" hand-off → for PWAs where even iframe printing is
+          unavailable: copies the contract into a new tab of the normal browser
+          (Safari/Chrome), where Share → Print → Save as PDF definitely works.
+       4. Last resort → plain window.print(). */
+
+  /* force collapsed days open while printing, remember & restore after */
+  const expandAllForPrint = () => {
+    const pages = $$('.page');
+    const wasCollapsed = [];
+    pages.forEach(p => {
+      if (p.classList.contains('day-collapsed')) { wasCollapsed.push(p); p.classList.remove('day-collapsed'); }
+    });
+    return () => wasCollapsed.forEach(p => p.classList.add('day-collapsed'));
   };
-  $('#print-pdf').addEventListener('click', async e => {
-    const btn = e.currentTarget;
-    if (!useGeneratedPDF()) { window.print(); return; }
-    const old = btn.textContent;
-    btn.disabled = true; btn.textContent = '⏳ Building PDF…';
+
+  const printViaIframe = async () => {
+    const clone = document.documentElement.cloneNode(true);
+    /* strip things that must never appear in the printed/PDF output */
+    clone.querySelectorAll('.login-overlay,.modal-overlay,.ai-overlay,.toast,.lb-viewer,.btn-group,#nojs-warning,[id^="lb-"],script:not([src])')
+      .forEach(n => n.remove());
+    /* rebuild the stylesheet links with absolute URLs so the iframe is styled */
+    clone.querySelectorAll('link[rel="stylesheet"]').forEach(l => { l.href = new URL(l.getAttribute('href'), location.href).href; });
+    /* remove any interactive state that could hide content in the copy */
+    clone.querySelectorAll('.day-collapsed').forEach(p => p.classList.remove('day-collapsed'));
+
+    const html = '<!DOCTYPE html>\n' + clone.outerHTML;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+
+    return await new Promise(resolve => {
+      const frame = document.createElement('iframe');
+      frame.setAttribute('aria-hidden', 'true');
+      frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;';
+      let settled = false;
+      const done = ok => {
+        if (settled) return; settled = true;
+        clearTimeout(timer);
+        setTimeout(() => { frame.remove(); try { URL.revokeObjectURL(url); } catch { /* ignore */ } }, 1500);
+        resolve(ok);
+      };
+      const timer = setTimeout(() => done(false), 9000);   // phone browsers can be slow building the doc
+      frame.addEventListener('load', () => {
+        try {
+          const w = frame.contentWindow;
+          if (!w) return done(false);
+          w.onafterprint = () => done(true);
+          w.focus();
+          w.print();
+          /* if print() is silently ignored (some WebViews), fall back in 2.5s */
+          setTimeout(() => done(true), 2500);
+        } catch { done(false); }
+      });
+      frame.src = url;
+      document.body.appendChild(frame);
+    });
+  };
+
+  /* PWA hand-off: reopen the exact same app inside the normal browser, where
+     the user can use the browser's own Share/Print menu reliably. */
+  const openInBrowserForPDF = () => {
     try {
-      writeStore();                                   // make sure the newest entries are on disk first
-      const res = await makeContractPDF();
-      downloadBlob(res.blob, res.filename);
-      toast('📄 PDF ready — check your Downloads folder ♥', 3400);
+      const u = new URL(location.href);
+      u.searchParams.set('dhpdf', '1');
+      const win = window.open(u.href, '_blank');
+      if (!win) { window.location.href = u.href; return true; }  // popup blocked → navigate instead
+      return true;
+    } catch { return false; }
+  };
+
+  const runPrintPDF = async btn => {
+    const old = btn.textContent;
+    btn.disabled = true; btn.textContent = '⏳ Preparing PDF…';
+    const restore = expandAllForPrint();
+    try {
+      writeStore();                                       // newest entries on disk first
+      if (typeof makeContractPDF === 'function') {       // dedicated generator (if shipped)
+        const res = await makeContractPDF();
+        downloadBlob(res.blob, res.filename);
+        toast('📄 PDF ready — check your Downloads folder ♥', 3400);
+        return;
+      }
+      const standalone = (() => {
+        try {
+          return (window.matchMedia && (window.matchMedia('(display-mode: standalone)').matches
+            || window.matchMedia('(display-mode: fullscreen)').matches)) || navigator.standalone === true;
+        } catch { return false; }
+      })();
+      if (standalone && isIOS_()) {                      // iOS PWA: print is unavailable there
+        toast('🌐 Opening in Safari — there tap Share ⎙ → Print → Save as PDF.', 4200);
+        if (openInBrowserForPDF()) return;
+      }
+      const ok = await printViaIframe();                 // Android PWA / WebView / everything else
+      if (!ok) {
+        if (standalone && openInBrowserForPDF()) {
+          toast('🌐 Opened in your browser — use the menu → Print → Save as PDF.', 4200);
+          return;
+        }
+        window.print();                                  // final fallback
+      } else if (standalone) {
+        toast('🖨 In the print sheet choose “Save as PDF” as the destination.', 4200);
+      }
     } catch (err) {
       console.warn(err);
-      toast('⚠️ Could not build the PDF here — opening the print dialog instead.', 3600);
-      try { window.print(); } catch { /* nothing more we can do */ }
+      toast('⚠️ Could not open the print dialog here — opening in the browser instead.', 3800);
+      if (!openInBrowserForPDF()) { try { window.print(); } catch { /* nothing more we can do */ } }
     } finally {
+      restore();
       btn.disabled = false; btn.textContent = old;
     }
-  });
+  };
+
+  const isIOS_ = () => {
+    if (typeof window.isIOS === 'function') { try { return !!window.isIOS(); } catch { /* fall through */ } }
+    return /iP(hone|ad|od)/.test(navigator.userAgent || '') ||
+      (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1);
+  };
+
+  $('#print-pdf').addEventListener('click', e => runPrintPDF(e.currentTarget));
+
+  /* v4.10 — arriving via the "open in browser" hand-off (?dhpdf=1): once the
+     app is up, auto-open the print dialog so Save-as-PDF is one tap away. */
+  setTimeout(() => {
+    try {
+      if (!/[?&]dhpdf=1/.test(location.search)) return;
+      history.replaceState(null, '', location.pathname + location.search.replace(/[?&]dhpdf=1/, '').replace(/&&/, '?') + location.hash);
+      toast('📄 Use your browser menu → Share/Print → “Save as PDF”. Opening the print dialog now…', 5200);
+      setTimeout(() => { try { window.print(); } catch { /* ignore */ } }, 900);
+    } catch { /* ignore */ }
+  }, 2500);
 
   /* gentle autosave — every change writes instantly, plus safety nets */
   ['input', 'change'].forEach(ev => document.addEventListener(ev, writeStore, true));
@@ -632,7 +1485,61 @@
      sealed slots/dates take ownership instead of being overwritten by old data.
      (app.js is loaded with `defer`, so this also runs after js/device.js and
      js/pdf.js have defined their globals.) */
-  const bootContract = () => { restoreDays(); loadSaved(); applySignatures(); };
+  const bootContract = async () => {
+    /* v3.6 DH — wait for the first Supabase pull before replaying state,
+       otherwise the contract boots from an empty mirror and never syncs. */
+    try { await window.CloudStore.ready; } catch { /* offline → boot local-only */ }
+    restoreDays(); loadSaved(); applySignatures();
+    /* v4.18 DH — one tick after everything is in the DOM, refit every box to
+       THIS screen's width (fonts may still be loading → refit once more when
+       they finish). Guarantees all boxes/text sit inside the phone screen. */
+    requestAnimationFrame(() => { try { fitAllBoxes(); } catch { /* ignore */ } });
+    setTimeout(() => { try { fitAllBoxes(); } catch { /* ignore */ } }, 500);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => { try { scheduleFitAllBoxes(); } catch { /* ignore */ } }).catch(() => {});
+    }
+  };
+
+  /* v3.6 DH — keep multi-device sync fresh: whenever the tab regains focus /
+     becomes visible, pull the latest cloud state and re-apply it. */
+  let lastFocusSync = 0;
+  /* v4.13 DH — THE "SAME ON BOTH PHONES" RULE: a background/realtime refresh may
+     NOT overwrite fields the user is editing right now (previously every focus
+     event replayed the whole cloud mirror onto the live DOM — so half-typed text
+     on this phone got replaced by the other device's older copy, and it felt like
+     "sync keeps undoing my typing"). We snapshot the currently-focused field before
+     the replay and put its local value straight back afterwards. */
+  const resyncFromCloud = () => {
+    if (!window.CloudStore || typeof window.CloudStore.refresh !== 'function') return;
+    const now = Date.now();
+    if (now - lastFocusSync < 1500) return;           // debounce rapid focus/visibility events
+    lastFocusSync = now;
+    Promise.resolve(window.CloudStore.refresh()).then(st => {
+      if (!st) return;                                 // offline / not configured → keep current UI
+      if (!overlay.classList.contains('hidden')) return; // locked → unlock() will replay on login
+      const ae = document.activeElement;
+      const protect = ae && ae.matches && ae.matches('#main-contract input, #main-contract textarea, #main-contract select')
+        ? { el: ae, key: keyFor(ae), value: ae.value, checked: ae.checked } : null;
+      if (protect) protect.el.dataset.dhkHold = '1';
+      if (overlay.classList.contains('hidden')) restoreDays(window.CloudStore.days());
+      loadSaved(window.CloudStore.fields());
+      applySignatures();
+      if (protect) {
+        const target = document.querySelector(`[data-dhk-hold]`) || protect.el;
+        try {
+          if (target.type === 'checkbox') target.checked = !!protect.checked;
+          else target.value = protect.value;
+          target.focus({ preventScroll: true });
+        } catch { /* element gone (day deleted elsewhere) — nothing to protect */ }
+        delete target.dataset.dhkHold;
+      }
+    }).catch(() => {});
+  };
+  window.addEventListener('focus', resyncFromCloud);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) resyncFromCloud(); });
+  /* v4.13d DH — realtime: when the OTHER device saves, replay its newest state
+     into this DOM within ~1 s without waiting for a tab-focus event. */
+  try { if (window.CloudStore && typeof window.CloudStore.onChange === 'function') window.CloudStore.onChange(resyncFromCloud); } catch { /* ignore */ }
 
   /* ---------- v3.4 DH: hoisted helpers (declared here, used above) ----------
      These two were previously declared further down the file as `const`s while
@@ -665,11 +1572,17 @@
     });
   }
 
-  /* append a freshly created day page to the contract */
+  /* ---------- append a freshly created day page to the contract ---------- */
   function addDayPage(p) {
+    markDayCreated('day' + p.n);   // v4.11 DH — permanent creation stamp (syncs via persistDays)
     const tpl = document.createElement('template');
     tpl.innerHTML = dayPageHTML(p).trim();
     const section = tpl.content.firstElementChild;
+    /* v4.13 DH — stamp the new page's fields with permanent identity tokens while
+       it is still detached, so persistDays() snapshots stamped HTML immediately and
+       the other device keys its values identically from the very first save. */
+    try { stampFields(section); } catch { /* ignore */ }
+    setCreatedBadge(section, createdAtFor('day' + p.n));   // visible "🕒 Created …" chip
     const summary = $('#summary');
     $('#main-contract').insertBefore(section, summary);
     wireNewDay(section);
@@ -734,6 +1647,16 @@
     window.CloudStore.saveFields(fields);
     collapsedOverride.delete(page.id);
     page.remove();
+    /* v4.8 DH — THE fix for "deleted day comes back": record a permanent
+       tombstone BEFORE persisting, so the pruned list that goes to the cloud
+       mirror + Supabase no longer contains it AND every future restore path
+       (reload / re-login / realtime pull / other device) refuses to re-attach
+       this day id. New days created afterwards are untouched. */
+    addDeleted(dayId);
+    /* v4.13e DH — push the EXPLICIT tombstone to the shared cloud 'deleted'
+       key so this deletion sticks permanently on EVERY device (absence from a
+       day list is never treated as a deletion any more). */
+    try { if (window.CloudStore && typeof window.CloudStore.saveDeleted === 'function') window.CloudStore.saveDeleted([dayId]); } catch { /* offline — local tombstone + next flush still deliver it */ }
     persistDays();                       // cloud day list no longer contains it
     save();
     refreshAiDayOptions();               // keep the AI target list in sync
@@ -761,6 +1684,12 @@
   const nextDayNumber = () => dayPages().reduce((mx, p) => Math.max(mx, dayNumber(p.id)), 0) + 1;
 
   const wipeAllDays = silent => {
+    /* v4.8 DH — tombstone every wiped day id BEFORE persisting so the cloud
+       mirror / Supabase receive the pruned list and nothing ever re-attaches
+       these days on reload, re-login or from the other device. */
+    addDeleted(dayPages().map(p => p.id));
+    /* v4.13e DH — push the wiped ids as EXPLICIT cloud tombstones too */
+    try { if (window.CloudStore && typeof window.CloudStore.saveDeleted === 'function') window.CloudStore.saveDeleted(dayPages().map(p => p.id)); } catch { /* offline guard: local tombstones still apply, flush retries */ }
     dayPages().forEach(p => {
       const dayId = p.id;
       const accepts = readAccepts();
@@ -774,7 +1703,9 @@
     const fields = window.CloudStore.fields();
     Object.keys(fields).forEach(k => { if (/^day\d+[>#]/.test(k)) delete fields[k]; });
     window.CloudStore.saveFields(fields);
-    window.CloudStore.saveWiped(true);   // sticky: days stay cleared after reload
+    /* v4.0 DH — saveWiped is a no-op now; the authoritative empty list below
+       is what keeps the contract cleared across reloads (only manual wipe
+       ever reaches this code path — nothing auto-wipes days anymore). */
     persistDays();
     refreshAiDayOptions();
     updateEmptyState();
@@ -818,6 +1749,10 @@
   /* ---------- add a brand-new BLANK day (manual creation) ---------- */
   const addBlankDay = () => {
     const N = nextDayNumber();
+    /* v4.8 DH — if this exact day id was deleted before (tombstoned), the user
+       is deliberately creating a NEW day with that number → lift the tombstone
+       so the fresh page can persist & restore normally. */
+    liftDeleted('day' + N);
     const section = addDayPage(blankPlan(N));
     persistDays();
     save();
@@ -1351,6 +2286,9 @@
   /* ---------- HTML builders for a brand-new day page ---------- */
   const dmyPill = () =>
     `<span class="datetime-group"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY"></span>`;
+  /* v4.9 DH — compact date pill for signature fields (no DD/MM/YYYY labels, tighter) */
+  const dmyPillCompact = () =>
+    `<span class="datetime-group datetime-compact"><input type="text" inputmode="numeric" maxlength="2" placeholder="DD" aria-label="Day"><i>/</i><input type="text" inputmode="numeric" maxlength="2" placeholder="MM" aria-label="Month"><i>/</i><input type="text" inputmode="numeric" maxlength="4" placeholder="YYYY" aria-label="Year"></span>`;
   const ynPair  = (a, b) => `<label class="yn"><input type="checkbox"> ${a}</label><label class="yn"><input type="checkbox"> ${b}</label>`;
 
   const dayPageHTML = p => {
@@ -1380,7 +2318,10 @@
         <button class="collapse-toggle" type="button" aria-expanded="true" title="Collapse / expand this day">▾ Collapse</button>
         <button class="clear-day-btn" type="button" data-day="day${N}">🗑 Clear this day</button>
         <button class="delete-day-btn danger" type="button" data-day="day${N}" title="Permanently remove Day ${N} from the contract and the cloud">✖ Delete day</button>
+        <a class="lb-day-link" href="https://bdsmlogbook.vercel.app/" target="_blank" rel="noopener" title="Open tonight in the BDSM Log Book — its saves stay in the Log Book's own cloud">📔 Open in Log Book ↗</a>
       </div>
+      <!-- v4.3 DH — live read-only feed from the BDSM Log Book cloud (filled by js/logbook.js) -->
+      <div class="logbook-feed"></div>
       <p class="lock-note">🔒 This day is marked as finished — everything (signatures included) is sealed. Set “Day finished” to ❌ No to edit again.</p>
 
       <p><strong>Between:</strong> Deep (the Dominant) &amp; Honey (the Submissive) · <em>${escH(p.coupleLabel || '')}</em></p>
@@ -1459,12 +2400,12 @@
       <div class="sign-row">
         <div class="sign-field"><label>Submissive / Bottom — signature</label><span class="initials-slot" data-area="signatories-day${N}" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
         <div class="sign-field"><label>Printed name</label><input class="editable-field" placeholder="Type printed name"></div>
-        <div class="sign-field"><label>Date</label>${dmyPill()}</div>
+        <div class="sign-field"><label>Date</label>${dmyPillCompact()}</div>
       </div>
       <div class="sign-row">
         <div class="sign-field"><label>Dominant / Top — signature</label><span class="initials-slot" data-area="signatories-day${N}" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
         <div class="sign-field"><label>Printed name</label><input class="editable-field" placeholder="Type printed name"></div>
-        <div class="sign-field"><label>Date</label>${dmyPill()}</div>
+        <div class="sign-field"><label>Date</label>${dmyPillCompact()}</div>
       </div>
 
       <h3 class="section-title">Pre-Scene Execution Affidavit — Day ${N}</h3>
@@ -1486,11 +2427,11 @@
       </div>
       <div class="sign-row">
         <div class="sign-field"><label>Deep's signature (debrief)</label><span class="initials-slot" data-area="debrief-day${N}" data-party="Deep"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-        <div class="sign-field"><label>Date</label>${dmyPill()}</div>
+        <div class="sign-field"><label>Date</label>${dmyPillCompact()}</div>
       </div>
       <div class="sign-row">
         <div class="sign-field"><label>Honey's signature (debrief)</label><span class="initials-slot" data-area="debrief-day${N}" data-party="Honey"><input type="text" class="editable-field" placeholder="Signature"></span></div>
-        <div class="sign-field"><label>Date</label>${dmyPill()}</div>
+        <div class="sign-field"><label>Date</label>${dmyPillCompact()}</div>
       </div>
 
       <!-- Our love stamp — Drive ref: https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw/view?usp=sharing (local copy) -->
@@ -1504,11 +2445,66 @@
   /* ---------- append a freshly created day ---------- */
   // NOTE: STATIC_IDS is already declared at the top of this IIFE (line ~57); redeclaring caused a SyntaxError.
   const persistDays = () => {
+    /* v4.0 DH — EVERY day page that exists right now (static Day 1 included,
+       blank or AI) is pushed to the cloud as [{id, html}], so a re-login on
+       any device rebuilds the COMPLETE contract — all day data AND the
+       Pre-Scene Execution Affidavit values come back from Supabase.
+       Called on create / delete / wipe / AI-write / Save. */
+    if (!window.CloudStore) return;
+    /* v4.13 DH — stamp every field with its permanent identity token BEFORE the
+       outerHTML snapshot is taken, so the stamps ride along inside the saved/copied
+       day markup. The other phone restores the SAME tokens → the same sentence lands
+       under the same cloud key on both devices (this is what makes "only" identical
+       content across devices actually hold). Also carry the creation stamp and the
+       last-write time down with each entry for the other device to adopt. */
+    ensureDhkStamps();
     const list = $$('.page')
-      .filter(p => dayNumber(p.id) && !STATIC_IDS.has(p.id))
-      .map(p => ({ id: p.id, html: p.outerHTML }));
-    window.CloudStore.saveDays(list)
-      .then(ok => { if (!ok && !window.CloudStore.ready) toast('⚠️ Cloud not configured — this day lives in the page only.', 3200); });
+      .filter(p => dayNumber(p.id))
+      .map(p => ({ id: p.id, html: p.outerHTML, createdAt: createdAtFor(p.id) || null, updatedAt: Date.now() }));
+    /* v4.2 DH — defensive capability checks: older browsers still holding a
+       STALE cached js/cloud.js (pre-v4.1) threw
+       "window.CloudStore.setMirrorDays is not a function" here, which killed
+       the whole AI-apply path before saveDays() could push anything to the
+       cloud. Each optional method is probed with typeof and wrapped in
+       try/catch, so even a mismatched cloud.js version cannot break saving. */
+    try {
+      if (typeof window.CloudStore.setMirrorDays === 'function') {
+        window.CloudStore.setMirrorDays(list);
+      } else if (typeof window.CloudStore.saveDays === 'function') {
+        window.CloudStore.saveDays(list);   // v3.x fallback: still reaches Supabase
+      }
+    } catch (e) { console.warn('[days] mirror set failed, falling back to saveDays:', e); }
+    try {
+      if (typeof window.CloudStore.saveDays !== 'function') return;
+      const p = window.CloudStore.saveDays(list);
+      if (p && typeof p.then === 'function') {
+        p.then(ok => { if (!ok) toast('⚠️ Cloud not reachable — this day lives on this device until sync returns.', 3200); })
+         .catch(() => {});
+      }
+    } catch (e) { console.error('[days] saveDays threw:', e); }
+  };
+  window.dhPersistDays = persistDays;   // used by js/cloud.js flush path & console recovery
+
+  /* v4.13d DH — cross-device sync guarantee hook for js/cloud.js:
+     before any cloud write is merged & pushed, collect the FRESHEST values
+     straight from this device's live DOM (fields + day pages). This makes
+     "what you see on screen right now" always win per-key, so a Save on one
+     phone can never push an older in-memory copy over the other phone's
+     newest data, and detached-day values are unioned rather than dropped. */
+  /* v4.13e DH — collectDays() is the AUTHORITATIVE day snapshot: every page
+     carries updatedAt/createdAt stamps (persistDays does), so cloud.js can do
+     true per-day LAST-WRITER-WINS merges. If persistDays hasn't booted yet we
+     return null → caller keeps its own snapshot instead of mixing in an
+     UNSTAMPED list that would corrupt the timestamp comparison. */
+  window.dhCollectFresh = key => {
+    try {
+      if (key === 'fields')  return collectState();
+      if (key === 'days')    return (typeof persistDays === 'function' && typeof window.dhPersistDays === 'function')
+        ? collectDays().map(d => ({ id: d.id, html: d.html, createdAt: createdAtFor(d.id) || null, updatedAt: Date.now() }))
+        : null;
+      if (key === 'accepts') return collectAccepts();
+    } catch { /* DOM mid-mutation — caller keeps its own snapshot */ }
+    return null;
   };
   /* NOTE: addDayPage() and ensureSignAccepts() were MOVED UP with bootContract()
      (see the hoisted-helpers block near the signature code) so they are fully
@@ -1519,6 +2515,13 @@
   const wireNewDay = page => {
     wireTextareas(page);
     wirePills(page);
+    /* v4.7 DH — restored/created day pages (and the Log Book blocks injected
+       below) get their tables wrapped in a horizontally scrollable shell so
+       nothing clips on phone screens. */
+    try { wrapTables(page); } catch { /* ignore */ }
+    /* v4.4 DH — freshly created/restored day pages get their BDSM Log Book
+       feed slot + pre-scene form injected and wired (js/logbook.js hook). */
+    try { window.dhLogbookRefreshDom && window.dhLogbookRefreshDom(); } catch { /* ignore */ }
     const clearBtn = $('.clear-day-btn', page);
     if (clearBtn) clearBtn.addEventListener('click', () => clearDay(clearBtn));
     const dfSel = $('.day-finished-select', page);
@@ -1550,11 +2553,14 @@
     return true;
   };
 
-  aiApplyBtn.addEventListener('click', () => {
+  function aiApplyClick() {
     if (!aiDraft) return;
+    console.log('DH-DEBUG: create branch, addDayPage=', typeof addDayPage, 'typeof window.addDayPage=', typeof window.addDayPage);
     if (aiMode === 'create') {
       const created = `✨ Day ${aiDraft.n} created by the AI — review it together before signing ♥`;
+      console.log('DH-DEBUG: calling addDayPage, n=', aiDraft.n, 'blank=', aiDraft.blank);
       const section = addDayPage(aiDraft);
+      console.log('DH-DEBUG: addDayPage returned', section && section.id, 'inDOM=', !!(section && window.document.contains(section)));
       persistDays();
       aiDraft = null;
       aiApplyBtn.disabled = true;
@@ -1573,33 +2579,22 @@
         save();
       }
     }
+  }
+
+  /* v3.7 DH: a throw here used to kill day creation silently — the global
+     error toast fired but nothing was logged, so wrap + console.error it. */
+  console.log('DH-DEBUG: binding aiApplyBtn listener');
+  aiApplyBtn.addEventListener('click', () => {
+    console.log('DH-DEBUG: apply clicked, draft=', !!aiDraft, 'mode=', aiMode);
+    try { aiApplyClick(); }
+    catch (err) { console.error('AI apply failed:', err); toast('⚠️ AI apply failed: ' + err.message, 4000); }
   });
 
-  /* ---------- textareas: grow with content (batched → cheap on phones) ---------- */
-  const autoGrow = ta => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; };
-  const autoGrowAll = () => $$('textarea').forEach(autoGrow);
-  let growQueued = false;
-  const scheduleAutoGrowAll = () => {
-    if (growQueued) return;
-    growQueued = true;
-    requestAnimationFrame(() => { growQueued = false; autoGrowAll(); });
-  };
-  window.scheduleAutoGrowAll = scheduleAutoGrowAll;   // used by js/device.js after a profile change
-  const wireTextareas = root => $$('textarea', root).forEach(ta => ta.addEventListener('input', () => autoGrow(ta)));
-
-  /* ---------- inline text inputs: grow to fit their text, stay compact ---------- */
-  const GROW_FONT = '15px "Cormorant Garamond", Georgia, serif';
-  const measureCanvas = document.createElement('canvas');
-  const mctx = measureCanvas.getContext('2d');
-  const growInput = inp => {
-    if (inp.dataset.pill === '1') return;                 // DD/MM/YYYY pills keep fixed size
-    const min = parseFloat(getComputedStyle(inp).minWidth) || 70;
-    const max = parseFloat(inp.dataset.growMax || '340');
-    mctx.font = getComputedStyle(inp).font || GROW_FONT;
-    const w = Math.ceil(mctx.measureText(inp.value || inp.placeholder || '').width) + 26;
-    inp.style.width = Math.min(Math.max(w, min), max) + 'px';
-  };
-  const growInputsIn = root => $$('input[type="text"]', root).forEach(growInput);
+  /* ---------- textareas / inline inputs ----------
+     v3.7 DH: autoGrow / autoGrowAll / scheduleAutoGrowAll / wireTextareas /
+     growInput / growInputsIn are declared at the TOP of this IIFE (see the
+     hoisted-helpers block near line ~62) so boot-time callers like
+     applyFieldData() never hit a TDZ ReferenceError. Only the listener stays here. */
   document.addEventListener('input', e => {
     const inp = e.target;
     if (inp.matches && inp.matches('#main-contract input[type="text"]:not([maxlength])')) growInput(inp);
@@ -1621,6 +2616,22 @@
   wireTextareas(document);
   wirePills(document);
   $$('.datetime-group').forEach(() => {});   // keep grouping explicit for readability
+
+  /* ---------- v4.7 DH — phone-first: make every data table horizontally
+     scrollable on narrow screens instead of clipping or squeezing columns.
+     Runs at boot and after each day restore (logbook.js injects its own
+     tables into day pages too, so this must re-run whenever days rebuild). ---------- */
+  const wrapTables = (root) => {
+    $$('table', root || document).forEach(t => {
+      if (t.closest('.table-scroll') || t.closest('.lb-form-box')) return;
+      const w = document.createElement('div');
+      w.className = 'table-scroll';
+      t.parentNode.insertBefore(w, t);
+      w.appendChild(t);
+    });
+  };
+  wrapTables(document);
+  window.dhWrapTables = wrapTables;          // exposed so logbook.js can reuse it
 
   /* ---------- keyboard-safe scrolling: a sticky footer bar would sit on top of
      the on-screen keyboard, so on phones we simply scroll the button into view ---------- */
@@ -1872,6 +2883,16 @@
       const wasCollapsed = page?.classList.contains('day-collapsed');
       if (wasCollapsed) page.classList.remove('day-collapsed');
       const rows = collectDay(page);
+      /* v4.6 DH — the "📔 BDSM Log Book — Pre-Scene entries" block must also
+         reach the email with ALL of its data columns (every sheet, every
+         column, plus cloud status). logbook.js exposes the snapshot reader;
+         it only reads the on-page form — the Log Book's original cloud is
+         never written to from the export. */
+      try {
+        const lbRows = (typeof window.dhLogbookEmailRows === 'function')
+          ? window.dhLogbookEmailRows(page) : [];
+        lbRows.forEach(r => rows.push({ label: r.label, value: r.value, lb: true }));
+      } catch (e) { console.warn('[email] log book snapshot skipped:', e); }
       if (wasCollapsed) page.classList.add('day-collapsed');
       return { id: s.dataset.day, rows };
     });
@@ -2015,11 +3036,50 @@
       /signature \(debrief\)/i,
       /Overall satisfaction|Aftercare effectiveness|Safeword used|Adjustments for next time|Debrief notes/i
     ];
-    const isAffidavit = r => AFFIDAVIT_MARKERS.some(m => typeof m === 'string' ? r.label.startsWith(m) : m.test(r.label));
+    const isAffidavit = r => AFFIDAVIT_MARKERS.some(m => typeof m === 'string' ? r.label.startsWith(m) : m.test(r.label)) && !isLb(r);
+    /* v4.6 DH — Log Book snapshot rows (label starts with "LB · ", "LB sheet · "
+       or "LB cloud") belong to the third email block, never to the affidavit */
+    const isLb = r => !!r.lb || /^LB\b/.test(r.label);
     const isCheck = r => /^(✓|○)/.test(r.label);
     const isSwVer = r => /^Safeword "/i.test(r.label);
     const isToy   = r => /^Toy · /i.test(r.label);
     const isDebr  = r => /Overall satisfaction|Aftercare effectiveness|Safeword used|Adjustments for next time|Debrief notes/i.test(r.label);
+
+    /* v4.6 DH — dedicated renderer for the "📔 BDSM Log Book — Pre-Scene entries"
+       block: every data column of every sheet as its own row, one compact
+       per-sheet summary table, plus cloud status & link. */
+    const renderLogbookBlock = list => {
+      if (!list.length) return;
+      plain += `\n── 📔 BDSM Log Book — Pre-Scene entries ──\n`;
+      bodyHtml += sectionH4(`📔 BDSM Log Book — Pre-Scene entries`);
+
+      const detail = list.filter(r => /^LB · /.test(r.label));
+      const sheets = list.filter(r => /^LB sheet · /.test(r.label));
+      const cloud  = list.filter(r => /^LB cloud/.test(r.label));
+      const link   = list.filter(r => /^LB link/.test(r.label));
+
+      if (detail.length) {
+        bodyHtml += `<div style="font-family:${SERIF};font-size:14px;color:#a04b5c;margin:8px 0 4px">&#128214; All recorded columns</div>`;
+        bodyHtml += dataTable(detail);
+        detail.forEach(r => { plain += `  ${r.label}: ${r.value}\n`; });
+      }
+      if (sheets.length) {
+        bodyHtml += `<div style="font-family:${SERIF};font-size:14px;color:#a04b5c;margin:16px 0 4px">&#128214; Sheet overview (every column)</div>`;
+        bodyHtml += gridTable(['Sheet', 'Columns'],
+          sheets.map(r => [`<strong style="color:#7b2d3b">${esc(r.label.replace(/^LB sheet · /, ''))}</strong>`, esc(r.value)]));
+        sheets.forEach(r => { plain += `  ${r.label}: ${r.value}\n`; });
+      }
+      if (cloud.length) {
+        bodyHtml += `<div style="font-family:${SERIF};font-size:14px;color:#a04b5c;margin:16px 0 4px">&#9729; Log Book cloud status</div>`;
+        bodyHtml += dataTable(cloud);
+        cloud.forEach(r => { plain += `  ${r.label}: ${r.value}\n`; });
+      }
+      link.forEach(r => {
+        plain += `  ${r.label}: ${r.value}\n`;
+        bodyHtml += `<p style="margin:10px 0 2px;font-family:${SANS};font-size:13px;color:#4a362c">📔 Open the Log Book: ` +
+          `<a href="${escA(r.value)}" target="_blank" rel="noopener" style="color:#7b2d3b;text-decoration:underline">${esc(r.value)}</a></p>`;
+      });
+    };
 
     const renderGroup = list => {
       if (!list.length) return;
@@ -2087,11 +3147,16 @@
         `</td></tr></table>`;
       if (!rows.length) { plain += '  (no entries recorded)\n'; bodyHtml += cardWrap('', `<p style="color:#5b4437;font-size:14px;margin:0;font-family:${SANS}">(&#9825; no entries recorded)</p>`); }
 
-      const dayRows = rows.filter(r => !isAffidavit(r));
-      const affRows = rows.filter(isAffidavit);
+      const lbRows    = rows.filter(isLb);
+      const restRows  = rows.filter(r => !isLb(r));
+      const dayRows = restRows.filter(r => !isAffidavit(r));
+      const affRows = restRows.filter(isAffidavit);
 
       if (dayRows.length) { bodyHtml += sectionH4('Day Section'); renderGroup(dayRows); }
       if (affRows.length) { bodyHtml += sectionH4(`Pre-Scene Execution Affidavit — ${esc(title)}`); renderGroup(affRows); }
+      /* v4.6 DH — third block: every Log Book column captured for this day */
+      if (lbRows.length) renderLogbookBlock(lbRows);
+      else { plain += '\n── 📔 BDSM Log Book — Pre-Scene entries ──\n  (log book block not present on this day)\n'; }
       bodyHtml += divider();
     });
     bodyHtml += footHtml;
@@ -2151,12 +3216,38 @@ ${bodyHtml}
      still works exactly as before.
      ============================================================ */
   const pwState = (() => {
-    try { return JSON.parse(localStorage.getItem(PW_KEY)) || {}; } catch { return {}; }
+    try { return JSON.parse(safeGet(PW_KEY)) || {}; } catch { return {}; }
   })();
-  const savePw = () => { try { localStorage.setItem(PW_KEY, JSON.stringify(pwState)); } catch { /* ignore */ } };
+  const savePw = () => { try { safeSet(PW_KEY, JSON.stringify(pwState)); } catch { /* ignore */ } };
 
-  /* ---------- "Add to Home screen" button ---------- */
-  const installBtn = $('#install-app');
+  /* ---------- "Add to Home screen" button (v4.7 DH — created in JS so the
+     install flow works even though index.html ships without an install UI) ---------- */
+  let installBtn = $('#install-app');
+  if (!installBtn && btnGroup) {
+    installBtn = document.createElement('button');
+    installBtn.type = 'button';
+    installBtn.id = 'install-app';
+    installBtn.className = 'btn btn-outline';
+    installBtn.textContent = '📲 Install app';
+    btnGroup.appendChild(installBtn);
+  }
+  /* v4.7 DH — manual "how to install" sheet for iOS/Safari (no auto-prompt there) */
+  let installModal = $('#install-modal');
+  if (!installModal) {
+    installModal = document.createElement('div');
+    installModal.className = 'modal-overlay';
+    installModal.id = 'install-modal';
+    installModal.setAttribute('role', 'dialog');
+    installModal.setAttribute('aria-modal', 'true');
+    installModal.innerHTML =
+      '<div class="modal-card">' +
+        '<div class="modal-header"><h3 id="install-title">📲 Add our contract to your home screen</h3>' +
+        '<button class="modal-close" id="install-close-btn" type="button" aria-label="Close dialog">×</button></div>' +
+        '<div class="modal-body html-body" id="install-steps" style="white-space:normal"></div>' +
+        '<div class="modal-footer"><button class="btn btn-primary" id="install-close-footer-btn" type="button">Got it ♥</button></div>' +
+      '</div>';
+    document.body.appendChild(installModal);
+  }
   let deferredPrompt = null;
   const alreadyInstalled = () => {
     try {
@@ -2200,7 +3291,7 @@ ${bodyHtml}
   setInstallUI();
 
   /* ---------- manual instructions when there is no auto-prompt (iOS/Safari) ---------- */
-  const installModal = $('#install-modal');
+  /* v4.7 DH — installModal / installSteps resolved above (created in JS if absent) */
   const installSteps = $('#install-steps');
   function showInstallHelp() {
     if (!installModal) { toast('📲 Use your browser menu → “Add to Home screen”.', 3600); return; }
@@ -2254,15 +3345,15 @@ ${bodyHtml}
       try { reg = await navigator.serviceWorker.register('sw.js'); }
       catch (err) { console.warn('Service worker not registered:', err); return; }
       const post = msg => { try { (reg.active || reg.installing || reg.waiting)?.postMessage(msg); } catch { /* ignore */ } };
-      post({ type: 'DH_STATE', key: STORE_KEY, value: localStorage.getItem(STORE_KEY) || null });
-      post({ type: 'DH_STATE', key: DAYS_KEY,  value: localStorage.getItem(DAYS_KEY)  || null });
-      post({ type: 'DH_STATE', key: 'signAccepted', value: localStorage.getItem('signAccepted') || null });
+      post({ type: 'DH_STATE', key: STORE_KEY, value: safeGet(STORE_KEY) || null });
+      post({ type: 'DH_STATE', key: DAYS_KEY,  value: safeGet(DAYS_KEY)  || null });
+      post({ type: 'DH_STATE', key: 'signAccepted', value: safeGet('signAccepted') || null });
       document.addEventListener('visibilitychange', () => {
-        if (pageVisible()) post({ type: 'DH_STATE', key: STORE_KEY, value: localStorage.getItem(STORE_KEY) || null });
+        if (pageVisible()) post({ type: 'DH_STATE', key: STORE_KEY, value: safeGet(STORE_KEY) || null });
       });
       ['syncData', 'save-contract'].forEach(id => {
         const b = $('#' + id);
-        if (b) b.addEventListener('click', () => post({ type: 'DH_STATE', key: DAYS_KEY, value: localStorage.getItem(DAYS_KEY) || null }));
+        if (b) b.addEventListener('click', () => post({ type: 'DH_STATE', key: DAYS_KEY, value: safeGet(DAYS_KEY) || null }));
       });
       if (reg.waiting) notifyUpdate();
       reg.addEventListener('updatefound', () => {
@@ -2295,9 +3386,9 @@ ${bodyHtml}
     navigator.serviceWorker.getRegistration().then(reg => {
       if (!reg) return;
       const post = msg => { try { (reg.active || reg.installing || reg.waiting)?.postMessage(msg); } catch { /* ignore */ } };
-      post({ type: 'DH_STATE', key: STORE_KEY, value: localStorage.getItem(STORE_KEY) || null });
-      post({ type: 'DH_STATE', key: DAYS_KEY,  value: localStorage.getItem(DAYS_KEY)  || null });
-      post({ type: 'DH_STATE', key: 'signAccepted', value: localStorage.getItem('signAccepted') || null });
+      post({ type: 'DH_STATE', key: STORE_KEY, value: safeGet(STORE_KEY) || null });
+      post({ type: 'DH_STATE', key: DAYS_KEY,  value: safeGet(DAYS_KEY)  || null });
+      post({ type: 'DH_STATE', key: 'signAccepted', value: safeGet('signAccepted') || null });
     }).catch(() => { /* ignore */ });
   }, 90000);
 })();
