@@ -1,81 +1,57 @@
-==============================================================
-EMAILJS - STEP 3: CREATE THE TEMPLATE (HTML + PHOTOS go here)
-https://www.emailjs.com -> Email Templates -> Create New Template
-(v4.26 — photos render INSIDE the email via public Drive links)
-==============================================================
+=====================================================================
+ EMAILJS TEMPLATE — FINAL EXACT SETUP (template_obq7xfj)
+ Fixes "Gmail shows HTML code instead of the rendered contract"
+=====================================================================
 
---- SUBJECT FIELD (paste exactly): ---
+WHY IT BROKE: EmailJS prints {{message}} as escaped TEXT unless the
+variable sits INSIDE raw-HTML block tags {!!!} ... {!!!} in the
+TEMPLATE. The app now sends clean HTML only, so the tags must be in
+the template (never in the message value).
 
-{{subject}}
+---------------------------------------------------------------------
+STEP A — Open the template editor
+  emailjs.com → Login → Dashboard → "Email Templates" (left menu)
+  → click your template: template_obq7xfj
 
+STEP B — Set these fields
+  Subject   :  {{subject}}
+  Send To   :  {{to_email}}          <-- MUST be exactly this
+  From name :  Deep & Honey          (anything you like)
+  Reply To  :  {{reply_to}}          (optional but recommended)
 
---- "To" / RECIPIENT SETTINGS (paste exactly): ---
+STEP C — Replace the ENTIRE body content (this is the key step)
+  1. In the CONTENT area click the "</>" button (source-code /
+     HTML mode) at the top-right of the editor toolbar.
+  2. DELETE everything inside it (all default text and styling).
+  3. Paste EXACTLY this single line:
 
-{{to_email}}
+        {!!!}{{message}}{{message_html}}{!!!}
 
+     Correct copy-paste version (choose ONE variable, both work):
 
---- FROM NAME (optional, type your name or leave default): ---
+        {!!!}{{message}}{!!!}
 
-Deep
+  4. That is all — no other text, no <p>, no wrapper needed.
 
+STEP D — Save
+  Click "Save" (top-right). Then optionally "Test it" with dummy
+  values to confirm rendering.
 
---- CONTENT / MESSAGE BODY (this is the most important part): ---
+---------------------------------------------------------------------
+APP SIDE (already done, v4.29):
+  • Sends variables: subject, to_email, reply_to, from_name,
+    message AND message_html (same clean styled HTML in both).
+  • Photos are Google Drive links -> make sure the 4 Drive files
+    are shared "Anyone with the link – Viewer".
+  • Deploy updated files (index.html, js/app.js, sw.js), open the
+    app once until the badge shows v4.29 DH, then:
+    fill form -> Email data -> type recipient in "Send TO" ->
+    Send now. Gmail will show the rendered contract, not code.
 
-Switch the template editor to "<>" / HTML source mode if available,
-then DELETE all the default text/blocks and paste ONLY this line:
-
-{{message}}
-
-
-That's it. Do NOT add any extra styling, headings or wrapper HTML
-around {{message}} — the app already sends the fully styled HTML
-(the whole contract with colors, fonts, layout AND the photo links),
-and EmailJS will render it directly in the email body.
-
-If the editor forces a rich-text box that you can't clear, just
-click inside it, press Ctrl+A, delete everything, then type:
-{{message}}
-
-
---- HOW THE PHOTOS GET INTO THE EMAIL (v4.25/v4.26) ---
-
-The app does NOT embed heavy base64 images (that was what hit the
-"message size should be less than 50KB" error). Instead every photo
-in the emailed copy points at its PUBLIC Google Drive pixel link:
-
-  https://lh3.googleusercontent.com/d/<FILE-ID>=w<h>h<h>
-
-Gmail loads those links automatically and shows the images inline.
-For this to work, ALL 4 Drive files must stay shared as
-"Anyone with the link" (Viewer):
-
-  1. Deep signature   : https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj/view
-  2. Honey signature  : https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI/view
-  3. Love stamp       : https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw/view
-  4. Soulmate logo    : https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS/view
-
-How to check sharing: open each link -> Share -> General access
-must say "Anyone with the link — Viewer".
-
-
---- OPTIONAL TEST VARIABLES (if EmailJS asks for sample values
-while previewing the template, use these): ---
-
-subject    = Our Agreement - Deep & Honey
-to_email   = honey@example.com
-message    = <h1>Hello!</h1><p>This is a test of the styled HTML email.</p>
-
-
---- AFTER SAVING: ---
-
-1. Click "Save" in the top-right corner.
-2. Done! The app is ALREADY pre-configured (v4.22+) with:
-     Service ID  = service_a5vpbye
-     Template ID = template_obq7xfj
-     Public Key  = gDRCzC6V8qn70e7mj
-   You do NOT need to enter these anywhere.
-3. The recipient address is typed MANUALLY in the email dialog
-   ("Send TO" box) every time before pressing 🚀 Send now.
-4. Press 🚀 Send now — the styled contract WITH signatures,
-   stamp and logo renders directly in the email body.
-==============================================================
+TROUBLESHOOTING
+  • Still shows code? You edited in rich-text mode. Redo STEP C in
+    "</>" source mode; the line must literally contain {!!!} tags.
+  • "{!!!}" visible as text in email? Then the tags were typed into
+    the message somewhere else — body must be ONLY the one line above.
+  • Photos missing? Drive sharing = "Anyone with the link".
+=====================================================================

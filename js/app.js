@@ -350,8 +350,11 @@
     }
   };
 
-  const APP_VERSION = 'v4.26 DH';
+  const APP_VERSION = 'v4.29 DH';
   const WHATS_NEW_TOP = [
+    '🩹 v4.29: NO MORE CODE IN GMAIL — the app now sends CLEAN HTML only (it stopped wrapping the payload in {!!!}/{!!} tags itself, because those belong ONLY inside the EmailJS template, not in the message value). FINAL FIX ON EMAILJS: open template_obq7xfj → click "</>" (source-code mode) → make the body exactly this ONE line:  {!!!}{{message}}{!!!}  → Save. Then send again — the contract renders as a real email.',
+    '🩹 v4.28: HTML-IN-BODY MADE BULLETPROOF — the send step now passes the styled contract as {{message_html}} (raw-HTML wrapped by the app) AND still as {{message}}, so your Gmail shows the rendered contract instead of source code no matter which variable your template uses. Set your EmailJS template body to just ONE line: {{message_html}}  Changelog: ',
+    '🩹 v4.27: HTML-SHOWING-AS-CODE-IN-GMAIL FIXED — EmailJS renders {{message}} as raw HTML only when it sits inside {!!!} … {!!!} blocks in the template body; otherwise Gmail shows the whole contract as visible source code. The send step now wraps the payload automatically. Also change your template CONTENT to: {!!!}{{message}}{!!!} Changelog: ',
     '📸 v4.26: PHOTOS NOW RENDER FOR REAL IN THE EMAIL — two upgrades over v4.25: (1) every emailed <img> points DIRECTLY at its public Google Drive pixel link (lh3.googleusercontent.com/d/<ID>) instead of the heavy base64 embed, so Gmail shows the signature, stamp & logo inline AND the payload stays far below EmailJS\'s 50 KB limit; (2) alt texts are normalised ("Deep"/"Honey"/"stamp"/"logo") so the swap can never miss an image. Requirement: keep the 4 Drive files shared as "Anyone with the link". Changelog: ',
     '📸 v4.25: PHOTOS GUARANTEED IN THE EMAIL — the send payload now measures every embedded image; any photo that cannot be swapped to a public Drive link AND still fit under EmailJS\'s 50 KB limit is replaced by a clickable "open photo" button (Drive view link) instead of silently vanishing. Keep your 4 Drive files shared as "Anyone with the link" and signatures, stamp & logo render INSIDE the email body. Changelog: ',
   ];
@@ -3432,6 +3435,11 @@ ${bodyHtml}
         return out;
       };
       let payloadHtml = driveify(htmlText);
+      /* v4.29 — IMPORTANT: never wrap the payload itself in {!!!}/{!!}.
+         Those are EMAILJS TEMPLATE block tags, not email content. If they are
+         inside the variable value, Gmail displays them as literal text and the
+         contract looks like broken code. The app now sends CLEAN HTML only;
+         the raw-HTML blocks must exist in the TEMPLATE (see guide txt). */
       const MAX_BYTES = 48 * 1024;                       /* safety margin under 50 KB */
       /* v4.25 — photos must never silently vanish: if the payload is still too
          big after Drive-link swapping, convert each remaining embedded image
@@ -3451,12 +3459,24 @@ ${bodyHtml}
       if (new Blob([payloadHtml]).size > MAX_BYTES) {    /* extreme fallback */
         payloadHtml = payloadHtml.slice(0, MAX_BYTES - 60) + '\n\n…[truncated to fit EmailJS 50 KB limit]';
       }
+      /* v4.28 — send BOTH variables so either template style works:
+         • {{message_html}} = raw-HTML-wrapped styled contract (recommended body var)
+         • {{message}}      = same payload kept for templates still using it,
+                              plus a plain-text fallback for text-only clients */
+      const plainFallback = htmlText
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
+        .replace(/\s+/g, ' ').trim().slice(0, 3500);
       await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, {
         to_email: toEmail,
         from_name: ejsCfg.fromName || 'Deep & Honey app',
         subject,
         reply_to: toEmail,
-        message: payloadHtml       /* the full styled HTML lands in the email BODY */
+        message_html: payloadHtml, /* raw-HTML wrapped — lands rendered in BODY */
+        message: payloadHtml,      /* older templates that still use {{message}} */
+        message_text: plainFallback/* optional plain-text variable */
       });
       try { safeSet('dh_email_to_last', toEmail); } catch { /* ignore */ }
       closeModal();
