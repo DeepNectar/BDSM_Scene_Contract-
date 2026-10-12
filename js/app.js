@@ -357,6 +357,7 @@
     '🔐 v4.17: FACE & FINGERPRINT UNLOCK NOW REALLY WORKS — the “✨ Yes, enable it” and “🔓 Unlock with Face / Fingerprint” buttons were silently dying on iPhones (iOS Safari < 18) and several Android browsers: those engines never hand the credential’s sealed blob back after a successful Face-ID scan, so every unlock threw, the app deleted the enrolment and hid the button (“needs re-enabling”). Fixed end-to-end: enrolment now ALSO stores a device-bound local envelope (key material split between the passkey seal and a browser-profile-only pepper, both useless alone), the unlock flow has three honest fallback paths instead of one fragile one, the hard-pinned authenticatorAttachment that made some WebViews throw NotAllowedError outright is gone, failed attempts are logged to the console instead of vanishing, and UI reveals no longer hang behind capability probes that never resolve. Re-enable biometrics once from the offer after unlocking with the secret word.',
     '🔐 v4.16: FACE & FINGERPRINT UNLOCK — whatever your phone supports! After you unlock with our secret word once, the app offers “✨ Yes, enable it”: your phone then asks for Face ID / fingerprint (the device sensor decides — the app NEVER sees or stores any biometric data) and a device-bound passkey is created. From then on the login card shows “🔓 Unlock with Face / Fingerprint” and one look/touch opens the contract. Each phone enrols its own biometric (stored locally on that device only, never synced); if a biometric ever fails or is removed from the phone, the normal secret-word login still works exactly as before, and you can re-enable anytime.',
     '📱 v4.14: TOTAL PHONE COMPACT PASS — everything in the app now adjusts to the phone screen so ALL of it is visible properly: the header version/cloud pills and Log Book line stack neatly instead of colliding, the contract-meta line (contract no. / effective date / parties) becomes one tidy column with the date pill wrapping inside the screen, wide tables scroll sideways inside their own rounded box without clipping or pushing the page wide, every input box is bounded by the viewport (auto-growing fields never exceed the screen), debrief & do/don\'t boxes go single-column, AI chips shrink to fit whole rows, the login card is compact and fully visible above the keyboard, and the toast stays on-screen. Also fixed a service-worker syntax error that kept phones serving stale cached files.',
+    '💌 v4.20: THE EMAIL NOW SHOWS THE HTML PREVIEW DIRECTLY — the “✉ Email data” dialog opens straight on the styled HTML preview (no more plain-text first). New “📤 Open Gmail (HTML in body)” button copies the full romantic HTML to your clipboard and opens a Gmail draft: click in the message area, paste once (Ctrl/Cmd+V) and the styled HTML lands DIRECTLY in the email body. “✉ Send Email” now also downloads the styled contract.html automatically so you can attach it to any mail app (mailto itself can only carry plain text), plus a dedicated “⬇ Save .html” button.',
     '☁️ v4.13c: CROSS-DEVICE SYNC GUARANTEE — if a day is created and saved on ONE device, it now syncs to EVERY device that opens this site with ALL its details: the day page itself, every typed field (Day section + Pre-Scene Affidavit), every checklist tick and every signature. Fixed the last silent-loss paths: the local day snapshot reader in cloud.js now understands BOTH storage shapes ({list:[…]} and flat {days:[…]}/legacy array) so a saved day can never be missed when merging from localStorage; the 💾 Save button awaits the REAL completion of every cloud write (fields + accepts + all day pages) before saying “Saved ✓”; deletions stay deleted everywhere via permanent tombstones; and a two-device automated test (tests/test_cross_device_sync.js) proves the whole create → save → appear-on-the-other-phone flow.',
     '🔐 v4.10b: LOGIN GATE FIXED & HARDENED — previously, if the app script failed to start on a device (or an old cached copy was served), the Unlock button had NO listener at all: any password seemed to “work” (nothing happened) and the wrong-password popup never appeared. Now the gate is wired with defensive checks, empty/near-miss passwords are always rejected with the red error + shake, Enter submits properly, the no-JS watchdog covers the login screen too (it alerts if app.js hasn’t loaded), and a new automated login test guards this forever.',
     '📄 v4.10: FIXED — the “📄 Print / PDF” button now works on the phone app! Previously it only called window.print(), which does nothing inside an installed PWA (no browser menu/print service) and silently fails in some Android WebViews. The button now runs a smart cascade: in-app print preview via a hidden iframe (works in PWAs & WebViews), and when even that is blocked it hands you over to Safari/Chrome where Share → Print → Save as PDF always works — with a toast guiding you every step. Collapsed days auto-expand for the printout and restore right after.',
@@ -2662,7 +2663,7 @@
   const modal      = $('#email-modal');
   const modalBody  = $('#modal-body');
   const tabButtons = $$('.modal-tabs button');
-  let fmt  = 'plain';
+  let fmt  = 'html';   /* v4.8 DH — the modal now opens straight on the HTML preview */
   let plainText = '', htmlText = '';
 
   const openModal  = () => { modal.classList.add('active'); $( '.modal-close', modal ).focus(); };
@@ -3203,10 +3204,71 @@ ${bodyHtml}
     }
   });
 
+  $('#modal-download-btn')?.addEventListener('click', () => {
+    try {
+      const blob = new Blob([htmlText], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = 'deep-honey-contract.html';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast('⬇ Styled HTML saved — open it in a browser or attach it to any email.');
+    } catch { toast('Download failed — use 📋 Copy instead.', 3200); }
+  });
+
   $('#modal-email-btn').addEventListener('click', () => {
+    /* v4.8 DH — mailto: can only carry PLAIN TEXT (email clients ignore/stripped
+       HTML in a mailto body), so "Send Email" opens the mail app with the plain
+       version, and the HTML file is downloaded alongside it as an attachment.
+       For the styled HTML directly in the email BODY, use one of:
+       • "Open Gmail (HTML in body)" — Gmail draft with the HTML preview inline; or
+       • attach the downloaded contract.html to any email you send manually. */
     const subject = encodeURIComponent('Deep & Honey — Contract Data (' + new Date().toLocaleDateString() + ')');
     const body = encodeURIComponent(plainText);
+
+    /* download the styled HTML so it can be attached to the email */
+    try {
+      const blob = new Blob([htmlText], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url;
+      a.download = 'deep-honey-contract.html';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    } catch { /* ignore */ }
+
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    toast('📎 Styled HTML downloaded — open your email app, paste the text and attach contract.html for the full HTML preview inside the email.', 5200);
+  });
+
+  /* ---------- "Open Gmail (HTML in body)" — true HTML preview inside the email body.
+     Gmail's compose URI accepts a plain-text body only, so after the draft opens we
+     copy the styled HTML to the clipboard: click in the Gmail message area and paste
+     once — the romantic HTML layout lands directly in the email body. ---------- */
+  let gmailBtn = $('#modal-gmail-btn');
+  if (!gmailBtn) {
+    gmailBtn = document.createElement('button');
+    gmailBtn.type = 'button';
+    gmailBtn.id = 'modal-gmail-btn';
+    gmailBtn.className = 'btn btn-outline';
+    gmailBtn.textContent = '📤 Open Gmail (HTML in body)';
+    const footer = modal && $('.modal-footer', modal);
+    if (footer) footer.insertBefore(gmailBtn, $('#modal-close-footer-btn') || null);
+  }
+  gmailBtn.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(htmlText); }
+    catch {
+      const ta = Object.assign(document.createElement('textarea'), { value: htmlText });
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); } catch { /* ignore */ }
+      ta.remove();
+    }
+    const subject = encodeURIComponent('Deep & Honey — Contract Data (' + new Date().toLocaleDateString() + ')');
+    const body = encodeURIComponent(plainText + '\n\n— After this draft opens: click in the Gmail message area and PASTE (Ctrl/Cmd+V): the styled HTML from your clipboard replaces this note with the full HTML preview in the email body.');
+    window.open('https://mail.google.com/mail/?view=cm&fs=1&su=' + subject + '&body=' + body, '_blank');
+    closeModal();
+    toast('📤 Gmail draft opening — HTML already on your clipboard: click in the message area and paste to get the styled preview in the email body.', 6000);
   });
 
   /* ============================================================
