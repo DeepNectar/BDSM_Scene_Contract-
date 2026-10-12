@@ -1,63 +1,57 @@
 ========================================================
-EMAILJS SETUP — FINAL VERSION (app v4.34 DH)
-Read this FIRST: the "code in the body" problem is NOT a
-template mistake anymore. EmailJS ALWAYS HTML-escapes
-template variables when sending through Gmail — their
-{!!!} raw-HTML block does not work with the Gmail service.
-That is why every previous attempt showed source code.
+EMAIL SETUP — FINAL VERSION (app v4.36 DH)
 
-THE FIX IS IN THE APP (v4.34): the contract is now sent
-inside an <iframe srcdoc="..."> wrapper, which renders as
-a real embedded page in Gmail/Outlook even after escaping.
-Photos stay visible via public Google Drive links.
-========================================================
+READ THIS FIRST — WHY THE CODE KEPT SHOWING IN THE BODY:
+EmailJS's Gmail service ALWAYS HTML-escapes template
+variables. Their {!!!} raw-HTML block does NOT work with
+Gmail OAuth. So anything you send through
+dashboard.emailjs.com appears as literal source code in
+the email body — no app-side trick can beat that escaper.
+That is why every previous fix still showed code.
 
-TEMPLATE: template_obq7xfj  (keep it SIMPLE)
----------------------------------------------
-1. dashboard.emailjs.com -> Email Templates -> template_obq7xfj -> Edit
-2. Click "</>" to switch to SOURCE-CODE mode.
-3. SELECT ALL and DELETE everything (the 👤 demo box, tables, all of it).
-4. Paste EXACTLY this one line into the body:
+THE REAL FIX (v4.36): 🚀 Send now defaults to
+📧 FormSubmit.co, which renders raw HTML natively
+(field _template = "raw_html"). No account, no API key,
+no template to configure. The styled contract arrives as
+a REAL HTML email in the body.
 
-{{message}}
+ONE-TIME SETUP (2 minutes)
+--------------------------
+1. Open the app -> ⚙ Email settings.
+2. "Send via" = 📧 FormSubmit.co (already the default).
+3. In the "Endpoint / key" field type the DESTINATION
+   inbox address (any Gmail/Outlook/Yahoo address, e.g.
+   honey@yourmail.com). Press Save.
+4. Fill the form -> ✉ Email data -> type recipient in
+   "Send TO" -> press 🚀 Send now.
+5. FIRST send only: FormSubmit replies "Please confirm
+   your email address". Open that inbox, click the
+   confirmation link FormSubmit emailed (one tap).
+6. Press 🚀 Send again -> the full styled contract lands
+   directly in the email BODY. Every later send works
+   instantly, no confirmation needed.
 
-   (NO {!!!} needed anymore — the app handles rendering.)
-
-5. Template settings tab:
-     Subject    = {{subject}}
-     To email   = {{to_email}}
-     Reply-to   = {{reply_to}}   (if the field exists)
-6. SAVE.
-
-SERVICE: service_a5vpbye
+OPTIONAL (photos inline)
 ------------------------
-Account -> Services -> must show "Connected" next to Gmail.
+Signatures/stamp/logo show via public Google Drive links.
+Keep the 4 Drive files shared "Anyone with the link -
+Viewer". Without them the text contract still renders.
 
-PUBLIC KEY: gDRCzC6V8qn70e7mj  (already built into the app)
-
-GOOGLE DRIVE (for photos in the email)
+OTHER PROVIDERS (also selectable in ⚙)
 --------------------------------------
-All 4 files must be shared "Anyone with the link - Viewer":
-  - Deep signature PNG
-  - Honey signature PNG
-  - Love stamp PNG
-  - Soulmate logo PNG
-
-APP USAGE
----------
-Fill form -> ✉ Email data -> type recipient in "Send TO"
--> 🚀 Send now (HTML in body).
-The email body will show the FULL styled preview embedded
-as an interactive page (scroll inside the frame).
+* ✉ Formspree  — free form at formspree.io; paste the
+  endpoint https://formspree.io/f/xxxxxxx or just id.
+* 📨 Web3Forms — free access key from web3forms.com.
+* 🟣 EmailJS   — still available, but its Gmail service
+  escapes HTML, so the body will show markup unless the
+  template uses the iframe-srcdoc copy the app sends for
+  that provider. Not recommended anymore.
 
 TROUBLESHOOTING
 ---------------
-* If you still see literal "<iframe ...>" TEXT (not a page),
-  your app is cached at an old version — hard refresh
-  (Ctrl+Shift+R) until the badge says v4.34 DH.
-* If the frame shows blank on a phone, open the email on
-  desktop/larger screen (Gmail mobile limits embedded frames).
-* Bulletproof alternative that ALWAYS renders everywhere:
-  use the "📤 Open Gmail (HTML in body)" button — it copies
-  the styled HTML to your clipboard; click in the Gmail
-  compose area and paste once.
+* Badge must say v4.36 DH — hard refresh (Ctrl+Shift+R)
+  if it shows an older version (service-worker cache).
+* 🧪 "Send render test" button in ⚙ settings proves the
+  chosen provider renders HTML: BIG RED styled text = OK.
+* Blank on phone? FormSubmit emails render best on
+  desktop Gmail/Outlook; mobile clients may reflow.

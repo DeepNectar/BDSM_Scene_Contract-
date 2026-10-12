@@ -21,6 +21,9 @@ Object.defineProperty(w, 'localStorage', { value: {
   getItem: k => (k in LS ? LS[k] : null), setItem: (k, v) => { LS[k] = String(v); }, removeItem: k => { delete LS[k]; },
 }, configurable: true });
 LS['dhContract.days.v1'] = JSON.stringify({ list: [{ id: 'day1', html: w.CloudStore.days()[0].html }] });
+/* v4.36 — app now defaults to FormSubmit; this test verifies the EmailJS
+   path (fake SDK below), so pin the provider in the saved config. */
+LS['dh_emailjs_v1'] = JSON.stringify({ provider: 'emailjs' });
 w.fetch = async () => ({ ok: true, blob: async () => ({ size: 10, type: 'image/png' }) });
 w.HTMLCanvasElement.prototype.getContext = () => ({ drawImage() {}, fillRect() {} });
 w.HTMLCanvasElement.prototype.toDataURL = () => 'data:image/jpeg;base64,' + 'A'.repeat(30000); /* heavy embed like real photos */
