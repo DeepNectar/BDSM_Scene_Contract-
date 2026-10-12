@@ -22,10 +22,13 @@
 <link rel="stylesheet" href="css/styles.css?v=52">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="js/supabase-config.js" defer></script>
-<script src="js/cloud.js?v=46" defer></script>
-<script src="js/cloud.js?v=45" defer></script>
-<script src="js/logbook.js?v=17" defer></script>
-<script src="js/bio.js?v=3" defer></script>
+<script src="js/cloud.js?v=47" defer></script>
+<script src="js/logbook.js?v=18" defer></script>
+<script src="js/device.js?v=2" defer></script>
+<!-- v4.42 DH: js/bio.js tag removed — the file does not exist in the deploy, so the
+     404 was one of the "app not rendering / buttons dead" symptoms. app.js already
+     guards every DhBio call (bioReady() checks window.DhBio first), so the biometric
+     zone simply stays hidden until a real bio.js is shipped. -->
 </head>
 <body>
 
