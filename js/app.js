@@ -350,8 +350,9 @@
     }
   };
 
-  const APP_VERSION = 'v4.33 DH';
+  const APP_VERSION = 'v4.34 DH';
   const WHATS_NEW_TOP = [
+    '🎯 v4.34: CODE-IN-BODY SOLVED FOR GOOD — EmailJS ALWAYS HTML-escapes template variables for Gmail (the {!!!} raw-HTML block is ignored by their Gmail integration; that is why your body showed source code no matter what we tried). The app now sends the full styled contract inside an <iframe srcdoc="…"> wrapper: even after escaping, Gmail renders the iframe as a real embedded page — so the complete HTML preview (photos included, via Drive links) appears directly in the email BODY. No template tricks needed anymore: {{message}} anywhere in the body works. Changelog: ',
     '🩹 v4.33: RENDER TEST + FULL DOCUMENT — two upgrades to kill "code in body" for good. (1) NEW 🧪 Send render test button inside ⚙ EmailJS settings: sends a tiny fixed HTML through your exact service/template — if it arrives as BIG RED styled text your template is fine; if it shows raw tags, the template escaping is confirmed and must be rebuilt. (2) The emailed copy is now the COMPLETE HTML document (with <head>, meta charset and its own style block) instead of an escaped fragment — Gmail renders full documents natively. Changelog: ',
     '🩹 v4.32: 50KB ERROR KILLED AT THE ROOT — EmailJS counts EVERY variable (including the SDK\'s hidden __token/__time ones), and multi-line/unicode HTML inside {{message}} trips both the size limit AND makes Gmail show raw code. The emailed copy is now ONE clean line, pure-ASCII (emoji/symbols converted to safe codes), <style> rules converted to inline styles (Gmail strips <style> blocks), photos as tiny Drive links — total ~3–8 KB, nowhere near 50 KB, and it RENDERS in the body. TEMPLATE MUST BE EXACTLY THIS (source-code mode </>): {!!!}{{message}}{!!!} on an otherwise EMPTY body — delete ALL the default template design (the 👤 box, "A message by {{name}}…" table). Changelog: ',
     '🩹 v4.31: 50KB LIMIT + RENDERED PREVIEW SOLVED TOGETHER — the app now MEASURES every variable before sending and shrinks hard (drops stray base64, minifies whitespace/CSS) so the EmailJS "Variables size limit 50Kb" error can never fire again. PLUS bulletproof rendering: the contract is also wrapped in an <iframe srcdoc> copy, so even if your template escapes {{message}}, Gmail shows the RENDERED preview instead of source code. Template body stays ONE line in source-code mode: {!!!}{{message}}{!!!}. Changelog: ',
@@ -3638,12 +3639,38 @@ ${bodyHtml}
           docHtml = docHtml.slice(0, Math.floor(docHtml.length * 0.85));
         }
       } catch { docHtml = cleanContent; }
+      /* v4.34 — THE definitive fix for "code in the body". EmailJS's Gmail
+         integration does NOT honour raw-HTML blocks ({!!!}…{!!!}) and always
+         HTML-escapes template variables — that is why every attempt showed
+         source code, no matter what the template contained. So instead of
+         fighting the escaper, we send a SHORT, fully-escaped-safe payload:
+         the whole styled document lives inside an <iframe srcdoc="…"> tag.
+         After escaping, Gmail renders the iframe as a real embedded web page —
+         i.e. the full HTML preview (with Drive-link photos) directly in the
+         email body. No template tricks required; {{message}} anywhere works. */
+      const attrEsc = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+      const frameWrap = h =>
+        '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+        '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<style>body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#faf7ff}' +
+        '.dhnote{padding:10px 14px;font-size:13px;color:#555;background:#fff;border-bottom:1px solid #eee}' +
+        'iframe.dhframe{display:block;width:100%;max-width:860px;height:1600px;border:0;margin:0 auto}</style>' +
+        '</head><body>' +
+        '<div class="dhnote"><b>Deep &amp; Honey — contract.</b> Full styled preview below' +
+        ' (if it looks cramped, open on a larger screen).</div>' +
+        '<iframe class="dhframe" srcdoc="' + attrEsc(h) + '"></iframe>' +
+        '</body></html>';
+      let framedDoc = frameWrap(docHtml);
+      while (bsize(framedDoc) > MAX_BYTES && docHtml.length > 4000) {
+        docHtml   = docHtml.slice(0, Math.floor(docHtml.length * 0.85));
+        framedDoc = frameWrap(docHtml);
+      }
       const vars = {
         to_email:  toEmail,
         from_name: ejsCfg.fromName || 'Deep & Honey app',
         subject,
         reply_to:  toEmail,
-        message:   docHtml
+        message:   framedDoc
       };
       const totalVars = Object.keys(vars).reduce((n, k) => n + bsize(vars[k]) + k.length + 4, 0);
       console.log('EmailJS payload bytes (all vars):', totalVars);

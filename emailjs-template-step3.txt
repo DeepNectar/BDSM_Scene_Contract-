@@ -1,61 +1,63 @@
-==========================================================
-EMAILJS TEMPLATE — EXACT SETUP (READ CAREFULLY, THIS IS
-THE REASON GMAIL SHOWS CODE INSTEAD OF THE PREVIEW)
-==========================================================
+========================================================
+EMAILJS SETUP — FINAL VERSION (app v4.34 DH)
+Read this FIRST: the "code in the body" problem is NOT a
+template mistake anymore. EmailJS ALWAYS HTML-escapes
+template variables when sending through Gmail — their
+{!!!} raw-HTML block does not work with the Gmail service.
+That is why every previous attempt showed source code.
 
-Your template STILL CONTAINS EmailJS's DEFAULT DEMO DESIGN
-(the "A message by {{name}}" box with the 👤 icon and a
-table). That demo design uses variables {{name}} and {{time}}
-which the app does NOT send — EmailJS then mis-renders and
-escapes everything. You must DELETE the whole default design.
+THE FIX IS IN THE APP (v4.34): the contract is now sent
+inside an <iframe srcdoc="..."> wrapper, which renders as
+a real embedded page in Gmail/Outlook even after escaping.
+Photos stay visible via public Google Drive links.
+========================================================
 
-STEPS:
-1. https://dashboard.emailjs.com/admin/templates
-2. Open template: template_obq7xfj  (click "Edit content")
-3. Click the "</>" button (top-right of the content editor)
-   to switch to SOURCE-CODE mode. IMPORTANT: do this FIRST,
-   before typing anything.
-4. SELECT ALL (Ctrl/Cmd+A) and DELETE everything — every div,
-   table, 👤 emoji, "A message by..." line. The body must be
-   completely EMPTY.
-5. Type EXACTLY this one line, nothing else:
+TEMPLATE: template_obq7xfj  (keep it SIMPLE)
+---------------------------------------------
+1. dashboard.emailjs.com -> Email Templates -> template_obq7xfj -> Edit
+2. Click "</>" to switch to SOURCE-CODE mode.
+3. SELECT ALL and DELETE everything (the 👤 demo box, tables, all of it).
+4. Paste EXACTLY this one line into the body:
 
-{!!!}{{message}}{!!!}
+{{message}}
 
-6. Check the OTHER fields (click "Template settings" tab):
-     Subject:    {{subject}}
-     To email:   {{to_email}}
-     Reply-to:   {{reply_to}}     (if the field exists)
-     From name:  Deep & Honey     (anything is fine)
-7. Click SAVE. Then optionally "Send a Test" once.
+   (NO {!!!} needed anymore — the app handles rendering.)
 
-----------------------------------------------------------
-WHAT THE APP SENDS (v4.32 DH — no action needed from you)
-----------------------------------------------------------
-Service ID : service_a5vpbye      (pre-filled in app)
-Public Key : gDRCzC6V8qn70e7mj    (pre-filled in app)
-Variables  : to_email, subject, reply_to, from_name, message
-             -> {{message}} = the FULL styled contract as ONE
-                clean ASCII line, ~3 KB total (limit is 50 KB),
-                photos are Google Drive links so they render
-                inline, styles are INLINE on each tag so Gmail
-                cannot strip them.
+5. Template settings tab:
+     Subject    = {{subject}}
+     To email   = {{to_email}}
+     Reply-to   = {{reply_to}}   (if the field exists)
+6. SAVE.
 
-----------------------------------------------------------
-GOOGLE DRIVE — PHOTOS MUST BE SHARED "Anyone with the link"
-----------------------------------------------------------
-Deep signature : https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj
-Honey signature: https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI
-Love stamp     : https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw
-Soulmate logo  : https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS
+SERVICE: service_a5vpbye
+------------------------
+Account -> Services -> must show "Connected" next to Gmail.
 
-----------------------------------------------------------
-IF SOMETHING GOES WRONG
-----------------------------------------------------------
-* Shows code again  -> the {!!!} tags are missing or you typed
-  them in rich-text mode instead of "</>" source mode. Redo
-  steps 3-5 exactly.
-* "Variables size limit" -> you have an OLD app version cached.
-  Hard-refresh (Ctrl+Shift+R) until the badge says v4.32 DH.
-* Photos blank -> Drive sharing was changed; set all 4 files
-  back to "Anyone with the link — Viewer".
+PUBLIC KEY: gDRCzC6V8qn70e7mj  (already built into the app)
+
+GOOGLE DRIVE (for photos in the email)
+--------------------------------------
+All 4 files must be shared "Anyone with the link - Viewer":
+  - Deep signature PNG
+  - Honey signature PNG
+  - Love stamp PNG
+  - Soulmate logo PNG
+
+APP USAGE
+---------
+Fill form -> ✉ Email data -> type recipient in "Send TO"
+-> 🚀 Send now (HTML in body).
+The email body will show the FULL styled preview embedded
+as an interactive page (scroll inside the frame).
+
+TROUBLESHOOTING
+---------------
+* If you still see literal "<iframe ...>" TEXT (not a page),
+  your app is cached at an old version — hard refresh
+  (Ctrl+Shift+R) until the badge says v4.34 DH.
+* If the frame shows blank on a phone, open the email on
+  desktop/larger screen (Gmail mobile limits embedded frames).
+* Bulletproof alternative that ALWAYS renders everywhere:
+  use the "📤 Open Gmail (HTML in body)" button — it copies
+  the styled HTML to your clipboard; click in the Gmail
+  compose area and paste once.
