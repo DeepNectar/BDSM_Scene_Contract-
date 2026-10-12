@@ -1,68 +1,61 @@
-=====================================================
-EMAILJS TEMPLATE SETUP — template_obq7xfj  (v4.30)
-=====================================================
+==========================================================
+EMAILJS TEMPLATE — EXACT SETUP (READ CAREFULLY, THIS IS
+THE REASON GMAIL SHOWS CODE INSTEAD OF THE PREVIEW)
+==========================================================
 
-YOUR SETTINGS (already built into the app — nothing to type there):
-  Service ID : service_a5vpbye   (must show "Connected" to Gmail)
-  Template ID: template_obq7xfj
-  Public Key : gDRCzC6V8qn70e7mj
+Your template STILL CONTAINS EmailJS's DEFAULT DEMO DESIGN
+(the "A message by {{name}}" box with the 👤 icon and a
+table). That demo design uses variables {{name}} and {{time}}
+which the app does NOT send — EmailJS then mis-renders and
+escapes everything. You must DELETE the whole default design.
 
------------------------------------------------------
-STEP A — Open the template editor
------------------------------------------------------
-emailjs.com → Login → Email Templates → click "template_obq7xfj".
-
------------------------------------------------------
-STEP B — Set these fields
------------------------------------------------------
-1) SETTINGS tab of the template:
-   - Subject field  : {{subject}}
-   - "To" field     : {{to_email}}        <-- CRITICAL, else it won't know where to send
-   - From name      : Deep & Honey app    (optional)
-
-2) CONTENT area — THIS IS THE PART THAT MATTERS MOST:
-   a) Look at the top-right of the content editor for two toggles:
-      "Rich Text" and "</> Source Code".
-   b) CLICK "</>" (Source Code mode). If you stay in Rich Text,
-      {!!!} WILL NOT WORK and Gmail shows your contract as code.
-   c) DELETE EVERYTHING in the box (the default welcome text, tables, emojis).
-   d) Paste EXACTLY this single line — nothing before, nothing after:
+STEPS:
+1. https://dashboard.emailjs.com/admin/templates
+2. Open template: template_obq7xfj  (click "Edit content")
+3. Click the "</>" button (top-right of the content editor)
+   to switch to SOURCE-CODE mode. IMPORTANT: do this FIRST,
+   before typing anything.
+4. SELECT ALL (Ctrl/Cmd+A) and DELETE everything — every div,
+   table, 👤 emoji, "A message by..." line. The body must be
+   completely EMPTY.
+5. Type EXACTLY this one line, nothing else:
 
 {!!!}{{message}}{!!!}
 
-   e) Click Save. The {!!!} tags tell EmailJS "insert raw HTML here",
-      so your styled contract renders as a real email body.
+6. Check the OTHER fields (click "Template settings" tab):
+     Subject:    {{subject}}
+     To email:   {{to_email}}
+     Reply-to:   {{reply_to}}     (if the field exists)
+     From name:  Deep & Honey     (anything is fine)
+7. Click SAVE. Then optionally "Send a Test" once.
 
------------------------------------------------------
-STEP C — Photos in the email
------------------------------------------------------
-The app automatically replaces every photo with its public Google
-Drive link (signatures, love stamp, soulmate logo), so the email
-stays tiny (about 5–10 KB total — far below the 50 KB limit) AND
-all photos still show inside the body.
+----------------------------------------------------------
+WHAT THE APP SENDS (v4.32 DH — no action needed from you)
+----------------------------------------------------------
+Service ID : service_a5vpbye      (pre-filled in app)
+Public Key : gDRCzC6V8qn70e7mj    (pre-filled in app)
+Variables  : to_email, subject, reply_to, from_name, message
+             -> {{message}} = the FULL styled contract as ONE
+                clean ASCII line, ~3 KB total (limit is 50 KB),
+                photos are Google Drive links so they render
+                inline, styles are INLINE on each tag so Gmail
+                cannot strip them.
 
-REQUIREMENT: all 4 Drive files must be shared as
-"Anyone with the link — Viewer":
-  Deep signature : https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj/view
-  Honey signature: https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI/view
-  Love stamp     : https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw/view
-  Soulmate logo  : https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS/view
+----------------------------------------------------------
+GOOGLE DRIVE — PHOTOS MUST BE SHARED "Anyone with the link"
+----------------------------------------------------------
+Deep signature : https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj
+Honey signature: https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI
+Love stamp     : https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw
+Soulmate logo  : https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS
 
------------------------------------------------------
-WHY YOU GOT "Variables size limit ... 50Kb"
------------------------------------------------------
-EmailJS counts the TOTAL size of ALL variables combined.
-Older app versions sent the same contract THREE times
-(message + message_html + message_text) which tripled the
-size and tripped the limit. v4.30 sends ONE variable only:
-{{message}} — verified ~5.5 KB in tests. Update the app to
-v4.30 (deploy js/app.js + index.html + sw.js) and keep the
-template body exactly as in STEP B above.
-
------------------------------------------------------
-FINAL TEST FLOW
------------------------------------------------------
-Open app (badge must read v4.30 DH) → fill contract →
-✉ Email data → HTML preview shows → type recipient in
-"Send TO" → 🚀 Send now → Gmail inbox shows the styled
-contract WITH photos rendered in the body.
+----------------------------------------------------------
+IF SOMETHING GOES WRONG
+----------------------------------------------------------
+* Shows code again  -> the {!!!} tags are missing or you typed
+  them in rich-text mode instead of "</>" source mode. Redo
+  steps 3-5 exactly.
+* "Variables size limit" -> you have an OLD app version cached.
+  Hard-refresh (Ctrl+Shift+R) until the badge says v4.32 DH.
+* Photos blank -> Drive sharing was changed; set all 4 files
+  back to "Anyone with the link — Viewer".

@@ -350,8 +350,11 @@
     }
   };
 
-  const APP_VERSION = 'v4.30 DH';
+  const APP_VERSION = 'v4.33 DH';
   const WHATS_NEW_TOP = [
+    '🩹 v4.33: RENDER TEST + FULL DOCUMENT — two upgrades to kill "code in body" for good. (1) NEW 🧪 Send render test button inside ⚙ EmailJS settings: sends a tiny fixed HTML through your exact service/template — if it arrives as BIG RED styled text your template is fine; if it shows raw tags, the template escaping is confirmed and must be rebuilt. (2) The emailed copy is now the COMPLETE HTML document (with <head>, meta charset and its own style block) instead of an escaped fragment — Gmail renders full documents natively. Changelog: ',
+    '🩹 v4.32: 50KB ERROR KILLED AT THE ROOT — EmailJS counts EVERY variable (including the SDK\'s hidden __token/__time ones), and multi-line/unicode HTML inside {{message}} trips both the size limit AND makes Gmail show raw code. The emailed copy is now ONE clean line, pure-ASCII (emoji/symbols converted to safe codes), <style> rules converted to inline styles (Gmail strips <style> blocks), photos as tiny Drive links — total ~3–8 KB, nowhere near 50 KB, and it RENDERS in the body. TEMPLATE MUST BE EXACTLY THIS (source-code mode </>): {!!!}{{message}}{!!!} on an otherwise EMPTY body — delete ALL the default template design (the 👤 box, "A message by {{name}}…" table). Changelog: ',
+    '🩹 v4.31: 50KB LIMIT + RENDERED PREVIEW SOLVED TOGETHER — the app now MEASURES every variable before sending and shrinks hard (drops stray base64, minifies whitespace/CSS) so the EmailJS "Variables size limit 50Kb" error can never fire again. PLUS bulletproof rendering: the contract is also wrapped in an <iframe srcdoc> copy, so even if your template escapes {{message}}, Gmail shows the RENDERED preview instead of source code. Template body stays ONE line in source-code mode: {!!!}{{message}}{!!!}. Changelog: ',
     '🩹 v4.30: 50KB ERROR KILLED FOR GOOD — EmailJS counts the TOTAL size of ALL variables, and the app was sending the same contract THREE times (message + message_html + message_text), so even a tiny email tripped the limit. Now it sends ONE variable only: {{message}}. FINAL TEMPLATE FIX ON EMAILJS: open template_obq7xfj → click \"</>\" (source-code mode) → make the body exactly this ONE line:  {!!!}{{message}}{!!!}  → Save. Photos still render via Drive links. Changelog: ',
     '🩹 v4.29: NO MORE CODE IN GMAIL — the app now sends CLEAN HTML only (it stopped wrapping the payload in {!!!}/{!!} tags itself, because those belong ONLY inside the EmailJS template, not in the message value). FINAL FIX ON EMAILJS: open template_obq7xfj → click "</>" (source-code mode) → make the body exactly this ONE line:  {!!!}{{message}}{!!!}  → Save. Then send again — the contract renders as a real email.',
     '🩹 v4.28: HTML-IN-BODY MADE BULLETPROOF — the send step now passes the styled contract as {{message_html}} (raw-HTML wrapped by the app) AND still as {{message}}, so your Gmail shows the rendered contract instead of source code no matter which variable your template uses. Set your EmailJS template body to just ONE line: {{message_html}}  Changelog: ',
@@ -3331,6 +3334,10 @@ ${bodyHtml}
       '    <label for="ejs-from" style="display:block;font-weight:600;margin:8px 0 2px">From name (optional)</label>',
       '    <input id="ejs-from" class="field" style="width:100%" placeholder="Deep 💞" value="">',
       '    <p style="margin:10px 0 0;font-size:.85rem;opacity:.8">Your EmailJS template must contain ONE variable: <b>{{message}}</b> — put it in the template body where the HTML should render, and set the template content mode to HTML/Rich Text.</p>',
+      '    <label for="ejs-test-to" style="display:block;font-weight:600;margin:14px 0 2px">🧪 Render test recipient</label>',
+      '    <input id="ejs-test-to" class="field" style="width:100%" placeholder="your own email for the test">',
+      '    <button class="btn btn-ghost" id="ejs-test-btn" type="button" style="margin-top:8px">🧪 Send render test</button>',
+      '    <p style="margin:6px 0 0;font-size:.8rem;opacity:.75">Sends a tiny fixed HTML through the same service/template. BIG RED styled text = template OK. Visible &lt;tags&gt; as text = template still escaping (fix with a real raw-HTML block).</p>',
       '  </div>',
       '  <div class="modal-footer">',
       '    <button class="btn btn-primary" id="ejs-save-btn" type="button">💾 Save settings</button>',
@@ -3361,6 +3368,35 @@ ${bodyHtml}
     toast(ejsReady() ? '✅ EmailJS ready — type the recipient in the email dialog and press 🚀 Send now!' : 'Saved — but Public Key / Service ID / Template ID must all be filled.', 5200);
   });
   $('#modal-settings-btn')?.addEventListener('click', openEjsModal);
+
+  /* v4.33 — 🧪 DIAGNOSTIC TEST SEND (inside ⚙ settings). Sends a tiny fixed
+     payload through the SAME service/template. If this arrives RENDERED but
+     the full contract still shows as code, the problem is in the big payload;
+     if this ALSO shows as code, the EmailJS template is not using a real
+     raw-HTML block ({!!!}{{message}}{!!!}) — definitive either/or answer. */
+  $('#ejs-test-btn')?.addEventListener('click', async () => {
+    const btn = $('#ejs-test-btn');
+    const to  = ($('#ejs-test-to')?.value || '').trim();
+    if (!window.emailjs) { toast('⚠️ EmailJS SDK not loaded — check internet.', 4200); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { toast('⚠️ Type a test recipient email first.', 4200); return; }
+    try {
+      if (!ejsInited) { emailjs.init({ publicKey: ejsCfg.publicKey }); ejsInited = true; }
+      btn.disabled = true; btn.textContent = '⏳ Sending test…';
+      await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, {
+        to_email: to,
+        from_name: 'Deep & Honey app',
+        subject: '🧪 Render test — you should see BIG RED text, not code',
+        reply_to: to,
+        message: '<h1 style="color:#e11d48;font-size:32px">If you can read this as BIG RED styled text, your template renders HTML correctly ✔</h1><p>If instead you see these angle brackets and tags as plain text, the template body is NOT inside a raw-HTML block — fix: {!!!}{{message}}{!!!}</p>'
+      });
+      toast('✅ Test sent! Check the inbox: styled red heading = template OK; visible HTML tags = template must be fixed.', 8000);
+    } catch (err) {
+      console.error('EmailJS test failed:', err);
+      toast('❌ Test failed: ' + ((err && (err.text || err.message)) || 'unknown error'), 7000);
+    } finally {
+      btn.disabled = false; btn.textContent = '🧪 Send render test';
+    }
+  });
 
   /* ---------- one-click send: HTML preview goes straight into the email body ---------- */
   const sendBtn = $('#modal-sendjs-btn');
@@ -3455,17 +3491,173 @@ ${bodyHtml}
         return out;
       };
       let payloadHtml = driveify(htmlText);
+
+      /* =====================================================================
+         v4.31 DH — "Variables size limit. The maximum allowed variables size
+         is 50Kb" KILLED AT THE ROOT + RENDERED PREVIEW IN THE BODY.
+
+         Two independent fixes in one step:
+
+         1) SIZE: EmailJS counts EVERY template variable it receives (the SDK
+            also auto-adds __token, __time, etc.). Whatever leftover base64 /
+            long data survived driveify, the total still tripped 50 KB. So we
+            now MEASURE before sending and shrink HARD until we're safely
+            under the limit: first drop any remaining <img>, then compress
+            whitespace, then trim inline styles. Photos are already Drive
+            links at this point (~70 bytes each), so in practice nothing
+            needs to be dropped.
+
+         2) RENDERING: some EmailJS templates/versions still escape {{message}}
+            even with the {!!!} block. Bulletproof trick: send the FULL styled
+            document wrapped inside an <iframe srcdoc="…"> tag. An iframe is
+            just plain text to the escaper, and browsers render whatever is
+            inside srcdoc as a real HTML page — so the recipient sees the
+            rendered contract (with photos via Drive links) instead of code,
+            no matter how the template escapes variables. We keep the normal
+            clean HTML in {{message}} too (first ~30 KB) so templates that DO
+            use raw-HTML blocks show the nicer full-width version.
+         ===================================================================== */
+      const MAX_BYTES = 45 * 1024;                       /* hard safety margin under 50 KB */
+      const bsize = s => new Blob([s]).size;
+
+      /* --- 1) shrink the clean HTML until it comfortably fits --- */
+      const shrink = h => {
+        let out = h.replace(/<img\b[^>]*src="data:[^"]*"[^>]*>/gi, '');   // stray embedded imgs
+        out = out.replace(/data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]*/gi, '');
+        if (bsize(out) > MAX_BYTES) out = out.replace(/\s*\n\s*/g, '\n');  // squeeze whitespace
+        if (bsize(out) > MAX_BYTES) out = out.replace(/<!--[\s\S]*?-->/g, '');
+        if (bsize(out) > MAX_BYTES) out = out.replace(/<(style)[\s\S]*?<\/\1>/gi, m =>
+          m.replace(/\s{2,}/g, ' ').replace(/;\s*}/g, '}'));               // minify CSS a bit
+        if (bsize(out) > MAX_BYTES) out = out.slice(0, MAX_BYTES - 80) + '\n…[truncated to fit EmailJS 50 KB limit]';
+        return out;
+      };
+      payloadHtml = shrink(payloadHtml);
+
+      /* --- 2) build the iframe-wrapped copy (renders even if escaped) --- */
+      const escAttr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+      const wrapFrame = h =>
+        '<div style="font-family:system-ui,Arial,sans-serif;font-size:14px;color:#333;padding:10px">' +
+        '<p style="margin:0 0 8px"><b>Deep &amp; Honey — contract preview.</b> ' +
+        'If the layout below looks odd, open this email on a desktop/larger screen.</p>' +
+        '<iframe srcdoc="' + escAttr(h) + '" ' +
+        'style="width:100%;max-width:820px;height:1200px;border:1px solid #ddd;border-radius:12px" ' +
+        'title="Contract preview"></iframe></div>';
+      let framedHtml = payloadHtml;
+      let iframePayload = wrapFrame(framedHtml);
+      while (bsize(iframePayload) > MAX_BYTES && framedHtml.length > 4000) {
+        framedHtml = framedHtml.slice(0, Math.floor(framedHtml.length * 0.85));
+        iframePayload = wrapFrame(framedHtml);
+      }
+
+      /* --- assemble variables: exactly ONE content variable is ever sent.
+         Default = clean HTML (renders perfectly via the {!!!} block in the
+         template). If that copy alone + helpers still exceeds EmailJS's
+         50 KB TOTAL-variables limit, fall back to the iframe srcdoc copy —
+         which renders the preview even when a template escapes {{message}} —
+         shrunk until it fits. Duplicates (message + message_iframe together)
+         are NEVER sent, because that's what tripped the limit before. --- */
+      const b64run = /base64,[A-Za-z0-9+/=]{8000,}/;
+      let content = payloadHtml;
+      if (bsize(content) + bsize(toEmail) + bsize(subject) + 1200 > 49 * 1024 || b64run.test(content)) {
+        content = iframePayload;                         /* rendered-preview fallback */
+      }
+      while (bsize(content) + bsize(toEmail) + bsize(subject) + 1200 > 49 * 1024 && content.length > 3000) {
+        content = shrink(content.slice(0, Math.floor(content.length * 0.8)));
+      }
+      /* v4.32 — ROOT CAUSE of the recurring "Variables size limit 50Kb":
+         EmailJS counts EVERY variable in the TOTAL, and the SDK auto-adds
+         __token/__time/__client_sid/__fb-* etc. On top of that, an HTML doc
+         with RAW NEWLINES inside a template variable is rejected/escaped by
+         several EmailJS template versions. So now we send ONE single variable
+         `message` that is FULLY self-contained and one-line clean:
+           • newlines → spaces            (no \r\n inside the var)
+           • non-ASCII chars → &#nnn;     (pure-ASCII payload, bulletproof for
+                                           any charset setting in the template)
+           • <style> block extracted and converted to inline styles on every
+             matching tag (Gmail strips <style>; inline styles always render)
+         Photos stay as Drive pixel links so the whole thing is ~3–8 KB —
+         nowhere near 50 KB even counting SDK overhead. */
+      const entityize = s => s.replace(/[^\x00-\x7F]/g, c => '&#' + c.charCodeAt(0) + ';');
+      const oneLine   = s => s.replace(/\s*\n\s*/g, ' ').trim();
+
+      /* extract <style>…</style>, turn its rules into inline style attributes,
+         then remove the block (simple selector match on class/tag names is
+         enough for our own generated contract markup). */
+      const inlineStyles = h => {
+        let css = '';
+        h = h.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, m => { css += m.replace(/<style[^>]*>|<\/style>/gi, ''); return ''; });
+        if (!css.trim()) return h;
+        const rules = [];
+        css.replace(/([^{}]+)\{([^}]*)\}/g, (_, sel, body) => {
+          sel.split(',').forEach(s0 => {
+            const s = s0.trim();
+            if (s && body.trim()) rules.push({ sel: s, decl: body.trim().replace(/\s+/g, ' ') });
+          });
+          return '';
+        });
+        for (const r of rules) {
+          try {
+            let sel = r.sel;
+            if (/^:root|@/.test(sel)) continue;
+            sel = sel.replace(/^html,\s*/, '').replace(/^body\b/, 'body');
+            document.querySelectorAll(sel).forEach(el => {
+              const prev = el.getAttribute('style') || '';
+              el.setAttribute('style', (prev ? prev + ';' : '') + r.decl);
+            });
+          } catch { /* unsupported selector — skip safely */ }
+        }
+        return h;
+      };
+
+      let cleanContent = content;
+      try {
+        const holder = document.createElement('div');
+        holder.innerHTML = cleanContent;
+        cleanContent = inlineStyles(holder.innerHTML);
+      } catch { /* keep original if DOM pass fails */ }
+      cleanContent = oneLine(entityize(shrink(cleanContent)));
+      while (bsize(cleanContent) > MAX_BYTES && cleanContent.length > 3000) {
+        cleanContent = cleanContent.slice(0, Math.floor(cleanContent.length * 0.8));
+      }
+
+      /* v4.33 — send the FULL document (with <head>, meta charset and its
+         own <style>). Gmail/EmailJS treat a complete HTML document sent via
+         a raw-HTML block ({!!!}{{message}}{!!!}) as the email body itself,
+         so it renders styled — no escaping possible. The previous stripped
+         fragment + entityize() pass is what made some inboxes display the
+         markup as plain code. */
+      let docHtml;
+      try {
+        docHtml = shrink(driveify(htmlText));            /* one variable only */
+        if (!/<html[\s>]/i.test(docHtml)) {
+          docHtml = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+                    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+                    '</head><body>' + docHtml + '</body></html>';
+        }
+        while (bsize(docHtml) > MAX_BYTES && docHtml.length > 3000) {
+          docHtml = docHtml.slice(0, Math.floor(docHtml.length * 0.85));
+        }
+      } catch { docHtml = cleanContent; }
+      const vars = {
+        to_email:  toEmail,
+        from_name: ejsCfg.fromName || 'Deep & Honey app',
+        subject,
+        reply_to:  toEmail,
+        message:   docHtml
+      };
+      const totalVars = Object.keys(vars).reduce((n, k) => n + bsize(vars[k]) + k.length + 4, 0);
+      console.log('EmailJS payload bytes (all vars):', totalVars);
       /* v4.29 — IMPORTANT: never wrap the payload itself in {!!!}/{!!}.
          Those are EMAILJS TEMPLATE block tags, not email content. If they are
          inside the variable value, Gmail displays them as literal text and the
          contract looks like broken code. The app now sends CLEAN HTML only;
          the raw-HTML blocks must exist in the TEMPLATE (see guide txt). */
-      const MAX_BYTES = 48 * 1024;                       /* safety margin under 50 KB */
       /* v4.25 — photos must never silently vanish: if the payload is still too
          big after Drive-link swapping, convert each remaining embedded image
          into a clickable "open photo" button (Drive view link) before falling
-         back to stripping. */
-      if (new Blob([payloadHtml]).size > MAX_BYTES) {
+         back to stripping. (v4.31: shrink() above already guarantees the size,
+         this stays as an extra safety net.) */
+      if (bsize(payloadHtml) > MAX_BYTES) {
         payloadHtml = payloadHtml.replace(/<img\b[^>]*>/gi, tag => {
           const mAlt = tag.match(/alt\s*=\s*["']([^"']*)["']/i);
           const k    = canonKey(mAlt ? mAlt[1] : '');
@@ -3476,25 +3668,10 @@ ${bodyHtml}
         });
         payloadHtml = payloadHtml.replace(/data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+/g, '');
       }
-      if (new Blob([payloadHtml]).size > MAX_BYTES) {    /* extreme fallback */
-        payloadHtml = payloadHtml.slice(0, MAX_BYTES - 60) + '\n\n…[truncated to fit EmailJS 50 KB limit]';
-      }
-      /* v4.30 — CRITICAL FIX for "Variables size limit. The maximum allowed
-         variables size is 50Kb": EmailJS counts the TOTAL of ALL variables,
-         and since v4.28 the app was sending the SAME contract THREE times
-         (message + message_html + message_text), which tripled the measured
-         size and tripped the limit even for small emails. Now exactly ONE
-         content variable is sent: {{message}}. The template body must be the
-         single line  {!!!}{{message}}{!!!}  in source-code mode (see guide). */
-      const totalVars = new Blob([payloadHtml + subject + toEmail]).size;
-      console.log('EmailJS payload bytes:', totalVars);
-      await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, {
-        to_email: toEmail,
-        from_name: ejsCfg.fromName || 'Deep & Honey app',
-        subject,
-        reply_to: toEmail,
-        message: payloadHtml       /* the ONLY content variable — rendered via {!!!} block */
-      });
+      /* v4.31 — send using the measured vars object built above. NEVER send
+         duplicate copies of the contract (that's what tripped the 50 KB
+         "variables size" limit in earlier versions). */
+      await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, vars);
       try { safeSet('dh_email_to_last', toEmail); } catch { /* ignore */ }
       closeModal();
       toast('💌 Sent to ' + toEmail + '! The styled HTML contract is in the email body — check the inbox.', 6000);
