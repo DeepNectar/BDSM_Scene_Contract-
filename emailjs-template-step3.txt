@@ -1,57 +1,38 @@
-========================================================
-EMAIL SETUP — FINAL VERSION (app v4.36 DH)
+EMAIL SETUP — FINAL VERSION (app v4.38 DH)
+===========================================
 
-READ THIS FIRST — WHY THE CODE KEPT SHOWING IN THE BODY:
-EmailJS's Gmail service ALWAYS HTML-escapes template
-variables. Their {!!!} raw-HTML block does NOT work with
-Gmail OAuth. So anything you send through
-dashboard.emailjs.com appears as literal source code in
-the email body — no app-side trick can beat that escaper.
-That is why every previous fix still showed code.
+ONE SITE ONLY: https://web3forms.com
+(EmailJS / FormSubmit / Formspree are REMOVED — every one of them
+escaped our HTML into visible source code inside the email body.)
 
-THE REAL FIX (v4.36): 🚀 Send now defaults to
-📧 FormSubmit.co, which renders raw HTML natively
-(field _template = "raw_html"). No account, no API key,
-no template to configure. The styled contract arrives as
-a REAL HTML email in the body.
+WHY WEB3FORMS RENDERS: it takes the app's styled contract and sends
+it as the email's REAL text/html part ("rich text emails"). Nothing
+is escaped, there is no template to configure, and Gmail/Outlook
+display the styled preview directly in the body.
 
-ONE-TIME SETUP (2 minutes)
---------------------------
-1. Open the app -> ⚙ Email settings.
-2. "Send via" = 📧 FormSubmit.co (already the default).
-3. In the "Endpoint / key" field type the DESTINATION
-   inbox address (any Gmail/Outlook/Yahoo address, e.g.
-   honey@yourmail.com). Press Save.
-4. Fill the form -> ✉ Email data -> type recipient in
-   "Send TO" -> press 🚀 Send now.
-5. FIRST send only: FormSubmit replies "Please confirm
-   your email address". Open that inbox, click the
-   confirmation link FormSubmit emailed (one tap).
-6. Press 🚀 Send again -> the full styled contract lands
-   directly in the email BODY. Every later send works
-   instantly, no confirmation needed.
+SETUP ONCE (~1 minute, free, no signup):
+  1. Open https://web3forms.com
+  2. Type the inbox that should RECEIVE the contracts.
+  3. Press "Create Access Key".
+  4. Web3Forms emails an activation link + your access key to that
+     inbox. Click the activation link ONCE, then copy the key.
+  5. In the app: ✉ Email data → ⚙ Email settings → paste the key in
+     "Access Key from web3forms.com" → (optionally note the inbox +
+     From name) → 💾 Save settings.
+  6. Press 🧪 Send render test. The mail must arrive showing BIG RED
+     STYLED TEXT. If it does, everything renders — close and press
+     🚀 Send now on any day.
 
-OPTIONAL (photos inline)
-------------------------
-Signatures/stamp/logo show via public Google Drive links.
-Keep the 4 Drive files shared "Anyone with the link -
-Viewer". Without them the text contract still renders.
+IF THE TEST SHOWS TAGS AS PLAIN TEXT:
+  • Your key's inbox never confirmed the activation email — re-create
+    the key at web3forms.com and click the confirmation link.
+  • Make sure you are running v4.38 DH (header badge). Hard-refresh
+    with Ctrl+Shift+R so the service worker serves the new files.
 
-OTHER PROVIDERS (also selectable in ⚙)
---------------------------------------
-* ✉ Formspree  — free form at formspree.io; paste the
-  endpoint https://formspree.io/f/xxxxxxx or just id.
-* 📨 Web3Forms — free access key from web3forms.com.
-* 🟣 EmailJS   — still available, but its Gmail service
-  escapes HTML, so the body will show markup unless the
-  template uses the iframe-srcdoc copy the app sends for
-  that provider. Not recommended anymore.
+PHOTOS: signatures/stamp/logo ride along as public Google Drive
+pixel links (files shared "Anyone with the link"), so they display
+inline without blowing up the message size.
 
-TROUBLESHOOTING
----------------
-* Badge must say v4.36 DH — hard refresh (Ctrl+Shift+R)
-  if it shows an older version (service-worker cache).
-* 🧪 "Send render test" button in ⚙ settings proves the
-  chosen provider renders HTML: BIG RED styled text = OK.
-* Blank on phone? FormSubmit emails render best on
-  desktop Gmail/Outlook; mobile clients may reflow.
+Your keys are stored ONLY in this browser (localStorage) and are
+never uploaded anywhere except straight to api.web3forms.com when
+you press Send.

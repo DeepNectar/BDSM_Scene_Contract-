@@ -350,6 +350,9 @@
     }
   };
 
+  const APP_VERSION = 'v4.38 DH';
+  const WHATS_NEW_TOP = [
+    '🔌 v4.38: ONE SITE ONLY \u2014 https://web3forms.com. You asked for a single RELIABLE rendering service, so EmailJS / FormSubmit / Formspree are ALL removed (every one of them escaped our HTML into visible source code in their default templates). Web3Forms is the only free service that sends YOUR html string as the email\u2019s REAL text/html part \u2014 the styled contract renders directly in the body, no template to configure at all. SETUP ONCE (~1 min): open web3forms.com \u2192 type the receiving inbox \u2192 \u201cCreate Access Key\u201d \u2192 paste the emailed key into \u2699 Email settings \u2192 Save \u2192 press 🧪 Send render test (big RED styled text = working) \u2192 every 🚀 Send now lands as a properly rendered HTML email. The payload also got cleaner: <style> rules are converted to INLINE styles (Gmail strips style blocks) and the old iframe/entityize tricks are gone \u2014 they were themselves making some inboxes show markup as plain code. Changelog: ',
   const APP_VERSION = 'v4.37 DH';
   const WHATS_NEW_TOP = [
     '🛑 v4.37: THE LAST REASON CODE STILL APPEARED — FIXED AT THE ROOT. Two traps were found: (1) the PWA service worker kept serving the OLD cached script, so earlier fixes never actually ran on your phone — every asset is re-versioned now and the app force-updates itself on open; (2) FormSubmit\u2019s \u201Draw_html template\u201D was NEVER a real option (silently ignored — their default template escapes every field value, which is why code appeared there too). The app now posts the contract through FormSubmit\u2019s official **MESSAGE** field, whose content becomes the ACTUAL rendered email body — a real styled HTML email, no account, no keys. It also auto-fills your last-used recipient as the destination inbox in ⚙ settings. Verify in 30 seconds: hard-refresh (Ctrl+Shift+R), check the header badge says v4.37 DH, press 🧪 Send render test in ⚙ Email settings — BIG RED styled text = fixed.',
@@ -3307,22 +3310,35 @@ ${bodyHtml}
 
   /* ============================================================
      🚀 ONE-CLICK SEND with the HTML preview directly in the email
-     BODY (no mail client, no pasting). v4.35 DH supports FOUR
-     providers — pick one under ⚙ Settings → "Send via":
-       • 🟣 EmailJS        (free https://dashboard.emailjs.com account:
-                            Service ID + Template ID + Public Key)
-       • 📧 FormSubmit.co  (NO account/key at all — just the recipient
-                            address; first send needs a one-tap confirm)
-       • ✉ Formspree      (free https://formspree.io form key/endpoint)
-       • 📨 Web3Forms      (free https://web3forms.com access key)
+     BODY (no mail client, no pasting). v4.38 DH uses exactly ONE
+     reliable site — https://web3forms.com — whose rich-text emails
+     carry our HTML as the real text/html MIME part, so it RENDERS
+     instead of showing up escaped as source code (EmailJS, FormSubmit
+     and Formspree all escaped it; they are removed for good).
      Credentials are stored locally in this browser (localStorage)
      — never uploaded. The recipient address is typed manually in
      the email dialog every time before sending.
      ============================================================ */
-  const EJS_KEY = 'dh_emailjs_v1';
+  /* v4.38 DH — ONE site only: https://web3forms.com. The old settings were
+     stored under 'dh_emailjs_v1' with fake/escaped providers baked in; we read
+     them ONCE for migration (to keep the user's email/name) but all future
+     writes go to the brand-new 'dh_mail_v2' key, so stale multi-provider or
+     iframe-mode settings can NEVER come back to haunt a send. */
+  const EJS_KEY = 'dh_mail_v2';
+  let legacyCfg = {};
+  try { legacyCfg = JSON.parse(safeGet('dh_emailjs_v1')) || {}; } catch { legacyCfg = {}; }
   const ejsCfg  = (() => {
     try { return JSON.parse(safeGet(EJS_KEY)) || {}; } catch { return {}; }
   })();
+  if (!Object.keys(ejsCfg).length) {
+    if (legacyCfg.fromName) ejsCfg.fromName = legacyCfg.fromName;
+    const lastTo = safeGet('dh_email_to_last') || legacyCfg.endpoint;
+    if (lastTo && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(lastTo)) ejsCfg.inbox = lastTo;
+  }
+  /* Web3Forms is the ONLY provider now: its "rich text / HTML emails" option
+     sends YOUR message value as the real text/html MIME part of the email —
+     nothing is escaped into visible source code like EmailJS did. */
+  if (!ejsCfg.serviceId)  ejsCfg.serviceId  = 'service_a5vpbye';   /* kept for reference only */
   /* v4.37 — destination inbox remembered separately from the provider key,
      so switching providers never loses it and FormSubmit is ready instantly. */
   if (!ejsCfg.endpoint) {
@@ -3343,18 +3359,15 @@ ${bodyHtml}
   const saveEjs = () => safeSet(EJS_KEY, JSON.stringify(ejsCfg));
   let   ejsInited = false;
 
-  const PROVIDERS = ['emailjs', 'formsubmit', 'formspree', 'web3forms'];
-  const providerReady = p => {
-    p = p || ejsCfg.provider || 'formsubmit';
-    if (p === 'emailjs')   return !!(ejsCfg.serviceId && ejsCfg.templateId && ejsCfg.publicKey);
-    /* v4.36 — formsubmit needs exactly one thing: the destination inbox
-       address typed into the settings "Endpoint / key" field (it IS the
-       endpoint we POST to). No account, no key. */
-    if (p === 'formsubmit') return !!(ejsCfg.endpoint && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ejsCfg.endpoint.trim()));
-    /* formspree / web3forms need the single endpoint/key field */
-    return !!(ejsCfg.endpoint && ejsCfg.endpoint.trim());
-  };
-  const ejsReady = () => providerReady(ejsCfg.provider);
+  /* v4.38 DH — ONE reliable site only: Web3Forms (https://web3forms.com).
+     EmailJS escaped every variable into visible source code; FormSubmit &
+     Formspree do the same to custom field values in their default templates.
+     Web3Forms is the only free service that takes YOUR html string as the
+     REAL text/html part of the email (rich-text emails), so the styled
+     contract renders in the body exactly as written. */
+  const w3fKey    = () => (ejsCfg.publicKey || '').trim();
+  const validKey  = k => /^[A-Za-z0-9_-]{8,64}$/.test(k);
+  const ejsReady  = () => validKey(w3fKey());
 
   /* ---------- settings sheet ---------- */
   let ejsModal = $('#ejs-modal');
@@ -3366,36 +3379,20 @@ ${bodyHtml}
     ejsModal.setAttribute('aria-modal', 'true');
     ejsModal.innerHTML = [
       '<div class="modal-card">',
-      '  <div class="modal-header"><h3>⚙ Email settings</h3><button class="modal-close" id="ejs-close-btn" type="button">×</button></div>',
+      '  <div class="modal-header"><h3>⚙ Email settings (Web3Forms)</h3><button class="modal-close" id="ejs-close-btn" type="button">×</button></div>',
       '  <div class="modal-body html-body" style="text-align:left">',
-      '    <p style="margin:0 0 10px">Pick how 🚀 Send delivers the contract. EmailJS is <b>pre-configured</b>; the other providers need no EmailJS account at all.</p>',
-      '    <label for="ejs-provider" style="display:block;font-weight:600;margin:8px 0 2px">Send via</label>',
-      '    <select id="ejs-provider" class="field" style="width:100%">',
-      '      <option value="emailjs">🟣 EmailJS (dashboard.emailjs.com)</option>',
-      '      <option value="formsubmit">📧 FormSubmit.co (no account/key needed)</option>',
-      '      <option value="formspree">✉ Formspree (formspree.io)</option>',
-      '      <option value="web3forms">📨 Web3Forms (web3forms.com)</option>',
-      '    </select>',
-      '    <div id="ejs-emailjs-fields">',
-      '    <label for="ejs-pk" style="display:block;font-weight:600;margin:8px 0 2px">Public Key</label>',
-      '    <input id="ejs-pk" class="field" style="width:100%" placeholder="e.g. abcDEF123xyz" value="">',
-      '    <label for="ejs-svc" style="display:block;font-weight:600;margin:8px 0 2px">Service ID</label>',
-      '    <input id="ejs-svc" class="field" style="width:100%" placeholder="service_xxxxxxx" value="">',
-      '    <label for="ejs-tpl" style="display:block;font-weight:600;margin:8px 0 2px">Template ID</label>',
-      '    <input id="ejs-tpl" class="field" style="width:100%" placeholder="template_xxxxxxx" value="">',
-      '    <p style="margin:10px 0 0;font-size:.85rem;opacity:.8">Your EmailJS template must contain ONE variable: <b>{{message}}</b> — put it in the template body where the HTML should render, and set the template content mode to HTML/Rich Text.</p>',
-      '    </div>',
-      '    <div id="ejs-endpoint-fields" style="display:none">',
-      '    <label for="ejs-endpoint" style="display:block;font-weight:600;margin:8px 0 2px">Form key / Access key / Endpoint URL</label>',
-      '    <input id="ejs-endpoint" class="field" style="width:100%" placeholder="e.g. xyzabcd@yourmail.com (FormSubmit) · https://formspree.io/f/xxxxxxx or xxxxxxx (Formspree) · your 8-char access key (Web3Forms)" value="">',
-      '    <p id="ejs-endpoint-help" style="margin:8px 0 0;font-size:.85rem;opacity:.8"></p>',
-      '    </div>',
+      '    <p style="margin:0 0 10px">🚀 Send delivers through <b>one reliable site only</b>: <a href="https://web3forms.com" target="_blank" rel="noopener">web3forms.com</a>. It sends your styled contract as a REAL rich-text (HTML) email — it never escapes markup into visible source code like EmailJS did.</p>',
+      '    <label for="ejs-pk" style="display:block;font-weight:600;margin:8px 0 2px">1. Access Key from web3forms.com</label>',
+      '    <input id="ejs-pk" class="field" style="width:100%" placeholder="paste your access key here (looks like ABC12DEF34GH56IJ)">',
+      '    <p style="margin:6px 0 10px;font-size:.85rem;opacity:.85">Get it FREE in ~1 minute: open <b>web3forms.com</b> → type the inbox that should RECEIVE the contracts → press “Create Access Key” → no signup — the key is emailed to that inbox instantly. Paste it above.</p>',
+      '    <label for="ejs-inbox" style="display:block;font-weight:600;margin:8px 0 2px">2. Receiving inbox (for your records)</label>',
+      '    <input id="ejs-inbox" class="field" style="width:100%" placeholder="the inbox tied to your access key">',
       '    <label for="ejs-from" style="display:block;font-weight:600;margin:8px 0 2px">From name (optional)</label>',
       '    <input id="ejs-from" class="field" style="width:100%" placeholder="Deep 💞" value="">',
       '    <label for="ejs-test-to" style="display:block;font-weight:600;margin:14px 0 2px">🧪 Render test recipient</label>',
       '    <input id="ejs-test-to" class="field" style="width:100%" placeholder="your own email for the test">',
       '    <button class="btn btn-ghost" id="ejs-test-btn" type="button" style="margin-top:8px">🧪 Send render test</button>',
-      '    <p style="margin:6px 0 0;font-size:.8rem;opacity:.75">Sends a tiny fixed HTML through the selected provider. BIG RED styled text = OK. Visible &lt;tags&gt; as text = configuration issue.</p>',
+      '    <p style="margin:6px 0 0;font-size:.8rem;opacity:.75">Sends a tiny fixed HTML through your key. BIG RED styled text = working ✔. If tags appear as plain text, the key belongs to an inbox where rich-text was declined — re-create the key at web3forms.com and accept the confirmation email.</p>',
       '  </div>',
       '  <div class="modal-footer">',
       '    <button class="btn btn-primary" id="ejs-save-btn" type="button">💾 Save settings</button>',
@@ -3428,38 +3425,54 @@ ${bodyHtml}
     }
   };
   const openEjsModal = () => {
-    $('#ejs-provider').value = ejsCfg.provider || 'emailjs';
-    $('#ejs-pk').value  = ejsCfg.publicKey  || '';
-    $('#ejs-svc').value = ejsCfg.serviceId  || '';
-    $('#ejs-tpl').value = ejsCfg.templateId || '';
-    $('#ejs-endpoint').value = ejsCfg.endpoint || '';
-    $('#ejs-from').value= ejsCfg.fromName   || '';
-    syncProviderUI();
+    $('#ejs-pk').value = ejsCfg.publicKey || '';
+    $('#ejs-inbox').value = ejsCfg.inbox || '';
+    $('#ejs-from').value = ejsCfg.fromName || '';
     ejsModal.classList.add('active');
   };
-  $('#ejs-provider')?.addEventListener('change', syncProviderUI);
   $('#ejs-close-btn').addEventListener('click', () => ejsModal.classList.remove('active'));
   $('#ejs-cancel-btn').addEventListener('click', () => ejsModal.classList.remove('active'));
   ejsModal.addEventListener('click', e => { if (e.target === ejsModal) ejsModal.classList.remove('active'); });
   $('#ejs-save-btn').addEventListener('click', () => {
-    ejsCfg.provider   = $('#ejs-provider').value || 'emailjs';
-    ejsCfg.publicKey  = $('#ejs-pk').value.trim();
-    ejsCfg.serviceId  = $('#ejs-svc').value.trim();
-    ejsCfg.templateId = $('#ejs-tpl').value.trim();
-    ejsCfg.endpoint   = $('#ejs-endpoint').value.trim();
-    ejsCfg.fromName   = $('#ejs-from').value.trim();
+    ejsCfg.publicKey = $('#ejs-pk').value.trim();
+    ejsCfg.inbox     = $('#ejs-inbox').value.trim();
+    ejsCfg.fromName  = $('#ejs-from').value.trim();
     saveEjs();
     ejsInited = false;           /* force re-init with new key */
     ejsModal.classList.remove('active');
     refreshSendBtn();
-    toast(ejsReady() ? '✅ Ready — type the recipient in the email dialog and press \u{1F680} Send!'
-                     : 'Saved — but the selected provider still needs its key/endpoint filled in.', 5200);
+    toast(ejsReady() ? '✅ Ready — press 🧪 Send render test once to confirm styling, then 🚀 Send!'
+                     : 'Saved — but a valid web3forms.com access key is still missing.', 5200);
   });
   $('#modal-settings-btn')?.addEventListener('click', openEjsModal);
 
-  /* ---------- provider dispatch (v4.35) — one send path per service ---------- */
+  /* ---------- THE ONE send path (v4.38) — Web3Forms only ---------- */
   const TEST_HTML = '<h1 style="color:#e11d48;font-size:32px">If you can read this as BIG RED styled text, your setup renders HTML correctly ✔</h1><p>If instead you see these angle brackets and tags as plain text, the provider/template is escaping HTML.</p>';
 
+  /* Web3Forms posts JSON to https://api.web3forms.com/submit. The `message`
+     value is delivered as the email's REAL text/html MIME part (rich-text),
+     so inline-styled HTML renders in the body — no template, no escaping.
+     Extra hidden fields beginning with "_" are control flags; "extra" fields
+     appear only when rich text is OFF, so we send nothing but the essentials. */
+  const sendViaProvider = async ({ html, subject, toEmail, fromName }) => {
+    const key = w3fKey();
+    if (!validKey(key)) throw new Error('No web3forms.com access key yet — open ⚙ Email settings, paste your key, press Save.');
+    const res = await fetch('https://api.web3forms.com/submit', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        access_key: key,
+        subject,
+        from_name: fromName || 'Deep & Honey app',
+        email: toEmail,          /* shown as the visitor/reply address */
+        replyto: toEmail,
+        message: html            /* ← becomes the rendered HTML body */
+      })
+    });
+    let data = null;
+    try { data = await res.json(); } catch { /* non-JSON error page */ }
+    if (!res.ok || (data && data.success === false)) {
+      throw new Error('Web3Forms error: ' + ((data && data.message) || ('HTTP ' + res.status)));
   const formsubmitEndpoint = () => {
     let ep = (ejsCfg.endpoint || '').trim();
     if (/^https?:\/\//i.test(ep)) return ep;                       /* full URL given */
@@ -3563,20 +3576,18 @@ ${bodyHtml}
       }
       return;
     }
-
-    throw new Error('Unknown email provider: ' + p);
   };
 
-  /* v4.33/v4.35 — 🧪 DIAGNOSTIC TEST SEND through the SELECTED provider. */
+  /* v4.38 — 🧪 DIAGNOSTIC TEST SEND through Web3Forms. */
   $('#ejs-test-btn')?.addEventListener('click', async () => {
     const btn = $('#ejs-test-btn');
-    const to  = ($('#ejs-test-to')?.value || '').trim();
-    if (!providerReady($('#ejs-provider')?.value || ejsCfg.provider)) { toast('⚠️ Fill the selected provider\u2019s key/endpoint first.', 4200); return; }
+    const to  = ($('#ejs-test-to')?.value || '').trim() || (ejsCfg.inbox || '').trim();
+    if (!ejsReady()) { toast('⚠️ Paste your web3forms.com access key first, then press 💾 Save settings.', 4200); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { toast('⚠️ Type a test recipient email first.', 4200); return; }
     try {
       btn.disabled = true; btn.textContent = '⏳ Sending test…';
       await sendViaProvider({
-        html: TEST_HTML, plain: 'Render test: you should see big red styled text in the HTML version.',
+        html: TEST_HTML,
         subject: '🧪 Render test — you should see BIG RED text, not code',
         toEmail: to, fromName: 'Deep & Honey app'
       });
@@ -3598,14 +3609,11 @@ ${bodyHtml}
   refreshSendBtn();
   sendBtn?.addEventListener('click', async () => {
     if (!(await ensureEmailContent())) return;          /* v4.35 — never send an empty body */
-    if (!providerReady()) {
+    if (!ejsReady()) {
       openEjsModal();
-      /* v4.36 — clear guidance instead of a silent dead-end: FormSubmit is
-         the default provider and needs exactly ONE thing — the destination
-         inbox typed into the settings field. */
-      toast(ejsCfg.provider === 'formsubmit'
-        ? '\u{1F4E7} One-time setup: in \u2699 Email settings, type the destination inbox address in the "Endpoint / key" field and press Save — then \u{1F680} Send again.'
-        : '\u2699 Fill the selected provider\u2019s key/endpoint in Email settings first, then Save.', 7000);
+      /* v4.38 — ONE site only: Web3Forms needs exactly one thing — the free
+         access key from web3forms.com pasted into ⚙ Email settings. */
+      toast('\u2699 One-time setup: get a FREE key at web3forms.com (type your inbox → Create Access Key → key arrives by email), paste it in \u2699 Email settings and press Save — then \u{1F680} Send again.', 8000);
       return;
     }
     const toEmail = (toInput ? toInput.value : '').trim();
@@ -3692,34 +3700,17 @@ ${bodyHtml}
       let payloadHtml = driveify(htmlText);
 
       /* =====================================================================
-         v4.31 DH — "Variables size limit. The maximum allowed variables size
-         is 50Kb" KILLED AT THE ROOT + RENDERED PREVIEW IN THE BODY.
-
-         Two independent fixes in one step:
-
-         1) SIZE: EmailJS counts EVERY template variable it receives (the SDK
-            also auto-adds __token, __time, etc.). Whatever leftover base64 /
-            long data survived driveify, the total still tripped 50 KB. So we
-            now MEASURE before sending and shrink HARD until we're safely
-            under the limit: first drop any remaining <img>, then compress
-            whitespace, then trim inline styles. Photos are already Drive
-            links at this point (~70 bytes each), so in practice nothing
-            needs to be dropped.
-
-         2) RENDERING: some EmailJS templates/versions still escape {{message}}
-            even with the {!!!} block. Bulletproof trick: send the FULL styled
-            document wrapped inside an <iframe srcdoc="…"> tag. An iframe is
-            just plain text to the escaper, and browsers render whatever is
-            inside srcdoc as a real HTML page — so the recipient sees the
-            rendered contract (with photos via Drive links) instead of code,
-            no matter how the template escapes variables. We keep the normal
-            clean HTML in {{message}} too (first ~30 KB) so templates that DO
-            use raw-HTML blocks show the nicer full-width version.
+         SIZE GUARD (kept from v4.31): whatever leftover base64 / long data
+         survived driveify, we MEASURE before sending and shrink HARD until
+         comfortably under ~45 KB: drop stray embedded <img>, compress
+         whitespace, strip comments, minify CSS as a last resort. Photos are
+         already Drive links at this point (~70 bytes each), so in practice
+         nothing needs to be dropped.
          ===================================================================== */
-      const MAX_BYTES = 45 * 1024;                       /* hard safety margin under 50 KB */
+      const MAX_BYTES = 45 * 1024;                       /* hard safety margin */
       const bsize = s => new Blob([s]).size;
 
-      /* --- 1) shrink the clean HTML until it comfortably fits --- */
+      /* --- shrink the clean HTML until it comfortably fits --- */
       const shrink = h => {
         let out = h.replace(/<img\b[^>]*src="data:[^"]*"[^>]*>/gi, '');   // stray embedded imgs
         out = out.replace(/data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]*/gi, '');
@@ -3727,61 +3718,24 @@ ${bodyHtml}
         if (bsize(out) > MAX_BYTES) out = out.replace(/<!--[\s\S]*?-->/g, '');
         if (bsize(out) > MAX_BYTES) out = out.replace(/<(style)[\s\S]*?<\/\1>/gi, m =>
           m.replace(/\s{2,}/g, ' ').replace(/;\s*}/g, '}'));               // minify CSS a bit
-        if (bsize(out) > MAX_BYTES) out = out.slice(0, MAX_BYTES - 80) + '\n…[truncated to fit EmailJS 50 KB limit]';
+        if (bsize(out) > MAX_BYTES) out = out.slice(0, MAX_BYTES - 80) + '\n…[truncated to fit message size limit]';
         return out;
       };
       payloadHtml = shrink(payloadHtml);
 
-      /* --- 2) build the iframe-wrapped copy (renders even if escaped) --- */
-      const escAttr = s => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-      const wrapFrame = h =>
-        '<div style="font-family:system-ui,Arial,sans-serif;font-size:14px;color:#333;padding:10px">' +
-        '<p style="margin:0 0 8px"><b>Deep &amp; Honey — contract preview.</b> ' +
-        'If the layout below looks odd, open this email on a desktop/larger screen.</p>' +
-        '<iframe srcdoc="' + escAttr(h) + '" ' +
-        'style="width:100%;max-width:820px;height:1200px;border:1px solid #ddd;border-radius:12px" ' +
-        'title="Contract preview"></iframe></div>';
-      let framedHtml = payloadHtml;
-      let iframePayload = wrapFrame(framedHtml);
-      while (bsize(iframePayload) > MAX_BYTES && framedHtml.length > 4000) {
-        framedHtml = framedHtml.slice(0, Math.floor(framedHtml.length * 0.85));
-        iframePayload = wrapFrame(framedHtml);
-      }
-
-      /* --- assemble variables: exactly ONE content variable is ever sent.
-         Default = clean HTML (renders perfectly via the {!!!} block in the
-         template). If that copy alone + helpers still exceeds EmailJS's
-         50 KB TOTAL-variables limit, fall back to the iframe srcdoc copy —
-         which renders the preview even when a template escapes {{message}} —
-         shrunk until it fits. Duplicates (message + message_iframe together)
-         are NEVER sent, because that's what tripped the limit before. --- */
-      const b64run = /base64,[A-Za-z0-9+/=]{8000,}/;
-      let content = payloadHtml;
-      if (bsize(content) + bsize(toEmail) + bsize(subject) + 1200 > 49 * 1024 || b64run.test(content)) {
-        content = iframePayload;                         /* rendered-preview fallback */
-      }
-      while (bsize(content) + bsize(toEmail) + bsize(subject) + 1200 > 49 * 1024 && content.length > 3000) {
-        content = shrink(content.slice(0, Math.floor(content.length * 0.8)));
-      }
-      /* v4.32 — ROOT CAUSE of the recurring "Variables size limit 50Kb":
-         EmailJS counts EVERY variable in the TOTAL, and the SDK auto-adds
-         __token/__time/__client_sid/__fb-* etc. On top of that, an HTML doc
-         with RAW NEWLINES inside a template variable is rejected/escaped by
-         several EmailJS template versions. So now we send ONE single variable
-         `message` that is FULLY self-contained and one-line clean:
-           • newlines → spaces            (no \r\n inside the var)
-           • non-ASCII chars → &#nnn;     (pure-ASCII payload, bulletproof for
-                                           any charset setting in the template)
-           • <style> block extracted and converted to inline styles on every
-             matching tag (Gmail strips <style>; inline styles always render)
-         Photos stay as Drive pixel links so the whole thing is ~3–8 KB —
-         nowhere near 50 KB even counting SDK overhead. */
-      const entityize = s => s.replace(/[^\x00-\x7F]/g, c => '&#' + c.charCodeAt(0) + ';');
-      const oneLine   = s => s.replace(/\s*\n\s*/g, ' ').trim();
-
-      /* extract <style>…</style>, turn its rules into inline style attributes,
-         then remove the block (simple selector match on class/tag names is
-         enough for our own generated contract markup). */
+      /* =====================================================================
+         v4.38 DH — ONE reliable site only: Web3Forms (web3forms.com).
+         Everything EmailJS-specific is GONE: no {!!!} template blocks, no
+         {{message}} variables to configure, no iframe-srcdoc trick to smuggle
+         markup past an escaper, no entityize/one-line mangling (that mangling
+         was ITSELF one reason inboxes displayed the markup as plain code).
+         Web3Forms delivers our `message` value as the email's real text/html
+         MIME part, so we hand it ONE clean full HTML document:
+           • photos swapped to public Drive pixel links (driveify above)
+           • <style> rules converted to INLINE styles (inlineStyles below) —
+             Gmail strips <style> blocks, inline styles always render
+           • shrunk hard under ~45 KB for safety
+         ===================================================================== */
       const inlineStyles = h => {
         let css = '';
         h = h.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, m => { css += m.replace(/<style[^>]*>|<\/style>/gi, ''); return ''; });
@@ -3808,34 +3762,21 @@ ${bodyHtml}
         return h;
       };
 
-      let cleanContent = content;
+      /* THE payload: one clean full HTML document, inline-styled, sized. */
+      let docHtml = '';
       try {
-        const holder = document.createElement('div');
-        holder.innerHTML = cleanContent;
-        cleanContent = inlineStyles(holder.innerHTML);
-      } catch { /* keep original if DOM pass fails */ }
-      cleanContent = oneLine(entityize(shrink(cleanContent)));
-      while (bsize(cleanContent) > MAX_BYTES && cleanContent.length > 3000) {
-        cleanContent = cleanContent.slice(0, Math.floor(cleanContent.length * 0.8));
-      }
-
-      /* v4.33 — send the FULL document (with <head>, meta charset and its
-         own <style>). Gmail/EmailJS treat a complete HTML document sent via
-         a raw-HTML block ({!!!}{{message}}{!!!}) as the email body itself,
-         so it renders styled — no escaping possible. The previous stripped
-         fragment + entityize() pass is what made some inboxes display the
-         markup as plain code. */
-      let docHtml;
-      try {
-        docHtml = shrink(driveify(htmlText));            /* one variable only */
+        docHtml = shrink(inlineStyles(payloadHtml));
         if (!/<html[\s>]/i.test(docHtml)) {
           docHtml = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
                     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-                    '</head><body>' + docHtml + '</body></html>';
+                    '</head><body style="margin:0;font-family:Arial,Helvetica,sans-serif;background:#faf7ff">' +
+                    docHtml + '</body></html>';
         }
         while (bsize(docHtml) > MAX_BYTES && docHtml.length > 3000) {
           docHtml = docHtml.slice(0, Math.floor(docHtml.length * 0.85));
         }
+      } catch { docHtml = payloadHtml; }
+      console.log('Web3Forms payload bytes:', bsize(docHtml));
       } catch { docHtml = cleanContent; }
       /* v4.34 — THE definitive fix for "code in the body". EmailJS's Gmail
          integration does NOT honour raw-HTML blocks ({!!!}…{!!!}) and always
@@ -3901,27 +3842,22 @@ ${bodyHtml}
         });
         payloadHtml = payloadHtml.replace(/data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+/g, '');
       }
-      /* v4.31 — send using the measured vars object built above. NEVER send
-         duplicate copies of the contract (that's what tripped the 50 KB
-         "variables size" limit in earlier versions).
-         v4.35 — routed through the SELECTED provider (EmailJS / FormSubmit /
-         Formspree / Web3Forms). The framed HTML goes as the message body; the
-         plain-text version rides along so providers that cannot render raw
-         HTML still deliver a readable contract. */
+      /* v4.38 — ONE path: the clean inline-styled document above is handed
+         straight to Web3Forms, which puts it into the email as its HTML
+         part. No wrapper, no escaping, no second copy. */
       await sendViaProvider({
-        html:    vars.message,
-        plain:   plainText || 'Open the attached/saved contract.html to view the styled version.',
-        subject: vars.subject,
-        toEmail: vars.to_email,
-        fromName: vars.from_name
+        html:     docHtml,
+        subject:  subject,
+        toEmail:  toEmail,
+        fromName: ejsCfg.fromName || 'Deep & Honey app'
       });
       try { safeSet('dh_email_to_last', toEmail); } catch { /* ignore */ }
       closeModal();
-      toast('💌 Sent to ' + toEmail + ' via ' + (ejsCfg.provider || 'emailjs') + '! The styled HTML contract is in the email body — check the inbox.', 6000);
+      toast('💌 Sent to ' + toEmail + ' via web3forms.com! The styled HTML contract is in the email body — check the inbox.', 6000);
     } catch (err) {
       console.error('Send failed:', err);
       const msg = (err && (err.text || err.message)) || 'unknown error';
-      toast('❌ Send failed: ' + msg + ' — check ⚙ Email settings (provider key/endpoint, or EmailJS template must use {{message}}).', 9000);
+      toast('❌ Send failed: ' + msg + ' — check ⚙ Email settings (your web3forms.com access key).', 9000);
     } finally {
       sendBtn.textContent = '🚀 Send now (HTML in body)';
       refreshSendBtn();
