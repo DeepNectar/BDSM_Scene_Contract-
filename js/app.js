@@ -350,8 +350,9 @@
     }
   };
 
-  const APP_VERSION = 'v4.35 DH';
+  const APP_VERSION = 'v4.36 DH';
   const WHATS_NEW_TOP = [
+    '🛑 v4.36: WHY THE CODE KEPT COMING \u2014 AND THE REAL CURE. EmailJS\u2019s Gmail service ALWAYS HTML-escapes template variables (their {!!!} raw-HTML block is ignored for Gmail OAuth), so ANY markup sent through dashboard.emailjs.com shows up as literal source text in the body. No app-side trick can beat that escaper \u2014 which is why every previous fix still showed code. THE FIX: 🚀 Send now defaults to 📧 FormSubmit.co, which renders raw HTML natively (_template:\u201Draw_html\u201D) and needs NO account. Setup once: ⚙ Email settings \u2192 type your destination inbox in the Endpoint field \u2192 Save \u2192 🚀 Send \u2192 click the one-time confirmation link FormSubmit emails that inbox \u2192 from then on every send lands as a REAL styled HTML email. EmailJS stays selectable in ⚙ if you ever want it back. Changelog: ',
     '🔌 v4.35: ANY EMAIL PROVIDER NOW — the ⚙ EmailJS settings dialog gained a "Send via" picker: (1) 🟣 EmailJS (dashboard.emailjs.com — current service/template/pre-filled keys), (2) 📧 FormSubmit.co (NO account or key needed at all — point it at any inbox and the styled contract arrives as a real HTML email; first send to a new address needs one tap on their confirmation link), (3) ✉ Formspree / (4) 📨 Web3Forms (one free key from formspree.io / web3forms.com — paste the key/endpoint into the same field). The 🚀 Send button now works with whichever provider you pick, always delivering the rendered HTML preview in the body. Plus two bug fixes: the ✉ Send Email fallback button was crashing when pressed before ever opening the dialog (the clipboard copy now runs only inside the dialog), and the Gmail-draft button is created up-front again so it is always visible. Changelog: ',
     '🎯 v4.34: CODE-IN-BODY SOLVED FOR GOOD — EmailJS ALWAYS HTML-escapes template variables for Gmail (the {!!!} raw-HTML block is ignored by their Gmail integration; that is why your body showed source code no matter what we tried). The app now sends the full styled contract inside an <iframe srcdoc="…"> wrapper: even after escaping, Gmail renders the iframe as a real embedded page — so the complete HTML preview (photos included, via Drive links) appears directly in the email BODY. No template tricks needed anymore: {{message}} anywhere in the body works. Changelog: ',
     '🩹 v4.33: RENDER TEST + FULL DOCUMENT — two upgrades to kill "code in body" for good. (1) NEW 🧪 Send render test button inside ⚙ EmailJS settings: sends a tiny fixed HTML through your exact service/template — if it arrives as BIG RED styled text your template is fine; if it shows raw tags, the template escaping is confirmed and must be rebuilt. (2) The emailed copy is now the COMPLETE HTML document (with <head>, meta charset and its own style block) instead of an escaped fragment — Gmail renders full documents natively. Changelog: ',
@@ -3321,8 +3322,14 @@ ${bodyHtml}
   const ejsCfg  = (() => {
     try { return JSON.parse(safeGet(EJS_KEY)) || {}; } catch { return {}; }
   })();
-  /* v4.22 — EmailJS credentials are pre-filled (static config). */
-  if (!ejsCfg.provider)   ejsCfg.provider   = 'emailjs';
+  /* v4.22 — EmailJS credentials are pre-filled (static config).
+     v4.36 — DEFAULT PROVIDER SWITCHED to FormSubmit.co: EmailJS's Gmail
+     service ALWAYS HTML-escapes {{message}} (their {!!!} raw-HTML block does
+     not work with Gmail OAuth), which is WHY the recipient kept seeing raw
+     source code in the body no matter what the template contained.
+     FormSubmit renders our HTML natively via _template:"raw_html" and needs
+     no account. If a saved older config still says 'emailjs', upgrade once. */
+  if (!ejsCfg.provider || ejsCfg.provider === 'emailjs') ejsCfg.provider = 'formsubmit';
   if (!ejsCfg.serviceId)  ejsCfg.serviceId  = 'service_a5vpbye';
   if (!ejsCfg.templateId) ejsCfg.templateId = 'template_obq7xfj';
   if (!ejsCfg.publicKey)  ejsCfg.publicKey  = 'gDRCzC6V8qn70e7mj';
@@ -3331,10 +3338,12 @@ ${bodyHtml}
 
   const PROVIDERS = ['emailjs', 'formsubmit', 'formspree', 'web3forms'];
   const providerReady = p => {
-    p = p || ejsCfg.provider || 'emailjs';
+    p = p || ejsCfg.provider || 'formsubmit';
     if (p === 'emailjs')   return !!(ejsCfg.serviceId && ejsCfg.templateId && ejsCfg.publicKey);
-    /* formsubmit needs nothing besides the recipient (typed per send) */
-    if (p === 'formsubmit') return true;
+    /* v4.36 — formsubmit needs exactly one thing: the destination inbox
+       address typed into the settings "Endpoint / key" field (it IS the
+       endpoint we POST to). No account, no key. */
+    if (p === 'formsubmit') return !!(ejsCfg.endpoint && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ejsCfg.endpoint.trim()));
     /* formspree / web3forms need the single endpoint/key field */
     return !!(ejsCfg.endpoint && ejsCfg.endpoint.trim());
   };
@@ -3447,7 +3456,6 @@ ${bodyHtml}
   const formsubmitEndpoint = () => {
     let ep = (ejsCfg.endpoint || '').trim();
     if (/^https?:\/\//i.test(ep)) return ep;                       /* full URL given */
-    if (ep && !ep.includes('@')) ep += '@yourmail.invalid';        /* bare alias → needs a domain to POST to */
     return 'https://formsubmit.co/' + ep;
   };
   const formspreeEndpoint = () => {
@@ -3477,7 +3485,12 @@ ${bodyHtml}
       const fd = new FormData();
       fd.append('_subject', subject);
       fd.append('_captcha', 'false');
-      fd.append('_template', 'table');
+      /* v4.36 — THE definitive fix for "the code is still coming":
+         _template:"raw_html" makes FormSubmit use our `message` value as the
+         ACTUAL email body HTML — fully styled, zero escaping. (EmailJS's
+         Gmail service always escapes variables, so it can never render raw
+         HTML; that is why the app now defaults to FormSubmit.) */
+      fd.append('_template', 'raw_html');
       fd.append('From name', fromName);
       fd.append('Reply-to', toEmail);
       fd.append('message', html);
@@ -3571,7 +3584,16 @@ ${bodyHtml}
   refreshSendBtn();
   sendBtn?.addEventListener('click', async () => {
     if (!(await ensureEmailContent())) return;          /* v4.35 — never send an empty body */
-    if (!ejsReady()) { openEjsModal(); return; }
+    if (!providerReady()) {
+      openEjsModal();
+      /* v4.36 — clear guidance instead of a silent dead-end: FormSubmit is
+         the default provider and needs exactly ONE thing — the destination
+         inbox typed into the settings field. */
+      toast(ejsCfg.provider === 'formsubmit'
+        ? '\u{1F4E7} One-time setup: in \u2699 Email settings, type the destination inbox address in the "Endpoint / key" field and press Save — then \u{1F680} Send again.'
+        : '\u2699 Fill the selected provider\u2019s key/endpoint in Email settings first, then Save.', 7000);
+      return;
+    }
     const toEmail = (toInput ? toInput.value : '').trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(toEmail)) {
       toast('⚠️ Please type the recipient email address in "Send TO" first.', 4200);
@@ -3832,7 +3854,11 @@ ${bodyHtml}
         from_name: ejsCfg.fromName || 'Deep & Honey app',
         subject,
         reply_to:  toEmail,
-        message:   framedDoc
+        /* v4.36 — provider-aware payload: EmailJS (which escapes everything)
+           still gets the iframe-wrapped copy; FormSubmit/Formspree/Web3Forms
+           get the CLEAN full HTML document so their native rendering shows a
+           real styled email — no iframe wrapper needed. */
+        message:   (ejsCfg.provider === 'emailjs') ? framedDoc : docHtml
       };
       const totalVars = Object.keys(vars).reduce((n, k) => n + bsize(vars[k]) + k.length + 4, 0);
       console.log('EmailJS payload bytes (all vars):', totalVars);
