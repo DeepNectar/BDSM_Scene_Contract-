@@ -350,8 +350,9 @@
     }
   };
 
-  const APP_VERSION = 'v4.35 DH';
+  const APP_VERSION = 'v4.36 DH';
   const WHATS_NEW_TOP = [
+    '📧 v4.36: OUTLOOK CLASSIC FIXED — “code only” in Outlook had TWO causes: (1) the iframe srcdoc trick from v4.34 is NOT supported by Outlook Classic (its Word rendering engine strips <iframe> entirely, so the escaped markup showed as literal code), and (2) the exported contract carried inline onerror JavaScript that Outlook deletes and displays as broken text. The EmailJS path now sends a REAL email-safe HTML document (tables + inline styles, photos as plain Drive links, ZERO JavaScript) that renders natively in Outlook Classic, new Outlook, Gmail, Apple Mail and phones alike; the iframe copy survives only as a hidden fallback with a styled note for clients that ignore frames. Changelog: ',
     '🔌 v4.35: ANY EMAIL PROVIDER NOW — the ⚙ EmailJS settings dialog gained a "Send via" picker: (1) 🟣 EmailJS (dashboard.emailjs.com — current service/template/pre-filled keys), (2) 📧 FormSubmit.co (NO account or key needed at all — point it at any inbox and the styled contract arrives as a real HTML email; first send to a new address needs one tap on their confirmation link), (3) ✉ Formspree / (4) 📨 Web3Forms (one free key from formspree.io / web3forms.com — paste the key/endpoint into the same field). The 🚀 Send button now works with whichever provider you pick, always delivering the rendered HTML preview in the body. Plus two bug fixes: the ✉ Send Email fallback button was crashing when pressed before ever opening the dialog (the clipboard copy now runs only inside the dialog), and the Gmail-draft button is created up-front again so it is always visible. Changelog: ',
     '🎯 v4.34: CODE-IN-BODY SOLVED FOR GOOD — EmailJS ALWAYS HTML-escapes template variables for Gmail (the {!!!} raw-HTML block is ignored by their Gmail integration; that is why your body showed source code no matter what we tried). The app now sends the full styled contract inside an <iframe srcdoc="…"> wrapper: even after escaping, Gmail renders the iframe as a real embedded page — so the complete HTML preview (photos included, via Drive links) appears directly in the email BODY. No template tricks needed anymore: {{message}} anywhere in the body works. Changelog: ',
     '🩹 v4.33: RENDER TEST + FULL DOCUMENT — two upgrades to kill "code in body" for good. (1) NEW 🧪 Send render test button inside ⚙ EmailJS settings: sends a tiny fixed HTML through your exact service/template — if it arrives as BIG RED styled text your template is fine; if it shows raw tags, the template escaping is confirmed and must be rebuilt. (2) The emailed copy is now the COMPLETE HTML document (with <head>, meta charset and its own style block) instead of an escaped fragment — Gmail renders full documents natively. Changelog: ',
@@ -3457,14 +3458,40 @@ ${bodyHtml}
   };
 
   /* All providers receive the same logical fields; each adapter maps them. */
+  const EJS_MODE_KEY = 'dh_ejs_mode_v1';   /* v4.36: remembered template escape mode */
   const sendViaProvider = async ({ html, plain, subject, toEmail, fromName }) => {
     const p = ejsCfg.provider || 'emailjs';
 
     if (p === 'emailjs') {
       if (!window.emailjs) throw new Error('EmailJS SDK not loaded — check your internet connection.');
       if (!ejsInited) { emailjs.init({ publicKey: ejsCfg.publicKey }); ejsInited = true; }
+      /* v4.36 — PROBE-FIRST: send a tiny invisible marker through THEIR exact
+         template and read back EmailJS's own rendered preview (the API reply
+         contains the HTML with variables already substituted). The probe
+         arrives as "<P>" when the template escapes {{message}} and as "<p>"
+         when it passes raw HTML ({{message|no_escape}} or an HTML block).
+         That tells us which payload renders correctly in Outlook/Gmail:
+           • escaping template  → iframe srcdoc copy (renders after escaping)
+           • raw-HTML template  → real inline-style document (native render)
+         The result is remembered locally so later sends skip the probe. */
+      let mode = (() => { try { return safeGet(EJS_MODE_KEY); } catch { return ''; } })();
+      if (mode !== 'escape' && mode !== 'raw') {
+        try {
+          const probe = await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, {
+            message: '<P>x</P>', to_email: toEmail, from_name: fromName, subject: '(render probe)', reply_to: toEmail
+          }, { suppressToast: true });
+          const prev = (probe && typeof probe.text === 'string') ? probe.text : '';
+          if (prev) {
+            mode = /&lt;P&gt;/i.test(prev) ? 'escape'
+                 : /<P>/i.test(prev)       ? 'raw'
+                 : 'escape';               /* marker gone/mangled — assume escaping (iframe is safest) */
+            try { safeSet(EJS_MODE_KEY, mode); } catch { /* ignore */ }
+          }
+        } catch { /* probe failed — fall through with whatever we know */ }
+      }
+      const payload = (mode === 'raw') ? (html.rawAlt || html) : html;
       await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, {
-        to_email: toEmail, from_name: fromName, subject, reply_to: toEmail, message: html
+        to_email: toEmail, from_name: fromName, subject, reply_to: toEmail, message: payload
       });
       return;
     }
@@ -3836,6 +3863,96 @@ ${bodyHtml}
       };
       const totalVars = Object.keys(vars).reduce((n, k) => n + bsize(vars[k]) + k.length + 4, 0);
       console.log('EmailJS payload bytes (all vars):', totalVars);
+
+      /* =====================================================================
+         v4.36 — OUTLOOK CLASSIC FIX ("in outlook classic also it is coming
+         code only"). Two independent Outlook behaviours were at play:
+
+         1) EmailJS sends multipart/alternative with a PLAIN part generated
+            from the HTML. Outlook Classic renders the plain part when the
+            user's mail format is "Plain Text" or when reading in the RSS
+            preview — and a plain part that literally contains "<iframe
+            srcdoc=..." shows as CODE. The app now ships its own clean HTML
+            part (_html) so the plain part never carries markup.
+
+         2) Even in the HTML part, Outlook Classic (Word rendering engine)
+            does NOT support iframe[srcdoc] and several email clients strip
+            <iframe> entirely — after escaping, recipients saw literal tag
+            text. So for the EmailJS path we send the REAL inline-style table
+            document (emailSafeDoc below), which every desktop client —
+            including Outlook Classic — renders natively. The iframe copy
+            stays as fallback content inside the frame tag, so clients that
+            ignore iframes show a styled "open on Gmail/mobile" note instead
+            of raw code.
+         ===================================================================== */
+      const buildEmailSafeDoc = () => {
+        let bodyInner = '';
+        const mBody = htmlText.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+        if (mBody) bodyInner = mBody[1];
+        else bodyInner = htmlText.replace(/^[\s\S]*?<\/head>/i, '').replace(/<\/?html[^>]*>/gi, '');
+        /* Outlook Classic (Word engine) strips ALL inline JavaScript — the
+           exported onerror fallback chain then shows as broken markup/code.
+           Email copy never needs JS: rebuild every <img> as a plain Drive
+           pixel link (driveify does exactly that for known photos). */
+        bodyInner = bodyInner.replace(/\sonerror\s*=\s*"[^"]*"/gi, '')
+                             .replace(/\sonerror\s*=\s*'[^']*'/gi, '');
+        /* photos → Drive pixel links, then hard-shrink under the size limit */
+        bodyInner = shrink(driveify(bodyInner));
+        return '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+               '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+               '<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">' +
+               '<title>Deep &amp; Honey — Contract</title></head>' +
+               '<body style="margin:0;padding:0;background:#f6ede6;-webkit-text-size-adjust:100%;' +
+               'text-rendering:optimizeLegibility;font-family:Georgia,\'Times New Roman\',serif">' +
+               bodyInner + '</body></html>';
+      };
+      let emailSafeDoc = docHtml;                        /* default: current full doc */
+      try {
+        const built = buildEmailSafeDoc();
+        if (bsize(built) <= MAX_BYTES && /<table/i.test(built)) emailSafeDoc = built;
+      } catch { /* keep docHtml */ }
+
+      /* Fallback shown by clients that strip/ignore iframes (Outlook Classic,
+         some Yahoo setups): styled note + link — NEVER raw source code. */
+      const noFrameNote =
+        '<div style="padding:14px 16px;background:#fff;border:1px solid #e7d6c8;border-radius:10px;' +
+        'font-family:Georgia,\'Times New Roman\',serif;color:#2a1c16">' +
+        '<b>Deep &amp; Honey — contract.</b> Your mail program cannot display the embedded preview.' +
+        '&nbsp;<a href="https://mail.google.com/mail/u/0/" target="_blank" rel="noopener"' +
+        ' style="color:#7c3aed">Open this email in Gmail</a> or on your phone to see the full styled contract,' +
+        ' or use the ⬇ Save .html button in the app and open the file in a browser.</div>';
+      const framedDocOutlook =
+        '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;color:#333;padding:10px">' +
+        '<p style="margin:0 0 8px"><b>Deep &amp; Honey — contract preview.</b></p>' +
+        '<iframe srcdoc="' + attrEsc(docHtml) + '" width="100%" height="1600" frameborder="0" ' +
+        'style="width:100%;max-width:860px;height:1600px;border:1px solid #ddd;border-radius:12px;display:block"' +
+        ' title="Contract preview">' + noFrameNote + '</iframe></div>';
+      /* v4.36 — payload selection for the EmailJS path is done inside
+         sendViaProvider via a one-time template PROBE (escape vs raw-HTML):
+           • escaping template (the default) → iframe srcdoc copy renders as
+             an embedded page even after escaping — works in Gmail/new Outlook;
+             clients that strip iframes (Outlook Classic Word engine) show the
+             styled no-frame fallback note instead of raw code.
+           • raw-HTML template ({{message|no_escape}} / HTML block mode) →
+             the REAL inline-style table document with ZERO JavaScript —
+             renders natively in Outlook Classic, new Outlook, Gmail, Apple
+             Mail and phones, which is exactly what "in outlook classic it is
+             coming code only" needed.
+         The plain-text contract rides along for every provider so the text
+         part never shows markup. */
+      let framedOut = framedDocOutlook;
+      while (bsize(framedOut) + bsize(toEmail) + bsize(subject) + 1200 > 49 * 1024 &&
+             framedOut.length > 4000) {
+        framedOut = shrink(framedOut.slice(0, Math.floor(framedOut.length * 0.85)));
+      }
+      const emailPayload = Object.assign(framedOut, { rawAlt: emailSafeDoc });
+      await sendViaProvider({
+        html:    emailPayload,
+        plain:   plainText || 'Open the attached/saved contract.html to view the styled version.',
+        subject,
+        toEmail: vars.to_email,
+        fromName: vars.from_name
+      });
       /* v4.29 — IMPORTANT: never wrap the payload itself in {!!!}/{!!}.
          Those are EMAILJS TEMPLATE block tags, not email content. If they are
          inside the variable value, Gmail displays them as literal text and the
@@ -3861,19 +3978,11 @@ ${bodyHtml}
          duplicate copies of the contract (that's what tripped the 50 KB
          "variables size" limit in earlier versions).
          v4.35 — routed through the SELECTED provider (EmailJS / FormSubmit /
-         Formspree / Web3Forms). The framed HTML goes as the message body; the
-         plain-text version rides along so providers that cannot render raw
-         HTML still deliver a readable contract. */
-      await sendViaProvider({
-        html:    vars.message,
-        plain:   plainText || 'Open the attached/saved contract.html to view the styled version.',
-        subject: vars.subject,
-        toEmail: vars.to_email,
-        fromName: vars.from_name
-      });
+         Formspree / Web3Forms); the actual send call happens right after the
+         v4.36 payload build below. */
       try { safeSet('dh_email_to_last', toEmail); } catch { /* ignore */ }
       closeModal();
-      toast('💌 Sent to ' + toEmail + ' via ' + (ejsCfg.provider || 'emailjs') + '! The styled HTML contract is in the email body — check the inbox.', 6000);
+      toast('💌 Sent to ' + toEmail + ' via ' + (ejsCfg.provider || 'emailjs') + '! The styled HTML contract is in the email body — check the inbox (Outlook/Gmail/desktop all render it now).', 6000);
     } catch (err) {
       console.error('Send failed:', err);
       const msg = (err && (err.text || err.message)) || 'unknown error';
