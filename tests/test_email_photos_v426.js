@@ -1,7 +1,8 @@
-/* v4.26 regression test — 🚀 Send now must deliver PHOTOS inside the email:
-   every exported <img> (base64 embed + onerror chain) is swapped for its
-   public Google Drive pixel link, the payload stays under EmailJS's 50 KB
-   variable limit, and emailjs.send receives to_email/subject/{{message}}. */
+/* v4.26 regression test (updated for v4.38) — 🚀 Send now must deliver
+   PHOTOS inside the email: every exported <img> (base64 embed + onerror
+   chain) is swapped for its public Google Drive pixel link, the payload
+   stays well under the size limit, and the Web3Forms POST receives the
+   clean HTML document as `message` (the rendered email body). */
 const fs = require('fs');
 const { JSDOM } = require('jsdom');
 
@@ -21,9 +22,9 @@ Object.defineProperty(w, 'localStorage', { value: {
   getItem: k => (k in LS ? LS[k] : null), setItem: (k, v) => { LS[k] = String(v); }, removeItem: k => { delete LS[k]; },
 }, configurable: true });
 LS['dhContract.days.v1'] = JSON.stringify({ list: [{ id: 'day1', html: w.CloudStore.days()[0].html }] });
-/* v4.36 — app now defaults to FormSubmit; this test verifies the EmailJS
-   path (fake SDK below), so pin the provider in the saved config. */
-LS['dh_emailjs_v1'] = JSON.stringify({ provider: 'emailjs' });
+/* v4.38 — sending goes through web3forms.com ONLY; seed a valid access key
+   in the new settings key so the 🚀 button is enabled. */
+LS['dh_mail_v2'] = JSON.stringify({ publicKey: 'TESTKEY12345678' });
 w.fetch = async () => ({ ok: true, blob: async () => ({ size: 10, type: 'image/png' }) });
 w.HTMLCanvasElement.prototype.getContext = () => ({ drawImage() {}, fillRect() {} });
 w.HTMLCanvasElement.prototype.toDataURL = () => 'data:image/jpeg;base64,' + 'A'.repeat(30000); /* heavy embed like real photos */
@@ -32,11 +33,14 @@ w.Image = FakeImg;
 w.URL.createObjectURL = () => 'blob:x'; w.URL.revokeObjectURL = () => {};
 w.addEventListener('jsdomError', () => {});
 
-/* fake EmailJS SDK v4 — capture init + send */
+/* fake fetch — capture the single Web3Forms POST */
 const sent = [];
-w.emailjs = {
-  init: o => { sent.push({ kind: 'init', publicKey: o.publicKey }); },
-  send: async (svc, tpl, params) => { sent.push({ kind: 'send', svc, tpl, params }); return { text: 'OK' }; },
+w.fetch = async (url, opts) => {
+  if (/api\.web3forms\.com/.test(url) || /web3forms/.test(String(url))) {
+    const body = JSON.parse(opts.body);
+    sent.push({ kind: 'send', url, body });
+  }
+  return { ok: true, status: 200, json: async () => ({ success: true, message: 'ok' }), text: async () => 'ok' };
 };
 
 try { w.eval(src); } catch (e) { console.log('EVAL ERR:', e.message); process.exit(1); }
@@ -63,17 +67,19 @@ try { w.eval(src); } catch (e) { console.log('EVAL ERR:', e.message); process.ex
   await new Promise(r => setTimeout(r, 600));
 
   const sendCall = sent.find(s => s.kind === 'send');
-  const msg = sendCall ? sendCall.params.message : '';
+  const msg = sendCall ? sendCall.body.message : '';
   const checks = [];
-  checks.push(['🚀 button triggered emailjs.init with pre-configured Public Key', sent.some(s => s.kind === 'init' && s.publicKey === 'gDRCzC6V8qn70e7mj')]);
-  checks.push(['sent via Service ID service_a5vpbye / Template ID template_obq7xfj', !!sendCall && sendCall.svc === 'service_a5vpbye' && sendCall.tpl === 'template_obq7xfj']);
-  checks.push(['recipient passed as to_email (typed manually)', !!sendCall && sendCall.params.to_email === 'honey@example.com']);
-  checks.push(['subject passed to {{subject}}', !!sendCall && /Contract Data/.test(sendCall.params.subject || '')]);
-  checks.push(['HTML lands directly in {{message}} (email body)', /^<!DOCTYPE html>/i.test(msg.trim())]);
+  checks.push(['🚀 button POSTed to https://api.web3forms.com/submit', !!sendCall && /api\.web3forms\.com\/submit/.test(sendCall.url)]);
+  checks.push(['access_key from ⚙ settings rides along', !!sendCall && sendCall.body.access_key === 'TESTKEY12345678']);
+  checks.push(['recipient passed as email/replyto (typed manually)', !!sendCall && sendCall.body.email === 'honey@example.com' && sendCall.body.replyto === 'honey@example.com']);
+  checks.push(['subject sent', !!sendCall && /Contract Data/.test(sendCall.body.subject || '')]);
+  checks.push(['HTML lands directly in message (rendered email body)', /^<!DOCTYPE html>/i.test(msg.trim())]);
+  checks.push(['NO iframe-srcdoc wrapper left in the payload', !/<iframe/.test(msg)]);
+  checks.push(['payload carries INLINE styles (renders in Gmail)', /style=\"[^\"]*(color|background|font)/.test(msg)]);
   checks.push(['PHOTOS: all 4 images point at Drive pixel links lh3.googleusercontent.com/d/',
     ['1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj','1HRoqjVvSDswlROnookv0ykGagHwLQ6FI','1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw','17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS']
       .every(id => msg.includes('lh3.googleusercontent.com/d/' + id))]);
-  checks.push(['payload far below EmailJS 50 KB limit', Buffer.byteLength(msg) < 48 * 1024]);
+  checks.push(['payload comfortably under the 45 KB safety cap', Buffer.byteLength(msg) < 45 * 1024]);
   checks.push(['no base64 embeds left in the emailed copy', !msg.includes(';base64,')]);
   checks.push(['no JS onerror handlers leaked into emailed HTML', !/onerror=/.test(msg)]);
 
