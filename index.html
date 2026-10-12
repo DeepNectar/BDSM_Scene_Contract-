@@ -99,12 +99,13 @@ document.addEventListener('click', function (e) {
       <button class="modal-close" id="modal-close-btn" type="button" aria-label="Close dialog">×</button>
     </div>
     <div class="modal-tabs" role="tablist">
-      <button class="active" data-format="plain" type="button" role="tab" aria-selected="true">Plain Text</button>
-      <button data-format="html" type="button" role="tab" aria-selected="false">HTML Format</button>
+      <button data-format="plain" type="button" role="tab" aria-selected="false">Plain Text</button>
+      <button class="active" data-format="html" type="button" role="tab" aria-selected="true">HTML Preview</button>
     </div>
     <div class="modal-body" id="modal-body"></div>
     <div class="modal-footer">
       <button class="btn btn-outline" id="modal-copy-btn" type="button">📋 Copy</button>
+      <button class="btn btn-outline" id="modal-download-btn" type="button">⬇ Save .html</button>
       <button class="btn btn-primary" id="modal-email-btn" type="button">✉ Send Email</button>
       <button class="btn btn-ghost" id="modal-close-footer-btn" type="button">Close</button>
     </div>

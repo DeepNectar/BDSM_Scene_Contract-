@@ -4,7 +4,7 @@ const html = fs.readFileSync('index.html','utf8');
 let src = fs.readFileSync('js/app.js','utf8');
 
 // expose buildEmail output for testing (exact match at lines 1347-1348)
-src = src.replace("    renderModal();\n    openModal();", "    window.__out = out; renderModal(); openModal();");
+src = src.replace('renderModal(); openModal();', 'window.__out = out; renderModal(); openModal();');
 
 const dom = new JSDOM(html, { runScripts: 'outside-only' });
 const w = dom.window;
