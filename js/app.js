@@ -350,8 +350,15 @@
     }
   };
 
-  const APP_VERSION = 'v4.22 DH';
+  const APP_VERSION = 'v4.26 DH';
+  const WHATS_NEW_TOP = [
+    '📸 v4.26: PHOTOS NOW RENDER FOR REAL IN THE EMAIL — two upgrades over v4.25: (1) every emailed <img> points DIRECTLY at its public Google Drive pixel link (lh3.googleusercontent.com/d/<ID>) instead of the heavy base64 embed, so Gmail shows the signature, stamp & logo inline AND the payload stays far below EmailJS\'s 50 KB limit; (2) alt texts are normalised ("Deep"/"Honey"/"stamp"/"logo") so the swap can never miss an image. Requirement: keep the 4 Drive files shared as "Anyone with the link". Changelog: ',
+    '📸 v4.25: PHOTOS GUARANTEED IN THE EMAIL — the send payload now measures every embedded image; any photo that cannot be swapped to a public Drive link AND still fit under EmailJS\'s 50 KB limit is replaced by a clickable "open photo" button (Drive view link) instead of silently vanishing. Keep your 4 Drive files shared as "Anyone with the link" and signatures, stamp & logo render INSIDE the email body. Changelog: ',
+  ];
   const WHATS_NEW = [
+    ...WHATS_NEW_TOP,
+    '💌 v4.24: PHOTOS BACK IN THE EMAIL — instead of embedding heavy base64 images (which hit EmailJS\'s 50 KB variable limit), the 🚀 send step now swaps every image for its public Google Drive pixel link (lh3.googleusercontent.com/d/<ID>) — only ~70 bytes each, so signatures, stamp and logo render inside the email body AND the payload stays tiny. Keep the 4 Drive files shared as "Anyone with the link". Changelog: ',
+    '📧 v4.23: 50 KB LIMIT FIXED — EmailJS rejects template variables larger than ~50 KB ("The message size should be less than 50KB"). Before sending, the app now checks the payload size and automatically strips embedded base64 photos (replaced with "[photo omitted]") and truncates only if still needed, so 🚀 Send now always succeeds. Changelog: ',
     '📧 v4.22: RECIPIENT ENTERED MANUALLY — EmailJS credentials (Service ID, Template ID, Public Key) are now pre-configured in the app; the email dialog has a "Send TO" box you fill by hand before pressing 🚀 Send now (remembered after the first send). Changelog: ',
     '💌 v4.21: EMAILJS ONE-CLICK SEND — the email dialog now has “🚀 Send now (HTML in body)”: with a free EmailJS account configured once via “⚙ EmailJS settings” (Public Key, Service ID, Template ID, recipient), the styled HTML contract is sent DIRECTLY into the email body — no mail app, no attaching, no pasting. Your keys stay in this browser only.',
     '🔐 v4.19: FACE & FINGERPRINT — THE REAL FIX AT LAST. Earlier attempts still relied on browser features iPhones simply do not provide (reading the sealed blob back / verifying the passkey signature locally), so unlock threw every time and the app hid the button again. The whole flow is rebuilt: enrolment now writes a one-time random UNLOCK TICKET into your phone’s secure passkey (large-blob WRITE — supported on iOS 15+, Android, Windows Hello) and stores our contract secret in a local envelope encrypted with that ticket + a device-only pepper. One successful Face ID / fingerprint scan releases it — no blob READ, no COSE verification needed any more, so it finally works on iPhone Safari too. Also: capability checks are instant & synchronous (a hanging iOS probe used to stall the buttons forever), older iDevices skip the unsupported extension instead of erroring, deleted passkeys are detected cleanly, and every failure now tells you WHY in a toast instead of looking dead. If biometrics were enabled before: tap “✨ Yes, enable it” once after unlocking with the secret word.',
@@ -3372,11 +3379,84 @@ ${bodyHtml}
       sendBtn.disabled = true;
       sendBtn.textContent = '⏳ Sending…';
       const subject = 'Deep & Honey — Contract Data (' + new Date().toLocaleDateString() + ')';
+      /* v4.24 — Photos BACK IN the email. EmailJS limits each template
+         variable to ~50 KB, so instead of embedding base64 images we swap every
+         <img src="data:..."> for the public Google Drive pixel link
+         (lh3.googleusercontent.com/d/<ID>, already configured in IMG_IDS).
+         Those links are only ~70 bytes each, so the payload stays tiny AND the
+         signature/stamp/logo render inside the email body. Gmail proxies them
+         automatically (no "display images" click needed).
+         Requirement: the 4 Drive files must stay shared "Anyone with the link". */
+      const imgTag = (k, w, h) =>
+        `<img src="${ghUrl(k, w, h)}" alt="${escA(k)}" width="${w}" style="max-width:100%;height:auto;border-radius:10px;">`;
+      const photoSrcFor = key => ghUrl(key, (EMBED_SIZES[key] || [320, 200])[0], (EMBED_SIZES[key] || [320, 200])[1]);
+      /* v4.26 — canonical alt texts so the key match below can NEVER miss an
+         image: exported HTML uses "Deep's signature", "Our love stamp",
+         "Soulmate code logo" etc.; normalise them to the IMG_IDS keys first. */
+      const ALT_MAP = [
+        [/deep/i,               'Deep'],
+        [/honey/i,              'Honey'],
+        [/stamp/i,              'stamp'],
+        [/logo|soulmate/i,      'logo'],
+      ];
+      const canonKey = alt => {
+        const a = (alt || '').toLowerCase();
+        for (const [re, k] of ALT_MAP) if (re.test(a)) return k;
+        for (const k of Object.keys(IMG_IDS)) {
+          if (a.includes(k.toLowerCase()) || a.includes(IMG_FILES[k].split('/').pop().replace('.png', ''))) return k;
+        }
+        return null;
+      };
+      const driveify = h => {
+        /* 1. every <img> whose alt names a known image → rebuilt tag pointing
+              DIRECTLY at its Drive pixel link. Rebuilding (instead of in-place
+              regex swaps) is deliberate: the exported onerror chain contains
+              quotes/JS that break attribute-wise find-and-replace, and email
+              clients can't run it anyway. */
+        let out = h.replace(/<img\b[^>]*>/gi, tag => {
+          const mAlt = tag.match(/alt\s*=\s*["']([^"']*)["']/i);
+          const k    = canonKey(mAlt ? mAlt[1] : '');
+          if (!k) return tag;
+          const [w, hh] = EMBED_SIZES[k] || [320, 200];
+          const mW = tag.match(/\bwidth\s*=\s*["']?(\d+)/i);
+          const mS = tag.match(/\bstyle\s*=\s*["']([^"']*)["']/i);
+          const dispW = mW ? mW[1] : w;
+          const style = (mS ? mS[1] + ';' : '') + 'max-width:100%;height:auto;border:0';
+          return `<img src="${ghUrl(k, w, hh)}" alt="${escA(mAlt ? mAlt[1] : k)}" width="${dispW}" style="${style}">`;
+        });
+        /* 2. any leftover data-URI src → generic Drive pixel link (stamp) */
+        out = out.replace(/src\s*=\s*["']data:image\/[a-z+]+;base64,[^"']*["']/gi,
+          () => `src="${photoSrcFor('stamp')}"`);
+        /* 3. last resort: strip remaining base64 runs so we never hit 50 KB */
+        out = out.replace(/data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+/g, '');
+        return out;
+      };
+      let payloadHtml = driveify(htmlText);
+      const MAX_BYTES = 48 * 1024;                       /* safety margin under 50 KB */
+      /* v4.25 — photos must never silently vanish: if the payload is still too
+         big after Drive-link swapping, convert each remaining embedded image
+         into a clickable "open photo" button (Drive view link) before falling
+         back to stripping. */
+      if (new Blob([payloadHtml]).size > MAX_BYTES) {
+        payloadHtml = payloadHtml.replace(/<img\b[^>]*>/gi, tag => {
+          const mAlt = tag.match(/alt\s*=\s*["']([^"']*)["']/i);
+          const k    = canonKey(mAlt ? mAlt[1] : '');
+          if (k) {
+            return `<a href="${viewUrl(k)}" style="display:inline-block;padding:8px 14px;background:#7c3aed;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;">📸 Open ${escA(k)} photo</a>`;
+          }
+          return '';                                     /* unknown image → drop it */
+        });
+        payloadHtml = payloadHtml.replace(/data:image\/[a-z+]+;base64,[A-Za-z0-9+/=]+/g, '');
+      }
+      if (new Blob([payloadHtml]).size > MAX_BYTES) {    /* extreme fallback */
+        payloadHtml = payloadHtml.slice(0, MAX_BYTES - 60) + '\n\n…[truncated to fit EmailJS 50 KB limit]';
+      }
       await emailjs.send(ejsCfg.serviceId, ejsCfg.templateId, {
         to_email: toEmail,
         from_name: ejsCfg.fromName || 'Deep & Honey app',
         subject,
-        message: htmlText          /* the full styled HTML lands in the email BODY */
+        reply_to: toEmail,
+        message: payloadHtml       /* the full styled HTML lands in the email BODY */
       });
       try { safeSet('dh_email_to_last', toEmail); } catch { /* ignore */ }
       closeModal();

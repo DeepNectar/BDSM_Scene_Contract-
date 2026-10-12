@@ -1,6 +1,7 @@
 ==============================================================
-EMAILJS - STEP 3: CREATE THE TEMPLATE (HTML goes here)
+EMAILJS - STEP 3: CREATE THE TEMPLATE (HTML + PHOTOS go here)
 https://www.emailjs.com -> Email Templates -> Create New Template
+(v4.26 — photos render INSIDE the email via public Drive links)
 ==============================================================
 
 --- SUBJECT FIELD (paste exactly): ---
@@ -28,12 +29,33 @@ then DELETE all the default text/blocks and paste ONLY this line:
 
 That's it. Do NOT add any extra styling, headings or wrapper HTML
 around {{message}} — the app already sends the fully styled HTML
-(the whole contract with colors, fonts and layout), and EmailJS
-will render it directly in the email body.
+(the whole contract with colors, fonts, layout AND the photo links),
+and EmailJS will render it directly in the email body.
 
 If the editor forces a rich-text box that you can't clear, just
 click inside it, press Ctrl+A, delete everything, then type:
 {{message}}
+
+
+--- HOW THE PHOTOS GET INTO THE EMAIL (v4.25/v4.26) ---
+
+The app does NOT embed heavy base64 images (that was what hit the
+"message size should be less than 50KB" error). Instead every photo
+in the emailed copy points at its PUBLIC Google Drive pixel link:
+
+  https://lh3.googleusercontent.com/d/<FILE-ID>=w<h>h<h>
+
+Gmail loads those links automatically and shows the images inline.
+For this to work, ALL 4 Drive files must stay shared as
+"Anyone with the link" (Viewer):
+
+  1. Deep signature   : https://drive.google.com/file/d/1KnoE8uWAwugB0PRMiPmq32eCW-ZxMasj/view
+  2. Honey signature  : https://drive.google.com/file/d/1HRoqjVvSDswlROnookv0ykGagHwLQ6FI/view
+  3. Love stamp       : https://drive.google.com/file/d/1xT4SnUR8dtEHP14MUMFZnYZnumAS96Fw/view
+  4. Soulmate logo    : https://drive.google.com/file/d/17_Wt5nHtKbuDc7DiynDexI-l-GY8RpgS/view
+
+How to check sharing: open each link -> Share -> General access
+must say "Anyone with the link — Viewer".
 
 
 --- OPTIONAL TEST VARIABLES (if EmailJS asks for sample values
@@ -47,11 +69,13 @@ message    = <h1>Hello!</h1><p>This is a test of the styled HTML email.</p>
 --- AFTER SAVING: ---
 
 1. Click "Save" in the top-right corner.
-2. Done! The app is ALREADY pre-configured (v4.22) with:
+2. Done! The app is ALREADY pre-configured (v4.22+) with:
      Service ID  = service_a5vpbye
      Template ID = template_obq7xfj
      Public Key  = gDRCzC6V8qn70e7mj
    You do NOT need to enter these anywhere.
 3. The recipient address is typed MANUALLY in the email dialog
    ("Send TO" box) every time before pressing 🚀 Send now.
+4. Press 🚀 Send now — the styled contract WITH signatures,
+   stamp and logo renders directly in the email body.
 ==============================================================
