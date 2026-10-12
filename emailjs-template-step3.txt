@@ -1,0 +1,57 @@
+==============================================================
+EMAILJS - STEP 3: CREATE THE TEMPLATE (HTML goes here)
+https://www.emailjs.com -> Email Templates -> Create New Template
+==============================================================
+
+--- SUBJECT FIELD (paste exactly): ---
+
+{{subject}}
+
+
+--- "To" / RECIPIENT SETTINGS (paste exactly): ---
+
+{{to_email}}
+
+
+--- FROM NAME (optional, type your name or leave default): ---
+
+Deep
+
+
+--- CONTENT / MESSAGE BODY (this is the most important part): ---
+
+Switch the template editor to "<>" / HTML source mode if available,
+then DELETE all the default text/blocks and paste ONLY this line:
+
+{{message}}
+
+
+That's it. Do NOT add any extra styling, headings or wrapper HTML
+around {{message}} — the app already sends the fully styled HTML
+(the whole contract with colors, fonts and layout), and EmailJS
+will render it directly in the email body.
+
+If the editor forces a rich-text box that you can't clear, just
+click inside it, press Ctrl+A, delete everything, then type:
+{{message}}
+
+
+--- OPTIONAL TEST VARIABLES (if EmailJS asks for sample values
+while previewing the template, use these): ---
+
+subject    = Our Agreement - Deep & Honey
+to_email   = honey@example.com
+message    = <h1>Hello!</h1><p>This is a test of the styled HTML email.</p>
+
+
+--- AFTER SAVING: ---
+
+1. Click "Save" in the top-right corner.
+2. Done! The app is ALREADY pre-configured (v4.22) with:
+     Service ID  = service_a5vpbye
+     Template ID = template_obq7xfj
+     Public Key  = gDRCzC6V8qn70e7mj
+   You do NOT need to enter these anywhere.
+3. The recipient address is typed MANUALLY in the email dialog
+   ("Send TO" box) every time before pressing 🚀 Send now.
+==============================================================

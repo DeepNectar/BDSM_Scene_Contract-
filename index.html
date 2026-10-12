@@ -99,12 +99,19 @@ document.addEventListener('click', function (e) {
       <button class="modal-close" id="modal-close-btn" type="button" aria-label="Close dialog">×</button>
     </div>
     <div class="modal-tabs" role="tablist">
-      <button class="active" data-format="plain" type="button" role="tab" aria-selected="true">Plain Text</button>
-      <button data-format="html" type="button" role="tab" aria-selected="false">HTML Format</button>
+      <button data-format="plain" type="button" role="tab" aria-selected="false">Plain Text</button>
+      <button class="active" data-format="html" type="button" role="tab" aria-selected="true">HTML Preview</button>
     </div>
     <div class="modal-body" id="modal-body"></div>
+    <div style="padding:10px 16px 0;text-align:left">
+      <label for="ejs-send-to" style="display:block;font-weight:600;margin:0 0 2px">Send TO (recipient email — type manually each time)</label>
+      <input id="ejs-send-to" class="field" type="email" style="width:100%" placeholder="honey@example.com" autocomplete="email">
+    </div>
     <div class="modal-footer">
       <button class="btn btn-outline" id="modal-copy-btn" type="button">📋 Copy</button>
+      <button class="btn btn-outline" id="modal-download-btn" type="button">⬇ Save .html</button>
+      <button class="btn btn-outline" id="modal-settings-btn" type="button">⚙ EmailJS settings</button>
+      <button class="btn btn-primary" id="modal-sendjs-btn" type="button">🚀 Send now (HTML in body)</button>
       <button class="btn btn-primary" id="modal-email-btn" type="button">✉ Send Email</button>
       <button class="btn btn-ghost" id="modal-close-footer-btn" type="button">Close</button>
     </div>
@@ -345,7 +352,8 @@ document.addEventListener('click', function (e) {
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
-<script src="js/app.js?v=52" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
+<script src="js/app.js?v=53" defer></script>
 <script src="js/sections.js?v=2" defer></script>
 <script src="js/sections.js?v=1" defer></script>
 </body>
