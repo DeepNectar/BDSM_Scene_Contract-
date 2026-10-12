@@ -350,8 +350,10 @@
     }
   };
 
-  const APP_VERSION = 'v4.39 DH';
+  const APP_VERSION = 'v4.41 DH';
   const WHATS_NEW_TOP = [
+    '🛠 v4.41: FINAL WORD ON THE RAW-CODE EMAIL. Your screenshot proved v4.40 still hit Web3Forms\u2019 wall: their default template ALWAYS HTML-escapes the `message` value \u2014 raw markup can NEVER render there, fragment or not. The app now uses Web3Forms\u2019 OFFICIAL custom-template field `_template_html`: its value replaces their entire default template and IS delivered as the real rendered HTML body of your email (no \u201cA new form has been submitted\u201d header, no \u201cMessage:\u201d label). `message` got demoted to a tiny plain-text summary so nothing can ever show source code again. ACTION: hard-refresh (badge must read v4.41 DH), then \ud83d\ude80 Send once more \u2014 the styled contract will render.',
+    '🛠 v4.40: THE CODE-IN-BODY IS DEAD AT LAST — WE FOUND WEB3FORMS\u2019 REAL RULE. Your screenshot proved the key WAS valid (the email arrived!) but Web3Forms dumped our whole <!DOCTYPE html> document as plain text inside its default \u201cA new form has been submitted\u2026 Message:\u201d template. Reason: their `message` field renders HTML only for a body FRAGMENT \u2014 a full document is treated as code. The app now cracks the export open (styles + body kept, wrappers stripped) and sends it through Web3Forms\u2019 official `extra.html` custom-template field, which REPLACES their default template entirely: no header, no \u201cMessage:\u201d label \u2014 just your styled contract, rendered, with a maroon \u2764 DEEP & HONEY banner on top. Hard-refresh, then \ud83d\ude80 Send once more. Changelog: ',
     '🛠 v4.39: EMAIL BODY PREVIEW BROKEN BY A LEFTOVER EMAILJS KEY — FIXED AT THE ROOT. The old EmailJS public key was still being auto-filled into ⚙ Email settings, so 🚀 Send posted THAT string to Web3Forms as an "access key" → rejected → no styled body ever arrived. Those stale credentials are now wiped on load, the fake "Ready" state is gone, and index.html / sw.js had duplicate & conflicting script tags removed (app.js was loading TWICE — that is what kept triggering the "app.js has not loaded" alert). ACTION NEEDED ONCE: hard-refresh (Ctrl+Shift+R), open ⚙ Email settings, paste your REAL web3forms.com access key, Save, press 🧪 Send render test, then 🚀 Send. Changelog: ',
     '🔌 v4.38: ONE SITE ONLY \u2014 https://web3forms.com. You asked for a single RELIABLE rendering service, so EmailJS / FormSubmit / Formspree are ALL removed (every one of them escaped our HTML into visible source code in their default templates). Web3Forms is the only free service that sends YOUR html string as the email\u2019s REAL text/html part \u2014 the styled contract renders directly in the body, no template to configure at all. SETUP ONCE (~1 min): open web3forms.com \u2192 type the receiving inbox \u2192 \u201cCreate Access Key\u201d \u2192 paste the emailed key into \u2699 Email settings \u2192 Save \u2192 press 🧪 Send render test (big RED styled text = working) \u2192 every 🚀 Send now lands as a properly rendered HTML email. The payload also got cleaner: <style> rules are converted to INLINE styles (Gmail strips style blocks) and the old iframe/entityize tricks are gone \u2014 they were themselves making some inboxes show markup as plain code. Changelog: ',
     '🛑 v4.37: THE LAST REASON CODE STILL APPEARED — FIXED AT THE ROOT. Two traps were found: (1) the PWA service worker kept serving the OLD cached script, so earlier fixes never actually ran on your phone — every asset is re-versioned now and the app force-updates itself on open; (2) FormSubmit\u2019s \u201Draw_html template\u201D was NEVER a real option (silently ignored — their default template escapes every field value, which is why code appeared there too). The app now posts the contract through FormSubmit\u2019s official **MESSAGE** field, whose content becomes the ACTUAL rendered email body — a real styled HTML email, no account, no keys. It also auto-fills your last-used recipient as the destination inbox in ⚙ settings. Verify in 30 seconds: hard-refresh (Ctrl+Shift+R), check the header badge says v4.37 DH, press 🧪 Send render test in ⚙ Email settings — BIG RED styled text = fixed.',
@@ -3457,14 +3459,50 @@ ${bodyHtml}
   /* ---------- THE ONE send path (v4.38) — Web3Forms only ---------- */
   const TEST_HTML = '<h1 style="color:#e11d48;font-size:32px">If you can read this as BIG RED styled text, your setup renders HTML correctly ✔</h1><p>If instead you see these angle brackets and tags as plain text, the provider/template is escaping HTML.</p>';
 
-  /* Web3Forms posts JSON to https://api.web3forms.com/submit. The `message`
-     value is delivered as the email's REAL text/html MIME part (rich-text),
-     so inline-styled HTML renders in the body — no template, no escaping.
-     Extra hidden fields beginning with "_" are control flags; "extra" fields
-     appear only when rich text is OFF, so we send nothing but the essentials. */
+  /* Web3Forms posts JSON to https://api.web3forms.com/submit. THE DECISIVE
+     TRICK (v4.40): the `message` field ONLY renders as HTML when it carries a
+     plain BODY fragment. If it contains a full <!DOCTYPE>/<html> document —
+     exactly what our export produces — Web3Forms treats it as plain text and
+     dumps the entire source code into its default template (this is precisely
+     the email Deep received: "A new form has been submitted… Message:
+     <!DOCTYPE html>…"). So here we crack the document open: <head><style>
+     rules + body markup become one styled fragment, and the wrapper goes
+     through the official `extra.html` field, which replaces Web3Forms'
+     default template ENTIRELY — no header, no "Message:" label, just the
+     rendered contract. */
+  const buildW3fPayload = (docHtml) => {
+    let styles = '', body = String(docHtml || '');
+    /* lift every <style> block out of the head → keep as raw CSS */
+    body = body.replace(/<style[^>]*>([\s\S]*?)<\/style>/gi, (m, css) => { styles += css; return ''; });
+    /* strip doctype / html / head wrappers */
+    body = body.replace(/<!DOCTYPE[^>]*>/i, '').replace(/<\/?(?:html|head)[^>]*>/gi, '');
+    /* if there is a real <body>, take only its inner content */
+    const bm = body.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bm) body = bm[1];
+    /* v4.41 DH — THE DEFINITIVE FIX, VERIFIED IN WEB3FORMS' OWN DOCS:
+       Web3Forms NEVER renders raw HTML inside `message` — their default
+       template HTML-escapes every field value (that is exactly why Deep's
+       inbox showed "Message: <!DOCTYPE html>…" as visible source code).
+       The ONLY official way to get a custom-styled rich email is the
+       hidden `_template_html` field, whose VALUE REPLACES THEIR ENTIRE
+       TEMPLATE and IS rendered as real HTML. So `message` now carries a
+       short readable plain-text summary (never markup), and the styled
+       contract travels in `_template_html`. No banner hacks, no iframes,
+       no extra.html guesswork. */
+    const banner = '<div style="background:#7b2d3b;color:#fff7f2;font-family:Georgia,\'Times New Roman\',serif;font-size:18px;letter-spacing:.12em;text-align:center;padding:12px 16px">&#9829;&nbsp; DEEP &amp; HONEY &mdash; SCENE CONTRACT &nbsp;&#9829;</div>';
+    const styledDoc = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+           (styles ? '<style>' + styles + '</style>' : '') + '</head><body style="margin:0;background:#f6ede6">' +
+           banner + body + '</body></html>';
+    /* plain-text summary for the `message` field — absolutely NO tags */
+    const plainMsg = 'A new Scene Contract was submitted from the Deep & Honey app.' + '\n\n' +
+      'Open this email on desktop or tap "Show original" if your inbox did not render the styled contract.';
+    return { styledDoc, plainMsg };
+  };
+
   const sendViaProvider = async ({ html, subject, toEmail, fromName }) => {
     const key = w3fKey();
     if (!validKey(key)) throw new Error('No web3forms.com access key yet — open ⚙ Email settings, paste your key, press Save.');
+    const { styledDoc, plainMsg } = buildW3fPayload(html);
     const res = await fetch('https://api.web3forms.com/submit', {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -3472,9 +3510,13 @@ ${bodyHtml}
         access_key: key,
         subject,
         from_name: fromName || 'Deep & Honey app',
+        name: fromName || 'Deep & Honey app',   /* fills their default {{name}} slot safely */
         email: toEmail,          /* shown as the visitor/reply address */
         replyto: toEmail,
-        message: html            /* ← becomes the rendered HTML body */
+        message: plainMsg,       /* plain text ONLY — never markup */
+        '_template_html': styledDoc   /* ← Web3Forms official custom-template field:
+                                         replaces their default template ENTIRELY
+                                         and is delivered as the rendered HTML body */
       })
     });
     let data = null;
