@@ -13,6 +13,7 @@
    declaration used to throw a SyntaxError and kill the whole service
    worker, so phone installs kept serving stale cached files). */
 const CACHE_NAME = 'dh-contract-v71';
+const CACHE_NAME = 'dh-contract-v70';
 const APP_SHELL = [
   './',
   './index.html',
@@ -21,6 +22,9 @@ const APP_SHELL = [
   './js/cloud.js?v=46',
   './js/logbook.js?v=17',
   './js/app.js?v=64',
+  './js/cloud.js?v=45',
+  './js/logbook.js?v=17',
+  './js/app.js?v=63',
   './js/bio.js?v=3',
   './manifest.webmanifest',
 ];
